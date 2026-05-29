@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# model-router.sh - Shared model routing helpers
+# model-router.sh - 共享的模型路由辅助函数
 #
 
-# Source guard: prevent double-sourcing
+# 导入保护：防止重复导入
 [[ -n "${_MODEL_ROUTER_LOADED:-}" ]] && return 0 2>/dev/null || true
 _MODEL_ROUTER_LOADED=1
 

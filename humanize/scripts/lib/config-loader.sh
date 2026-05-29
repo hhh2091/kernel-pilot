@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Source guard: prevent double-sourcing
+# 导入保护：防止重复导入
 [[ -n "${_CONFIG_LOADER_LOADED:-}" ]] && return 0 2>/dev/null || true
 _CONFIG_LOADER_LOADED=1
 
@@ -40,9 +40,9 @@ _config_loader_prepare_layer() {
     if [[ ! -f "$config_path" ]]; then
         if [[ "$required" == "true" ]]; then
             _config_loader_fatal "Missing required ${config_label}: $config_path"
-            # exit instead of return: this function is only called inside the (...)
-            # subshell in load_merged_config; set -e does not reliably propagate
-            # through nested if-body function calls in bash.
+            # 使用 exit 而不是 return: 此函数仅在 load_merged_config 中的 (...)
+            # 子 shell 内调用；set -e 在 bash 中不能可靠地通过嵌套的
+            # if 体函数调用传播。
             exit 1
         fi
         printf '{}' > "$output_file"

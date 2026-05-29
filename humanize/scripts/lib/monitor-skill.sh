@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 #
-# monitor-skill.sh - Skill monitor for humanize
+# monitor-skill.sh - humanize 的技能监控器
 #
-# Provides the _humanize_monitor_skill function for monitoring
-# skill invocations (ask-codex, ask-gemini) from .humanize/skill directory.
+# 提供 _humanize_monitor_skill 函数，用于监控来自
+# .humanize/skill 目录的技能调用（ask-codex、ask-gemini）。
 #
-# This file is sourced by humanize.sh and depends on:
-# - monitor-common.sh (monitor_get_yaml_value, monitor_format_timestamp, etc.)
+# 此文件由 humanize.sh 导入，依赖于:
+# - monitor-common.sh (monitor_get_yaml_value, monitor_format_timestamp 等)
 # - humanize.sh (humanize_split_to_array)
 
-# Monitor skill invocations from .humanize/skill
-# Shows a fixed status bar with aggregate stats and latest invocation details,
-# with live output display in the scrollable area below.
+# 监控来自 .humanize/skill 的技能调用
+# 显示带有聚合统计和最新调用详情的固定状态栏，
+# 下方可滚动区域显示实时输出。
 #
-# Accepts --tool-filter <codex|gemini> to show only invocations from a
-# specific tool.  Without the filter, all invocations are shown.
+# 接受 --tool-filter <codex|gemini> 以仅显示来自特定工具的调用。
+# 不使用过滤器时，显示所有调用。
 _humanize_monitor_skill() {
-    # Enable 0-indexed arrays in zsh for bash compatibility
-    # no_monitor suppresses background job notifications ([1] PID)
+    # 在 zsh 中启用 0 索引数组以兼容 bash
+    # no_monitor 抑制后台作业通知（[1] PID）
     [[ -n "${ZSH_VERSION:-}" ]] && setopt localoptions ksharrays no_monitor
 
     local skill_dir=".humanize/skill"
@@ -28,7 +28,7 @@ _humanize_monitor_skill() {
     local once_mode=false
     local tool_filter=""
 
-    # Parse arguments
+    # 解析参数
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --once) once_mode=true; shift ;;
@@ -40,16 +40,16 @@ _humanize_monitor_skill() {
         esac
     done
 
-    # Check if .humanize/skill exists
+    # 检查 .humanize/skill 是否存在
     if [[ ! -d "$skill_dir" ]]; then
         echo "Error: $skill_dir directory not found in current directory"
         echo "Run /humanize:ask-codex or /humanize:ask-gemini first to create skill invocations"
         return 1
     fi
 
-    # Determine the tool for a given invocation directory.
-    # Reads metadata.md first (completed), falls back to input.md (running).
-    # Returns: codex, gemini, or unknown
+    # 确定给定调用目录的工具。
+    # 首先读取 metadata.md（已完成），回退到 input.md（运行中）。
+    # 返回: codex、gemini 或 unknown
     _skill_get_tool() {
         local dir="$1"
         if [[ -f "$dir/metadata.md" ]]; then
@@ -63,19 +63,19 @@ _humanize_monitor_skill() {
         echo "unknown"
     }
 
-    # Check whether a directory passes the current tool filter.
-    # Returns 0 (pass) or 1 (skip).
+    # 检查目录是否通过当前工具过滤器。
+    # 返回 0（通过）或 1（跳过）。
     _skill_passes_filter() {
         [[ -z "$tool_filter" ]] && return 0
         local t=$(_skill_get_tool "$1")
         [[ "$t" == "$tool_filter" ]] && return 0
-        # Legacy invocations without a tool tag are treated as codex
+        # 没有工具标签的旧版调用被视为 codex
         [[ "$t" == "unknown" && "$tool_filter" == "codex" ]] && return 0
         return 1
     }
 
-    # List all valid skill invocation directories sorted newest-first
-    # Skill dirs use YYYY-MM-DD_HH-MM-SS or YYYY-MM-DD_HH-MM-SS-PID-RANDOM naming
+    # 列出所有有效的技能调用目录，按最新排序
+    # 技能目录使用 YYYY-MM-DD_HH-MM-SS 或 YYYY-MM-DD_HH-MM-SS-PID-RANDOM 命名
     _skill_list_dirs_sorted() {
         local dirs=()
         while IFS= read -r d; do
@@ -89,14 +89,14 @@ _humanize_monitor_skill() {
         printf '%s\n' "${dirs[@]}" | sort -r
     }
 
-    # Find latest skill invocation directory (by timestamp in name)
+    # 查找最新的技能调用目录（按名称中的时间戳）
     _skill_find_latest_dir() {
         _skill_list_dirs_sorted | head -1
     }
 
-    # Find the best invocation to monitor: newest with watchable content.
-    # Falls back to the absolute newest if nothing has content.
-    # Returns: dir|file (pipe-delimited pair)
+    # 查找最佳的调用以进行监控：最新的具有可观看内容的调用。
+    # 如果没有任何内容，则回退到绝对最新的调用。
+    # 返回: dir|file（管道分隔的对）
     _skill_find_best_invocation() {
         local best_dir="" best_file=""
         while IFS= read -r d; do
@@ -108,7 +108,7 @@ _humanize_monitor_skill() {
             fi
         done < <(_skill_list_dirs_sorted)
 
-        # Fallback to absolute newest even if no content
+        # 即使没有内容也回退到绝对最新的调用
         if [[ -z "$best_dir" ]]; then
             best_dir=$(_skill_find_latest_dir)
             [[ -n "$best_dir" ]] && best_file=$(_skill_find_monitored_file "$best_dir")
@@ -116,8 +116,8 @@ _humanize_monitor_skill() {
         echo "${best_dir}|${best_file}"
     }
 
-    # Count invocations by status
-    # Returns: total|success|error|timeout|empty|running
+    # 按状态统计调用次数
+    # 返回: total|success|error|timeout|empty|running
     _skill_count_stats() {
         local total=0 success=0 err=0 tmo=0 empty=0 running=0
         while IFS= read -r d; do
@@ -142,7 +142,7 @@ _humanize_monitor_skill() {
         echo "$total|$success|$err|$tmo|$empty|$running"
     }
 
-    # Extract question text from input.md
+    # 从 input.md 中提取问题文本
     _skill_get_question() {
         local dir="$1"
         [[ ! -f "$dir/input.md" ]] && echo "N/A" && return
@@ -151,8 +151,8 @@ _humanize_monitor_skill() {
         echo "${q:-N/A}"
     }
 
-    # Find the global cache directory for a skill invocation (display only)
-    # Returns the ~/.cache/humanize/... path if it exists, empty otherwise.
+    # 查找技能调用的全局缓存目录（仅用于显示）
+    # 如果存在则返回 ~/.cache/humanize/... 路径，否则返回空。
     _skill_find_cache_dir() {
         local unique_id=$(basename "$1")
         local project_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -162,10 +162,10 @@ _humanize_monitor_skill() {
         [[ -d "$cache_dir" ]] && echo "$cache_dir" || echo ""
     }
 
-    # Find the best file to monitor for a skill invocation
-    # Searches both global cache (~/.cache/humanize/), local cache ($dir/cache/),
-    # and project-local files (.humanize/skill/) for the best content.
-    # Supports both codex (codex-run.*) and gemini (gemini-run.*) cache files.
+    # 查找技能调用的最佳监控文件
+    # 搜索全局缓存（~/.cache/humanize/）、本地缓存（$dir/cache/）
+    # 和项目本地文件（.humanize/skill/）以获取最佳内容。
+    # 支持 codex（codex-run.*）和 gemini（gemini-run.*）缓存文件。
     _skill_find_monitored_file() {
         local dir="$1"
         local gcache=$(_skill_find_cache_dir "$dir")
@@ -173,13 +173,13 @@ _humanize_monitor_skill() {
         local is_running=false
         [[ ! -f "$dir/metadata.md" ]] && is_running=true
 
-        # Determine which tool produced this invocation for cache file naming
+        # 确定哪个工具产生了此调用，用于缓存文件命名
         local inv_tool=$(_skill_get_tool "$dir")
         local run_prefix="codex-run"
         [[ "$inv_tool" == "gemini" ]] && run_prefix="gemini-run"
 
-        # Helper: check a cache directory for best file
-        # Args: cache_dir, prefer_log (true for running, false for completed)
+        # 辅助函数：检查缓存目录中的最佳文件
+        # 参数: cache_dir, prefer_log（运行中为 true，已完成为 false）
         _check_cache_files() {
             local c="$1" prefer_log="$2"
             [[ ! -d "$c" ]] && return
@@ -187,26 +187,26 @@ _humanize_monitor_skill() {
                 [[ -f "$c/${run_prefix}.log" && -s "$c/${run_prefix}.log" ]] && { echo "$c/${run_prefix}.log"; return; }
                 [[ -f "$c/${run_prefix}.out" && -s "$c/${run_prefix}.out" ]] && { echo "$c/${run_prefix}.out"; return; }
                 [[ -f "$c/${run_prefix}.log" ]] && { echo "$c/${run_prefix}.log"; return; }
-                # Fallback: try the other prefix for legacy/mixed invocations
+                # 回退: 尝试其他前缀以处理旧版/混合调用
                 [[ -f "$c/codex-run.log" && -s "$c/codex-run.log" ]] && { echo "$c/codex-run.log"; return; }
                 [[ -f "$c/gemini-run.log" && -s "$c/gemini-run.log" ]] && { echo "$c/gemini-run.log"; return; }
             else
                 [[ -f "$c/${run_prefix}.out" && -s "$c/${run_prefix}.out" ]] && { echo "$c/${run_prefix}.out"; return; }
                 [[ -f "$c/${run_prefix}.log" && -s "$c/${run_prefix}.log" ]] && { echo "$c/${run_prefix}.log"; return; }
-                # Fallback
+                # 回退
                 [[ -f "$c/codex-run.out" && -s "$c/codex-run.out" ]] && { echo "$c/codex-run.out"; return; }
                 [[ -f "$c/gemini-run.out" && -s "$c/gemini-run.out" ]] && { echo "$c/gemini-run.out"; return; }
             fi
         }
 
         if [[ "$is_running" == "true" ]]; then
-            # Running: prefer cache logs (stderr has live progress)
+            # 运行中: 优先使用缓存日志（stderr 有实时进度）
             local f
             f=$(_check_cache_files "$gcache" true); [[ -n "$f" ]] && { echo "$f"; return; }
             f=$(_check_cache_files "$lcache" true); [[ -n "$f" ]] && { echo "$f"; return; }
             [[ -f "$dir/input.md" ]] && { echo "$dir/input.md"; return; }
         else
-            # Completed: prefer output.md with content, then cache files
+            # 已完成: 优先使用有内容的 output.md，然后是缓存文件
             [[ -f "$dir/output.md" && -s "$dir/output.md" ]] && { echo "$dir/output.md"; return; }
             local f
             f=$(_check_cache_files "$gcache" false); [[ -n "$f" ]] && { echo "$f"; return; }
@@ -216,7 +216,7 @@ _humanize_monitor_skill() {
         echo ""
     }
 
-    # Build the monitor title based on filter
+    # 根据过滤器构建监控器标题
     _skill_monitor_title() {
         case "$tool_filter" in
             codex)  echo " Humanize Skill Monitor [codex]" ;;
@@ -225,25 +225,25 @@ _humanize_monitor_skill() {
         esac
     }
 
-    # Draw the status bar at the top
+    # 在顶部绘制状态栏
     _skill_draw_status_bar() {
         local latest_dir="$1"
         local monitored_file="$2"
         local term_width=$(tput cols)
 
-        # ANSI colors
+        # ANSI 颜色
         local green="\033[1;32m" yellow="\033[1;33m" cyan="\033[1;36m"
         local magenta="\033[1;35m" red="\033[1;31m" reset="\033[0m"
         local bg="\033[44m" bold="\033[1m" dim="\033[2m"
         local clr_eol="\033[K"
 
-        # Aggregate stats
+        # 聚合统计
         local -a stats
         humanize_split_to_array stats "$(_skill_count_stats)"
         local total="${stats[0]}" success="${stats[1]}" err="${stats[2]}"
         local tmo="${stats[3]}" empty="${stats[4]}" running="${stats[5]}"
 
-        # Parse latest invocation metadata
+        # 解析最新调用的元数据
         local inv_status="running" model="N/A" effort="N/A" duration="N/A" started_at="N/A"
         local inv_tool="unknown"
         if [[ -n "$latest_dir" && -f "$latest_dir/metadata.md" ]]; then
@@ -261,7 +261,7 @@ _humanize_monitor_skill() {
         inv_status="${inv_status:-unknown}"; model="${model:-N/A}"; effort="${effort:-N/A}"
         inv_tool="${inv_tool:-unknown}"
 
-        # Status color
+        # 状态颜色
         local status_color="$dim"
         case "$inv_status" in
             success) status_color="$green" ;;
@@ -270,20 +270,20 @@ _humanize_monitor_skill() {
             running) status_color="$yellow" ;;
         esac
 
-        # Question (truncated)
+        # 问题（已截断）
         local question="N/A"
         [[ -n "$latest_dir" ]] && question=$(_skill_get_question "$latest_dir")
         local max_q_len=$((term_width - 14))
         [[ ${#question} -gt $max_q_len ]] && question="${question:0:$((max_q_len - 3))}..."
 
-        # Format timestamps
+        # 格式化时间戳
         local start_display=$(monitor_format_timestamp "$started_at")
 
-        # Resolve cache directory for display
+        # 解析缓存目录以供显示
         local cache_dir=""
         [[ -n "$latest_dir" ]] && cache_dir=$(_skill_find_cache_dir "$latest_dir")
 
-        # Truncate paths for display
+        # 截断路径以供显示
         local max_path_len=$((term_width - 14))
 
         local file_display="${monitored_file:-none}"
@@ -298,7 +298,7 @@ _humanize_monitor_skill() {
             cache_display="...${cache_display: -$csuffix_len}"
         fi
 
-        # Model display: for gemini, no effort; for codex, show (effort)
+        # 模型显示: gemini 不显示 effort; codex 显示 (effort)
         local model_display="$model"
         if [[ "$inv_tool" == "gemini" ]] || [[ "$effort" == "N/A" ]]; then
             model_display="$model"
@@ -309,9 +309,9 @@ _humanize_monitor_skill() {
         tput sc
         tput cup 0 0
 
-        # Line 1: Title
+        # 第 1 行: 标题
         printf "${bg}${bold}%-${term_width}s${reset}${clr_eol}\n" "$(_skill_monitor_title)"
-        # Line 2: Aggregate stats
+        # 第 2 行: 聚合统计
         printf "${cyan}Total:${reset}    ${bold}${total}${reset} invocations"
         [[ "$success" -gt 0 ]] && printf " | ${green}${success} success${reset}"
         [[ "$err" -gt 0 ]] && printf " | ${red}${err} error${reset}"
@@ -319,24 +319,24 @@ _humanize_monitor_skill() {
         [[ "$empty" -gt 0 ]] && printf " | ${yellow}${empty} empty${reset}"
         [[ "$running" -gt 0 ]] && printf " | ${yellow}${running} running${reset}"
         printf "${clr_eol}\n"
-        # Line 3: Focused invocation status + tool + model + duration
+        # 第 3 行: 聚焦调用状态 + 工具 + 模型 + 持续时间
         printf "${magenta}Focused:${reset}  ${status_color}%s${reset} | ${dim}[%s]${reset} ${yellow}Model:${reset} %s | ${cyan}Duration:${reset} %s${clr_eol}\n" "$inv_status" "$inv_tool" "$model_display" "${duration:-N/A}"
-        # Line 4: Started at
+        # 第 4 行: 开始时间
         printf "${cyan}Started:${reset}  %s${clr_eol}\n" "$start_display"
-        # Line 5: Question
+        # 第 5 行: 问题
         printf "${cyan}Question:${reset} %s${clr_eol}\n" "$question"
-        # Line 6: Cache directory
+        # 第 6 行: 缓存目录
         printf "${dim}Cache:${reset}    %s${clr_eol}\n" "$cache_display"
-        # Line 7: Watching file
+        # 第 7 行: 监控文件
         printf "${dim}Watching:${reset} %s${clr_eol}\n" "$file_display"
-        # Line 8: Separator
+        # 第 8 行: 分隔符
         printf "%.s-" $(seq 1 $term_width)
         printf "${clr_eol}\n"
 
         tput rc
     }
 
-    # --once mode: print summary and exit
+    # --once 模式: 打印摘要并退出
     if [[ "$once_mode" == "true" ]]; then
         local latest=$(_skill_find_latest_dir)
         if [[ -z "$latest" ]]; then
@@ -346,11 +346,11 @@ _humanize_monitor_skill() {
             return 1
         fi
 
-        # Find best invocation with content
+        # 查找具有内容的最佳调用
         local best_result=$(_skill_find_best_invocation)
         local best_dir="${best_result%%|*}"
         local best_file="${best_result#*|}"
-        # Use best_dir for display (it has content); fall back to latest
+        # 使用 best_dir 进行显示（它有内容）；回退到最新的
         local focus_dir="${best_dir:-$latest}"
 
         local -a stats
@@ -425,7 +425,7 @@ _humanize_monitor_skill() {
         return 0
     fi
 
-    # Interactive mode: live terminal monitor
+    # 交互模式: 实时终端监控器
     tput smcup  # Save screen
     tput civis  # Hide cursor
     clear
@@ -435,8 +435,8 @@ _humanize_monitor_skill() {
     local cleanup_done=false
     local TAIL_PID=""
 
-    # Cleanly stop the tail background process
-    # Uses disown to remove from zsh job table, preventing "[N] terminated" messages
+    # 干净地停止 tail 后台进程
+    # 使用 disown 从 zsh 作业表中移除，防止 "[N] terminated" 消息
     _skill_stop_tail() {
         if [[ -n "${TAIL_PID:-}" ]]; then
             disown "$TAIL_PID" 2>/dev/null || true
@@ -460,7 +460,7 @@ _humanize_monitor_skill() {
         echo "Monitor stopped."
     }
 
-    # Signal handlers (bash/zsh compatible)
+    # 信号处理器（bash/zsh 兼容）
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         TRAPINT() { _skill_cleanup; return 130; }
         TRAPTERM() { _skill_cleanup; return 143; }
@@ -469,16 +469,16 @@ _humanize_monitor_skill() {
         trap '_skill_cleanup' EXIT INT TERM
     fi
 
-    # Main monitoring loop
+    # 主监控循环
     while [[ "$monitor_running" == "true" ]]; do
-        # Check if skill directory still exists
+        # 检查技能目录是否仍然存在
         if [[ ! -d "$skill_dir" ]]; then
             _skill_cleanup
             echo "Skill directory deleted."
             return 0
         fi
 
-        # Find best invocation with watchable content
+        # 查找具有可观看内容的最佳调用
         local best_result=$(_skill_find_best_invocation)
         local focus_dir="${best_result%%|*}"
         local monitored_file="${best_result#*|}"
@@ -490,17 +490,17 @@ _humanize_monitor_skill() {
             continue
         fi
 
-        # Detect if the focused invocation changed
+        # 检测聚焦的调用是否已更改
         if [[ "$focus_dir" != "$current_skill_dir" ]]; then
             current_skill_dir="$focus_dir"
             current_file=""
             _skill_stop_tail
         fi
 
-        # Draw status bar
+        # 绘制状态栏
         _skill_draw_status_bar "$focus_dir" "$monitored_file"
 
-        # Switch to new file if the monitored file changed
+        # 如果监控的文件已更改则切换到新文件
         if [[ "$monitored_file" != "$current_file" ]] && [[ -n "$monitored_file" ]]; then
             current_file="$monitored_file"
             _skill_stop_tail
@@ -518,7 +518,7 @@ _humanize_monitor_skill() {
         sleep "$check_interval"
     done
 
-    # Reset trap handlers
+    # 重置 trap 处理器
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         unfunction TRAPINT TRAPTERM 2>/dev/null || true
     else

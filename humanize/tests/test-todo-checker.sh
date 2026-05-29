@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
-# Test script for check-todos-from-transcript.py
+# check-todos-from-transcript.py 的测试脚本
 #
-# Tests the Python task checker for proper error handling
-# and correct interpretation of task states.
-# Supports both legacy TodoWrite and new Task system (TaskCreate/TaskUpdate).
+# 测试 Python 任务检查器的错误处理和任务状态的正确解释。
+# 支持旧版 TodoWrite 和新任务系统（TaskCreate/TaskUpdate）。
 #
 
 set -euo pipefail
@@ -13,15 +12,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TODO_CHECKER="$PROJECT_ROOT/hooks/check-todos-from-transcript.py"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色
 
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# Test helper functions
+# 测试辅助函数
 pass() {
     echo -e "${GREEN}PASS${NC}: $1"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -34,7 +33,7 @@ fail() {
     TESTS_FAILED=$((TESTS_FAILED + 1))
 }
 
-# Setup test environment
+# 设置测试环境
 TEST_DIR=$(mktemp -d)
 trap "rm -rf $TEST_DIR" EXIT
 
@@ -44,12 +43,12 @@ echo "========================================"
 echo ""
 
 # ========================================
-# Test Group 1: Input Handling
+# 测试组 1：输入处理
 # ========================================
 echo "Test Group 1: Input Handling"
 echo ""
 
-# Test 1: Invalid JSON input should exit 2 (parse error)
+# 测试 1：无效 JSON 输入应退出 2（解析错误）
 echo "Test 1: Invalid JSON input"
 set +e
 RESULT=$(echo "not json at all" | python3 "$TODO_CHECKER" 2>&1)
@@ -61,7 +60,7 @@ else
     fail "Invalid JSON handling" "exit 2" "exit $EXIT_CODE"
 fi
 
-# Test 2: Empty input should exit 0 (allow proceeding - no transcript available)
+# 测试 2：空输入应退出 0（允许继续 - 无 transcript 可用）
 echo "Test 2: Empty input"
 set +e
 RESULT=$(echo "" | python3 "$TODO_CHECKER" 2>&1)
@@ -73,7 +72,7 @@ else
     fail "Empty input handling" "exit 0" "exit $EXIT_CODE"
 fi
 
-# Test 3: Valid JSON without transcript_path should exit 0
+# 测试 3：没有 transcript_path 的有效 JSON 应退出 0
 echo "Test 3: JSON without transcript_path"
 set +e
 RESULT=$(echo '{"other": "data"}' | python3 "$TODO_CHECKER" 2>&1)
@@ -85,7 +84,7 @@ else
     fail "Missing transcript_path" "exit 0" "exit $EXIT_CODE"
 fi
 
-# Test 4: Non-existent transcript file should exit 0
+# 测试 4：不存在的 transcript 文件应退出 0
 echo "Test 4: Non-existent transcript file"
 set +e
 RESULT=$(echo '{"transcript_path": "/nonexistent/path/transcript.jsonl"}' | python3 "$TODO_CHECKER" 2>&1)
@@ -98,13 +97,13 @@ else
 fi
 
 # ========================================
-# Test Group 2: Todo Detection
+# 测试组 2：Todo 检测
 # ========================================
 echo ""
 echo "Test Group 2: Todo Detection"
 echo ""
 
-# Test 5: Transcript with all completed todos
+# 测试 5：所有 todo 已完成的 transcript
 echo "Test 5: All todos completed"
 cat > "$TEST_DIR/transcript-all-complete.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Task 1", "status": "completed"}, {"content": "Task 2", "status": "completed"}]}}]}}
@@ -119,7 +118,7 @@ else
     fail "All todos completed" "exit 0" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 6: Transcript with incomplete todos
+# 测试 6：包含未完成 todo 的 transcript
 echo "Test 6: Incomplete todos"
 cat > "$TEST_DIR/transcript-incomplete.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Task 1", "status": "completed"}, {"content": "Task 2", "status": "pending"}]}}]}}
@@ -134,7 +133,7 @@ else
     fail "Incomplete todos" "exit 1" "exit $EXIT_CODE"
 fi
 
-# Test 7: Output includes incomplete todo details
+# 测试 7：输出包含未完成 todo 的详细信息
 echo "Test 7: Output includes todo details"
 if echo "$RESULT" | grep -q "Task 2"; then
     pass "Output includes incomplete task name"
@@ -142,7 +141,7 @@ else
     fail "Output includes task name" "Task 2 in output" "$RESULT"
 fi
 
-# Test 8: In-progress status counts as incomplete
+# 测试 8：进行中状态算作未完成
 echo "Test 8: In-progress status"
 cat > "$TEST_DIR/transcript-in-progress.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Task 1", "status": "in_progress"}]}}]}}
@@ -157,7 +156,7 @@ else
     fail "In-progress status" "exit 1" "exit $EXIT_CODE"
 fi
 
-# Test 8b: Queued TodoWrite item does NOT block exit
+# 测试 8b：排队的 TodoWrite 项不会阻止退出
 echo "Test 8b: Queued TodoWrite item"
 cat > "$TEST_DIR/transcript-queued.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "[queued] Cleanup follow-up", "status": "pending"}]}}]}}
@@ -172,7 +171,7 @@ else
     fail "Queued TodoWrite item" "exit 0" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 8c: Lane tags in the middle of TodoWrite content do NOT downgrade blocking tasks
+# 测试 8c：TodoWrite 内容中间的通道标签不会降级阻止任务
 echo "Test 8c: Inline queued tag does not bypass TodoWrite blocker"
 cat > "$TEST_DIR/transcript-inline-tag.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Fix docs mentioning [queued] follow-ups", "status": "pending"}]}}]}}
@@ -188,13 +187,13 @@ else
 fi
 
 # ========================================
-# Test Group 3: Transcript Format Variations
+# 测试组 3：Transcript 格式变体
 # ========================================
 echo ""
 echo "Test Group 3: Transcript Format Variations"
 echo ""
 
-# Test 9: Empty transcript file
+# 测试 9：空 transcript 文件
 echo "Test 9: Empty transcript file"
 touch "$TEST_DIR/transcript-empty.jsonl"
 set +e
@@ -207,7 +206,7 @@ else
     fail "Empty transcript" "exit 0" "exit $EXIT_CODE"
 fi
 
-# Test 10: Transcript with invalid JSONL lines
+# 测试 10：包含无效 JSONL 行的 transcript
 echo "Test 10: Invalid JSONL lines ignored"
 cat > "$TEST_DIR/transcript-invalid-lines.jsonl" << 'EOF'
 not json
@@ -224,7 +223,7 @@ else
     fail "Invalid JSONL handling" "exit 0 (valid todo found)" "exit $EXIT_CODE"
 fi
 
-# Test 11: Multiple TodoWrite calls - uses latest
+# 测试 11：多次 TodoWrite 调用 - 使用最新的
 echo "Test 11: Multiple TodoWrite calls uses latest"
 cat > "$TEST_DIR/transcript-multiple.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Old Task", "status": "pending"}]}}]}}
@@ -240,7 +239,7 @@ else
     fail "Multiple TodoWrite handling" "exit 0 (latest is completed)" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 12: Direct tool_use entry format
+# 测试 12：直接 tool_use 条目格式
 echo "Test 12: Direct tool_use entry format"
 cat > "$TEST_DIR/transcript-direct.jsonl" << 'EOF'
 {"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Task", "status": "completed"}]}}
@@ -255,7 +254,7 @@ else
     fail "Direct tool_use format" "exit 0" "exit $EXIT_CODE"
 fi
 
-# Test 13: type: message format
+# 测试 13：type: message 格式
 echo "Test 13: Alternative message format"
 cat > "$TEST_DIR/transcript-message.jsonl" << 'EOF'
 {"type": "message", "content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Task", "status": "completed"}]}}]}
@@ -271,13 +270,13 @@ else
 fi
 
 # ========================================
-# Test Group 4: Edge Cases
+# 测试组 4：边界情况
 # ========================================
 echo ""
 echo "Test Group 4: Edge Cases"
 echo ""
 
-# Test 14: Todo with missing status field
+# 测试 14：缺少状态字段的 Todo
 echo "Test 14: Todo with missing status"
 cat > "$TEST_DIR/transcript-no-status.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Task without status"}]}}]}}
@@ -286,14 +285,14 @@ set +e
 RESULT=$(echo "{\"transcript_path\": \"$TEST_DIR/transcript-no-status.jsonl\"}" | python3 "$TODO_CHECKER" 2>&1)
 EXIT_CODE=$?
 set -e
-# Missing status should be treated as incomplete (not "completed")
+# 缺少状态应被视为未完成（而非 "completed"）
 if [[ $EXIT_CODE -eq 1 ]]; then
     pass "Missing status treated as incomplete"
 else
     fail "Missing status handling" "exit 1 (incomplete)" "exit $EXIT_CODE"
 fi
 
-# Test 15: Todo with empty content
+# 测试 15：内容为空的 Todo
 echo "Test 15: Todo with empty content"
 cat > "$TEST_DIR/transcript-empty-content.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "", "status": "pending"}]}}]}}
@@ -308,7 +307,7 @@ else
     fail "Empty content handling" "exit 1" "exit $EXIT_CODE"
 fi
 
-# Test 16: Unicode in todo content
+# 测试 16：todo 内容中的 Unicode
 echo "Test 16: Unicode in todo content"
 cat > "$TEST_DIR/transcript-unicode.jsonl" << 'EOF'
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "Task with unicode", "status": "completed"}]}}]}}
@@ -324,19 +323,19 @@ else
 fi
 
 # ========================================
-# Test Group 5: New Task System (File-based)
+# 测试组 5：新任务系统（基于文件）
 # ========================================
-# The new Task system reads task state from ~/.claude/tasks/<session_id>/ directory
-# (the authoritative source), NOT from transcript parsing (which causes ghost tasks).
+# 新任务系统从 ~/.claude/tasks/<session_id>/ 目录读取任务状态
+# （权威来源），而非从 transcript 解析（会导致幽灵任务）。
 echo ""
 echo "Test Group 5: New Task System (File-based)"
 echo ""
 
-# Create mock tasks base directory
+# 创建模拟任务基础目录
 MOCK_TASKS_BASE="$TEST_DIR/mock-tasks"
 mkdir -p "$MOCK_TASKS_BASE"
 
-# Test 17: Single pending task (no status field defaults to pending)
+# 测试 17：单个待处理任务（无状态字段默认为待处理）
 echo "Test 17: Single pending task"
 MOCK_SESSION_17="session-17"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_17"
@@ -353,7 +352,7 @@ else
     fail "Single pending task" "exit 1" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 18: Single completed task
+# 测试 18：单个已完成任务
 echo "Test 18: Single completed task"
 MOCK_SESSION_18="session-18"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_18"
@@ -370,7 +369,7 @@ else
     fail "Single completed task" "exit 0" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 19: Task with in_progress status (still incomplete)
+# 测试 19：in_progress 状态的任务（仍为未完成）
 echo "Test 19: Task with in_progress status"
 MOCK_SESSION_19="session-19"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_19"
@@ -387,7 +386,7 @@ else
     fail "Task with in_progress status" "exit 1" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 19b: Queued file-based task does NOT block exit
+# 测试 19b：排队的基于文件任务不会阻止退出
 echo "Test 19b: Queued task does not block"
 MOCK_SESSION_19B="session-19b"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_19B"
@@ -404,7 +403,7 @@ else
     fail "Queued task" "exit 0" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 19c: Explicit blocking tag still blocks
+# 测试 19c：显式阻止标签仍然阻止
 echo "Test 19c: Blocking task still blocks"
 MOCK_SESSION_19C="session-19c"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_19C"
@@ -421,7 +420,7 @@ else
     fail "Blocking task" "exit 1 with [blocking] output" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 19d: Inline queued tag in task body does NOT downgrade blocking tasks
+# 测试 19d：任务正文中的内联排队标签不会降级阻止任务
 echo "Test 19d: Inline queued tag in task body does not bypass blocker"
 MOCK_SESSION_19D="session-19d"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_19D"
@@ -438,7 +437,7 @@ else
     fail "Inline queued file-based task" "exit 1 with [blocking] output" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 20: Multiple tasks, one incomplete
+# 测试 20：多个任务，一个未完成
 echo "Test 20: Multiple tasks, one incomplete"
 MOCK_SESSION_20="session-20"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_20"
@@ -458,7 +457,7 @@ else
     fail "Multiple tasks with one incomplete" "exit 1" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 21: Multiple tasks, all completed
+# 测试 21：多个任务，全部完成
 echo "Test 21: Multiple tasks, all completed"
 MOCK_SESSION_21="session-21"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_21"
@@ -478,7 +477,7 @@ else
     fail "Multiple tasks all completed" "exit 0" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 22: Deleted task is ignored (not incomplete)
+# 测试 22：已删除的任务被忽略（非未完成）
 echo "Test 22: Deleted task is ignored"
 MOCK_SESSION_22="session-22"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_22"
@@ -495,7 +494,7 @@ else
     fail "Deleted task is ignored" "exit 0" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 23: Mix of legacy TodoWrite and new Task system
+# 测试 23：旧版 TodoWrite 和新任务系统的混合
 echo "Test 23: Mix of TodoWrite (transcript) and Task (file)"
 MOCK_SESSION_23="session-23"
 mkdir -p "$MOCK_TASKS_BASE/$MOCK_SESSION_23"
@@ -515,7 +514,7 @@ else
     fail "Mixed TodoWrite and Task" "exit 1 (Task incomplete)" "exit $EXIT_CODE, output: $RESULT"
 fi
 
-# Test 24: Output includes Task ID for new Task system
+# 测试 24：输出包含新任务系统的任务 ID
 echo "Test 24: Output includes Task ID"
 if echo "$RESULT" | grep -q "Task #"; then
     pass "Output includes Task ID marker"
@@ -523,7 +522,7 @@ else
     fail "Output includes Task ID" "Task # in output" "$RESULT"
 fi
 
-# Test 25: Non-existent session directory (no tasks)
+# 测试 25：不存在的会话目录（无任务）
 echo "Test 25: Non-existent session directory"
 set +e
 RESULT=$(echo "{\"session_id\": \"nonexistent-session\", \"tasks_base_dir\": \"$MOCK_TASKS_BASE\"}" | python3 "$TODO_CHECKER" 2>&1)
@@ -536,7 +535,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================"

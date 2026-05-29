@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Tests for bitlesson-validate-delta.sh validation rules
+# bitlesson-validate-delta.sh 验证规则测试
 #
 
 set -euo pipefail

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Tests for explore-idea manifest and run state structure.
+# explore-idea 清单和运行状态结构的测试。
 #
-# Verifies the manifest.json schema and run directory structure described
-# in commands/explore-idea.md and the worker-results.jsonl contract.
+# 验证 commands/explore-idea.md 中描述的 manifest.json 模式
+# 和运行目录结构，以及 worker-results.jsonl 契约。
 #
 
 set -euo pipefail
@@ -25,7 +25,7 @@ echo ""
 echo "--- File Existence ---"
 echo ""
 
-# All required files exist
+# 所有必需文件存在
 for f in "$EXPLORE_CMD" "$WORKER_PROMPT" "$REPORT_TEMPLATE"; do
     if [[ -f "$f" ]]; then
         pass "file exists: $(basename "$f")"
@@ -45,7 +45,7 @@ echo ""
 echo "--- Manifest JSON Schema (from explore-idea.md) ---"
 echo ""
 
-# manifest.json fields mentioned in command
+# 命令中提到的 manifest.json 字段
 MANIFEST_FIELDS=(
     "run_id"
     "created_at"
@@ -100,42 +100,42 @@ echo ""
 echo "--- Run Directory Structure ---"
 echo ""
 
-# Run directory path pattern (defined in validation script, referenced as <RUN_DIR> in command)
+# 运行目录路径模式（在验证脚本中定义，在命令中引用为 <RUN_DIR>）
 if grep -q "\.humanize/explore/" "$VALIDATE_IO_SCRIPT"; then
     pass "run directory is under .humanize/explore/ (validate-explore-idea-io.sh)"
 else
     fail "run directory under .humanize/explore/" ".humanize/explore/" "not found"
 fi
 
-# dispatch-prompts subdirectory
+# dispatch-prompts 子目录
 if grep -q "dispatch-prompts" "$EXPLORE_CMD"; then
     pass "dispatch-prompts/ subdirectory documented"
 else
     fail "dispatch-prompts/ subdirectory documented"
 fi
 
-# worker-results.jsonl
+# worker-results.jsonl 文件
 if grep -q "worker-results.jsonl" "$EXPLORE_CMD"; then
-    pass "worker-results.jsonl file documented"
+    pass "worker-results.jsonl 文件已记录"
 else
     fail "worker-results.jsonl file documented"
 fi
 
-# explore-report.md
+# explore-report.md 文件
 if grep -q "explore-report.md" "$EXPLORE_CMD"; then
     pass "explore-report.md file documented"
 else
     fail "explore-report.md file documented"
 fi
 
-# final-idea.md
+# final-idea.md 文件
 if grep -q "final-idea.md" "$EXPLORE_CMD"; then
     pass "final-idea.md file documented"
 else
     fail "final-idea.md file documented"
 fi
 
-# .failed sentinel
+# .failed 哨兵文件
 if grep -q "\.failed" "$EXPLORE_CMD"; then
     pass ".failed sentinel file documented for error recovery"
 else
@@ -146,7 +146,7 @@ echo ""
 echo "--- worker-results.jsonl Schema ---"
 echo ""
 
-# worker-results.jsonl fields
+# worker-results.jsonl 字段
 JSONL_FIELDS=(
     "schema_version"
     "run_id"
@@ -173,14 +173,14 @@ echo ""
 echo "--- manifest.json Write Order ---"
 echo ""
 
-# manifest.json must be written BEFORE dispatch
+# manifest.json 必须在调度前写入
 if grep -q "BEFORE" "$EXPLORE_CMD" && grep -q "manifest" "$EXPLORE_CMD"; then
     pass "command requires manifest.json written BEFORE dispatch"
 else
     fail "command requires manifest.json written BEFORE dispatch"
 fi
 
-# report template has required sections
+# 报告模板包含必需的部分
 if grep -q "Tier 1" "$REPORT_TEMPLATE" && grep -q "Tier 2" "$REPORT_TEMPLATE"; then
     pass "report template contains two-tier ranking sections"
 else

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Setup script for start-rlcr-loop
+# start-rlcr-loop 的设置脚本
 #
-# Creates state files for the loop that uses Codex to review Claude's work.
+# 为使用 Codex 审查 Claude 工作的循环创建状态文件。
 #
-# Usage:
+# 用法:
 #   setup-rlcr-loop.sh <path/to/plan.md> [--max N] [--codex-model MODEL:EFFORT]
 #
 

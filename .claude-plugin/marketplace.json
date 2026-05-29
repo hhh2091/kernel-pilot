@@ -3,12 +3,12 @@
   "owner": {
     "name": "BBuf"
   },
-  "description": "KernelPilot's Claude Code marketplace for the Humanize kernel optimization loop.",
+  "description": "KernelPilot 的 Claude Code 市场，用于 Humanize 内核优化循环。",
   "plugins": [
     {
       "name": "humanize",
       "source": "./humanize",
-      "description": "Humanize plus KernelPilot's autonomous GPU kernel optimization loop, KernelWiki evidence, ncu-report-skill profiling, and review-gated iteration.",
+      "description": "Humanize 加上 KernelPilot 的自主 GPU 内核优化循环、KernelWiki 证据、ncu-report-skill 性能分析和审查门控迭代。",
       "version": "1.17.0"
     }
   ]

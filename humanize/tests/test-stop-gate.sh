@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Tests for rlcr-stop-gate wrapper project root detection
+# rlcr-stop-gate 包装器项目根目录检测的测试
 #
 
 set -euo pipefail
@@ -15,7 +15,7 @@ echo "RLCR Stop Gate Wrapper Tests"
 echo "=========================================="
 echo ""
 
-# Build a minimal active loop that should block on missing summary file.
+# 构建一个最小活跃循环，在缺少摘要文件时应阻止。
 setup_active_loop_fixture() {
     local project_dir="$1"
 
@@ -58,10 +58,10 @@ agent_teams: false
 EOF_STATE
 }
 
-# Single setup_test_dir call to avoid EXIT trap overwrite and temp dir leak.
+# 单次 setup_test_dir 调用，避免 EXIT 陷阱覆盖和临时目录泄漏。
 setup_test_dir
 
-# Test 1: Default project root should be caller cwd (not plugin install dir)
+# 测试 1：默认项目根目录应为调用者当前目录（非插件安装目录）
 T1_DIR="$TEST_DIR/t1"
 mkdir -p "$T1_DIR"
 setup_active_loop_fixture "$T1_DIR/project"
@@ -88,7 +88,7 @@ else
     fail "rlcr-stop-gate reports a real loop blocking reason" "output containing BLOCK:" "$OUTPUT1"
 fi
 
-# Test 2: --project-root override works from outside target repository
+# 测试 2：--project-root 覆盖从目标仓库外部工作
 T2_DIR="$TEST_DIR/t2"
 mkdir -p "$T2_DIR"
 setup_active_loop_fixture "$T2_DIR/project"
@@ -115,7 +115,7 @@ else
     fail "rlcr-stop-gate --project-root output contains expected block reason" "output containing BLOCK:" "$OUTPUT2"
 fi
 
-# Test 3: Tracked Humanize state blocks before normal loop validation
+# 测试 3：已跟踪的 Humanize 状态在正常循环验证之前阻止
 T3_DIR="$TEST_DIR/t3"
 mkdir -p "$T3_DIR"
 setup_active_loop_fixture "$T3_DIR/project"
@@ -144,10 +144,9 @@ else
     fail "rlcr-stop-gate reports tracked Humanize state with dedicated reason" "output containing Tracked Humanize State Blocked" "$OUTPUT3"
 fi
 
-# Test 4: Unrelated dot-prefixed files that happen to start with .humanize-
-# must not be treated as loop state. .humanize-backup and .humanizeconfig are
-# explicitly allowed by the git add validator (tests/test-humanize-escape.sh);
-# the tracked-state guard must stay consistent and ignore them.
+# 测试 4：以 .humanize- 开头的无关点文件不得被视为循环状态。
+# .humanize-backup 和 .humanizeconfig 被 git add 验证器明确允许
+# （tests/test-humanize-escape.sh）；已跟踪状态守卫必须保持一致并忽略它们。
 T4_DIR="$TEST_DIR/t4"
 mkdir -p "$T4_DIR"
 setup_active_loop_fixture "$T4_DIR/project"
@@ -177,7 +176,7 @@ else
     fail "rlcr-stop-gate does not emit tracked-state reason for .humanize-backup" "no Tracked Humanize State Blocked line" "$OUTPUT4"
 fi
 
-# Test 5: No active loop -> gate allows exit (exit 0)
+# 测试 5：无活跃循环 -> 闸门允许退出（exit 0）
 T5_DIR="$TEST_DIR/t5"
 mkdir -p "$T5_DIR/empty-project"
 
@@ -203,19 +202,17 @@ else
     fail "rlcr-stop-gate reports ALLOW when no active loop" "output containing ALLOW:" "$OUTPUT5"
 fi
 
-# Test 6: Empty session_id must NOT drop transcript_path from the hook
-# input JSON (regression: a `select(length > 0)` used as a plain object
-# value would collapse the whole enclosing object to empty whenever any
-# selected field was empty, wiping forwarded fields like transcript_path
-# even though only session_id was missing). The fix replaces the plain
-# select with explicit if/then/else so each field independently becomes
-# null on empty input.
+# 测试 6：空 session_id 不得从钩子输入 JSON 中删除 transcript_path
+# （回归问题：当任何选定字段为空时，用作普通对象值的 `select(length > 0)`
+# 会将整个封闭对象折叠为空，即使只有 session_id 缺失也会清除
+# transcript_path 等转发字段）。修复方法用显式 if/then/else 替换
+# 普通 select，使每个字段在输入为空时独立变为 null。
 T6_DIR="$TEST_DIR/t6"
 mkdir -p "$T6_DIR/bin"
 
-# Mock hook that echoes the raw stdin it received, so we can inspect the
-# JSON rlcr-stop-gate.sh builds without depending on the real hook's
-# pending-bg logic.
+# 模拟钩子，回显收到的原始 stdin，以便我们可以检查
+# rlcr-stop-gate.sh 构建的 JSON，而不依赖真实钩子的
+# 待处理后台逻辑。
 cat > "$T6_DIR/bin/loop-codex-stop-hook.sh" <<'MOCK_HOOK_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -228,13 +225,13 @@ printf '%s\n' '{"decision":"block","reason":"mock-hook","systemMessage":"mock"}'
 MOCK_HOOK_EOF
 chmod +x "$T6_DIR/bin/loop-codex-stop-hook.sh"
 
-# Layout expected by rlcr-stop-gate.sh: HUMANIZE_ROOT/hooks/loop-codex-stop-hook.sh.
-# We stage a fake plugin root pointing at the mock hook and copy the gate
-# wrapper next to it so the relative resolution resolves to the mock.
+# rlcr-stop-gate.sh 期望的布局：HUMANIZE_ROOT/hooks/loop-codex-stop-hook.sh。
+# 我们设置一个指向模拟钩子的假插件根目录，并将闸门包装器复制到旁边，
+# 使相对解析指向模拟钩子。
 mkdir -p "$T6_DIR/plugin/scripts" "$T6_DIR/plugin/hooks/lib"
 cp "$T6_DIR/bin/loop-codex-stop-hook.sh" "$T6_DIR/plugin/hooks/loop-codex-stop-hook.sh"
 cp "$GATE_SCRIPT" "$T6_DIR/plugin/scripts/rlcr-stop-gate.sh"
-# rlcr-stop-gate sources hooks/lib/project-root.sh for PROJECT_ROOT resolution.
+# rlcr-stop-gate 加载 hooks/lib/project-root.sh 来解析 PROJECT_ROOT。
 REAL_PROJECT_ROOT_LIB="$(dirname "$GATE_SCRIPT")/../hooks/lib/project-root.sh"
 cp "$REAL_PROJECT_ROOT_LIB" "$T6_DIR/plugin/hooks/lib/project-root.sh"
 chmod +x "$T6_DIR/plugin/scripts/rlcr-stop-gate.sh"
@@ -246,10 +243,9 @@ T6_TRANSCRIPT="$T6_DIR/fake-transcript.jsonl"
 set +e
 (
     cd "$T6_DIR"
-    # Pin CLAUDE_PROJECT_DIR so rlcr-stop-gate resolves a root even though
-    # the fixture is not a git repo. This test exercises the JSON-object-
-    # collapse regression for empty session_id; project-root resolution is
-    # orthogonal and must not short-circuit the gate with an ALLOW.
+    # 固定 CLAUDE_PROJECT_DIR，使 rlcr-stop-gate 即使在测试夹具不是
+    # Git 仓库时也能解析根目录。此测试验证空 session_id 的 JSON 对象
+    # 折叠回归；项目根解析是正交的，不得用 ALLOW 短路闸门。
     CLAUDE_PROJECT_DIR="$T6_DIR" \
     MOCK_HOOK_INPUT_LOG="$T6_INPUT_LOG" \
     "$T6_DIR/plugin/scripts/rlcr-stop-gate.sh" \
@@ -275,9 +271,9 @@ else
     fi
 fi
 
-# Exit 10 because the mock hook always returns decision:"block"; ensure
-# the wrapper reached the decision branch rather than exiting 20
-# (wrapper error) or 0 (bogus ALLOW from lost transcript_path).
+# 退出码 10，因为模拟钩子总是返回 decision:"block"；确保
+# 包装器到达了决策分支，而不是退出 20（包装器错误）
+# 或 0（因丢失 transcript_path 而产生的虚假 ALLOW）。
 if [[ "$EXIT6" -eq 10 ]]; then
     pass "rlcr-stop-gate reaches decision branch with empty session_id + real transcript_path"
 else
@@ -286,17 +282,15 @@ else
         "exit 10 (mock hook returns block)" "exit $EXIT6; output: $T6_BODY"
 fi
 
-# Assertions about ignoring an inherited CLAUDE_PROJECT_DIR were
-# removed during the rebase onto upstream/dev: upstream's
-# `resolve_project_root` deliberately honors CLAUDE_PROJECT_DIR as
-# the first-choice signal (CLAUDE_PROJECT_DIR -> git toplevel, no
-# pwd fallback). That is an intentional upstream design choice, not
-# a regression, so those two old assertions are no longer
-# applicable. The --project-root explicit-override check below still
-# holds and is the right contract for the CLI flag.
+# 关于忽略继承的 CLAUDE_PROJECT_DIR 的断言在 rebase 到
+# upstream/dev 期间被移除：上游的 `resolve_project_root` 故意
+# 将 CLAUDE_PROJECT_DIR 作为首选信号（CLAUDE_PROJECT_DIR -> git
+# toplevel，无 pwd 回退）。这是上游有意的设计选择，不是回归，
+# 因此那两个旧断言不再适用。下面的 --project-root 显式覆盖
+# 检查仍然有效，是 CLI 标志的正确契约。
 
-# --project-root MUST still override the default cwd / inherited env
-# so callers can explicitly target a different repository.
+# --project-root 必须仍然覆盖默认的 cwd / 继承的环境，
+# 以便调用者可以显式定位不同的仓库。
 T5_DIR="$TEST_DIR/t5-explicit-override"
 mkdir -p "$T5_DIR/empty-cwd"
 setup_active_loop_fixture "$T5_DIR/target-project"

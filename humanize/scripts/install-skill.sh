@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 #
-# Install/upgrade KernelPilot Humanize skills for Kimi and/or Codex.
+# 为 Kimi 和/或 Codex 安装/升级 KernelPilot Humanize 技能。
 #
-# What this does:
-# 1) Sync skills/{humanize,humanize-gen-plan,humanize-rlcr,...} to target skills dir(s)
-# 2) Copy runtime dependencies into <skills-dir>/humanize/{scripts,hooks,prompt-template}
-# 3) Sync KernelWiki / ncu-report-skill into the target skills dir
-# 4) Hydrate SKILL.md command paths with concrete runtime root paths
+# 此脚本的功能：
+# 1) 将 skills/{humanize,humanize-gen-plan,humanize-rlcr,...} 同步到目标技能目录
+# 2) 将运行时依赖复制到 <skills-dir>/humanize/{scripts,hooks,prompt-template}
+# 3) 将 KernelWiki / ncu-report-skill 同步到目标技能目录
+# 4) 用具体的运行时根路径填充 SKILL.md 命令路径
 #
-# Usage:
+# 用法:
 #   ./scripts/install-skill.sh [options]
 #
-# Options:
-#   --repo-root PATH        Humanize repo root (default: auto-detect)
-#   --target MODE           kimi|codex|both (default: kimi)
-#   --skills-dir PATH       Legacy alias for target skills dir (kept for compatibility)
-#   --kimi-skills-dir PATH  Kimi skills dir (default: ~/.config/agents/skills)
-#   --codex-skills-dir PATH Codex skills dir (default: ${CODEX_HOME:-~/.codex}/skills)
-#   --codex-config-dir PATH Codex config dir for hooks/config.toml (default: ${CODEX_HOME:-~/.codex})
-#   --kernelpilot-root PATH KernelPilot checkout root (default: auto-detect)
-#   --kernelwiki-root PATH  KernelWiki checkout used by kernel-agent skill (default: external/KernelWiki)
+# 选项:
+#   --repo-root PATH        Humanize 仓库根目录（默认: 自动检测）
+#   --target MODE           kimi|codex|both（默认: kimi）
+#   --skills-dir PATH       目标技能目录的旧版别名（为兼容性保留）
+#   --kimi-skills-dir PATH  Kimi 技能目录（默认: ~/.config/agents/skills）
+#   --codex-skills-dir PATH Codex 技能目录（默认: ${CODEX_HOME:-~/.codex}/skills）
+#   --codex-config-dir PATH Codex 配置目录用于 hooks/config.toml（默认: ${CODEX_HOME:-~/.codex})
+#   --kernelpilot-root PATH KernelPilot 检出根目录（默认: 自动检测）
+#   --kernelwiki-root PATH  kernel-agent 技能使用的 KernelWiki 检出（默认: external/KernelWiki）
 #   --ncu-report-skill-root PATH
-#                            ncu-report-skill checkout used by kernel-agent skill (default: external/ncu-report-skill)
-#   --dry-run               Print actions without writing
-#   -h, --help              Show help
+#                            kernel-agent 技能使用的 ncu-report-skill 检出（默认: external/ncu-report-skill）
+#   --dry-run               打印操作但不写入
+#   -h, --help              显示帮助
 #
 
 set -euo pipefail

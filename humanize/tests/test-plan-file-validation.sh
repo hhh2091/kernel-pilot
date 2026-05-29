@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Tests for plan file validation in setup-rlcr-loop.sh
+# setup-rlcr-loop.sh 中计划文件验证的测试
 #
-# Tests:
-# - Absolute path rejection
-# - Relative path within project
-# - Symlink rejection
-# - Submodule rejection
-# - Git repo validation
-# - Plan file tracking status validation
+# 测试：
+# - 绝对路径拒绝
+# - 项目内的相对路径
+# - 符号链接拒绝
+# - 子模块拒绝
+# - Git 仓库验证
+# - 计划文件跟踪状态验证
 #
 
 set -uo pipefail
@@ -16,11 +16,11 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Unset CLAUDE_PROJECT_DIR so setup-rlcr-loop.sh uses pwd (the temp test repo)
-# instead of the actual repo root where this test is running
+# 取消设置 CLAUDE_PROJECT_DIR 以便 setup-rlcr-loop.sh 使用 pwd（临时测试仓库）
+# 而不是此测试运行的实际仓库根目录
 unset CLAUDE_PROJECT_DIR
 
-# Test helpers
+# 测试辅助函数
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -33,14 +33,14 @@ pass() { echo -e "${GREEN}PASS${NC}: $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
 fail() { echo -e "${RED}FAIL${NC}: $1"; echo "  Expected: $2"; echo "  Got: $3"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
 skip() { echo -e "${YELLOW}SKIP${NC}: $1 - $2"; TESTS_SKIPPED=$((TESTS_SKIPPED + 1)); }
 
-# Setup test environment
+# 设置测试环境
 TEST_DIR=$(mktemp -d)
 trap "rm -rf $TEST_DIR" EXIT
 
 setup_test_repo() {
     cd "$TEST_DIR"
 
-    # Only init git if not already initialized
+    # 仅在尚未初始化时初始化 git
     if [[ ! -d ".git" ]]; then
         git init -q
         git config user.email "test@test.com"
@@ -49,7 +49,7 @@ setup_test_repo() {
         git add init.txt
         git -c commit.gpgsign=false commit -q -m "Initial commit"
 
-        # Create test plan files
+        # 创建测试计划文件
         mkdir -p plans
         cat > plans/test-plan.md << 'EOF'
 # Test Plan
@@ -63,19 +63,19 @@ Test the RLCR loop functionality
 - Requirement 3
 EOF
 
-        # Add plans/ to gitignore (default behavior)
+        # 将 plans/ 添加到 gitignore（默认行为）
         echo "plans/" >> .gitignore
         git add .gitignore
         git -c commit.gpgsign=false commit -q -m "Add gitignore"
     fi
 }
 
-# Mock codex command - always use mock to avoid calling real codex (slow)
+# 模拟 codex 命令 - 始终使用模拟以避免调用真实 codex（速度慢）
 mock_codex() {
     mkdir -p "$TEST_DIR/bin"
     cat > "$TEST_DIR/bin/codex" << 'EOF'
 #!/usr/bin/env bash
-# Mock codex for test-plan-file-validation.sh
+# test-plan-file-validation.sh 的模拟 codex
 echo "mock codex"
 EOF
     chmod +x "$TEST_DIR/bin/codex"
@@ -85,7 +85,7 @@ EOF
 echo "=== Test: Plan File Path Validation ==="
 echo ""
 
-# Test 1: Absolute path should fail
+# 测试 1：绝对路径应该失败
 setup_test_repo
 mock_codex
 
@@ -100,7 +100,7 @@ else
     fail "Absolute path rejection" "exit 1 with relative path error" "$RESULT"
 fi
 
-# Test 2: Non-existent file should fail
+# 测试 2：不存在的文件应该失败
 echo "Test 2: Reject non-existent file"
 set +e
 RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "nonexistent.md" 2>&1)
@@ -112,7 +112,7 @@ else
     fail "Non-existent file rejection" "exit 1 with not found error" "$RESULT"
 fi
 
-# Test 2.5: Non-existent directory should fail with clear error
+# 测试 2.5：不存在的目录应该以清晰错误失败
 echo "Test 2.5: Reject non-existent parent directory"
 set +e
 RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "nonexistent-dir/plan.md" 2>&1)
@@ -124,7 +124,7 @@ else
     fail "Non-existent parent directory rejection" "exit 1 with directory not found error" "$RESULT"
 fi
 
-# Test 2.6: Path with spaces should fail
+# 测试 2.6：带空格的路径应该失败
 echo "Test 2.6: Reject path with spaces"
 mkdir -p "$TEST_DIR/path with spaces"
 cat > "$TEST_DIR/path with spaces/plan.md" << 'EOF'
@@ -145,7 +145,7 @@ else
     fail "Path with spaces rejection" "exit 1 with spaces error" "$RESULT"
 fi
 
-# Test 2.7: Filename with spaces should fail
+# 测试 2.7：带空格的文件名应该失败
 echo "Test 2.7: Reject filename with spaces"
 cat > "$TEST_DIR/plan with spaces.md" << 'EOF'
 # Plan
@@ -165,7 +165,7 @@ else
     fail "Filename with spaces rejection" "exit 1 with spaces error" "$RESULT"
 fi
 
-# Test 2.8: Path with shell metacharacters should fail
+# 测试 2.8：带 shell 元字符的路径应该失败
 echo "Test 2.8: Reject path with shell metacharacters"
 cat > "$TEST_DIR/plans/test-plan.md" << 'EOF'
 # Plan
@@ -175,7 +175,7 @@ Test metacharacters
 - Requirement 1
 - Requirement 2
 EOF
-# Test various shell metacharacters
+# 测试各种 shell 元字符
 for meta_char in ';' '&' '|' '$' '`' '<' '>' '(' ')' '{' '}' '[' ']' '!' '#' '~' '*' '?'; do
     RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "plans/test${meta_char}plan.md" 2>&1) || true
     if ! echo "$RESULT" | grep -q "shell metacharacters"; then
@@ -185,7 +185,7 @@ for meta_char in ';' '&' '|' '$' '`' '<' '>' '(' ')' '{' '}' '[' ']' '!' '#' '~'
 done
 pass "Path with shell metacharacters rejected"
 
-# Test 3: Symlink should fail
+# 测试 3：符号链接应该失败
 echo "Test 3: Reject symbolic link"
 ln -sf plans/test-plan.md "$TEST_DIR/link-plan.md"
 set +e
@@ -200,7 +200,7 @@ fi
 
 # Test 3.5: Path resolution error handling (Fix #4)
 echo "Test 3.5: Handle path resolution errors gracefully"
-# Create a directory structure where cd might fail
+# 创建一个 cd 可能失败的目录结构
 mkdir -p "$TEST_DIR/permission-test"
 cd "$TEST_DIR/permission-test"
 git init -q
@@ -209,7 +209,7 @@ git config user.name "Test"
 echo "init" > init.txt
 git add init.txt
 git -c commit.gpgsign=false commit -q -m "Initial"
-# Create a plan directory that we'll make inaccessible
+# 创建一个我们将使其不可访问的计划目录
 mkdir -p plans
 cat > plans/plan.md << 'EOF'
 # Plan
@@ -222,15 +222,15 @@ EOF
 echo "plans/" >> .gitignore
 git add .gitignore
 git -c commit.gpgsign=false commit -q -m "Gitignore"
-# Make the plans directory unreadable (if we have permission to do so)
+# 使 plans 目录不可读（如果我们有权限这样做）
 if chmod 000 plans 2>/dev/null; then
     set +e
     RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "plans/plan.md" 2>&1)
     EXIT_CODE=$?
     set -e
-    # Restore permissions for cleanup
+    # 恢复权限以便清理
     chmod 755 plans
-    # Should fail with clear error about directory access
+    # 应该因目录访问的清晰错误而失败
     if [[ $EXIT_CODE -ne 0 ]] && echo "$RESULT" | grep -qE "resolve|not found|directory"; then
         pass "Path resolution error handled gracefully"
     else
@@ -241,7 +241,7 @@ else
 fi
 cd "$TEST_DIR"
 
-# Test 4: Plan outside project (../ escape) should fail
+# 测试 4：项目外的计划（../ 逃逸）应该失败
 echo "Test 4: Reject path escaping project directory"
 mkdir -p "$TEST_DIR/outside"
 cat > "$TEST_DIR/outside/escape-plan.md" << 'EOF'
@@ -270,9 +270,9 @@ else
     fail "Path escape rejection" "exit 1 with project directory error" "$RESULT"
 fi
 
-# Test 5: Non-git repo should fail
+# 测试 5：非 git 仓库应该失败
 echo "Test 5: Reject non-git repository"
-# Create a completely separate directory that is NOT inside any git repo
+# 创建一个完全不在任何 git 仓库内的独立目录
 NOGIT_DIR=$(mktemp -d)
 cd "$NOGIT_DIR"
 cat > plan.md << 'EOF'
@@ -295,9 +295,9 @@ else
     fail "Non-git repo rejection" "exit 1 with git repository error" "$RESULT"
 fi
 
-# Test 6: Git repo without commits should fail
+# 测试 6：没有提交的 git 仓库应该失败
 echo "Test 6: Reject git repo without commits"
-# Create a completely separate directory that is NOT inside any git repo
+# 创建一个完全不在任何 git 仓库内的独立目录
 NOCOMMIT_DIR=$(mktemp -d)
 cd "$NOCOMMIT_DIR"
 git init -q
@@ -325,7 +325,7 @@ echo ""
 echo "=== Test: Plan File Tracking Validation ==="
 echo ""
 
-# Test 7: Tracked file without --track-plan-file should fail
+# 测试 7：没有 --track-plan-file 的跟踪文件应该失败
 echo "Test 7: Reject tracked file without --track-plan-file"
 cd "$TEST_DIR"
 rm -rf tracked-test 2>/dev/null || true
@@ -357,7 +357,7 @@ else
     fail "Tracked file rejection" "exit 1 with gitignored error" "$RESULT"
 fi
 
-# Test 8: Untracked file with --track-plan-file should fail
+# 测试 8：带 --track-plan-file 的未跟踪文件应该失败
 echo "Test 8: Reject untracked file with --track-plan-file"
 cd "$TEST_DIR"
 rm -rf untracked-test 2>/dev/null || true
@@ -391,7 +391,7 @@ else
     fail "Untracked file with --track-plan-file rejection" "exit 1 with tracked error" "$RESULT"
 fi
 
-# Test 9: Modified tracked file with --track-plan-file should fail
+# 测试 9：带 --track-plan-file 的已修改跟踪文件应该失败
 echo "Test 9: Reject modified tracked file with --track-plan-file"
 cd "$TEST_DIR"
 rm -rf modified-test 2>/dev/null || true
@@ -428,9 +428,9 @@ echo ""
 echo "=== Test: Branch Name Validation ==="
 echo ""
 
-# Test 9.5: Reject branch names with YAML-unsafe characters (Fix #2)
-# Note: Git itself may reject some of these characters, which is fine
-# We test that either git rejects it OR our script rejects it
+# 测试 9.5：拒绝带 YAML 不安全字符的分支名称（修复 #2）
+# 注意：Git 本身可能会拒绝其中一些字符，这没问题
+# 我们测试 git 拒绝它或我们的脚本拒绝它
 echo "Test 9.5: Reject branch with colon (YAML-unsafe)"
 cd "$TEST_DIR"
 rm -rf branch-test 2>/dev/null || true
@@ -442,7 +442,7 @@ git config user.name "Test"
 echo "init" > init.txt
 git add init.txt
 git -c commit.gpgsign=false commit -q -m "Initial"
-# Get the default branch name for this repo (main or master)
+# 获取此仓库的默认分支名称（main 或 master）
 BRANCH_TEST_DEFAULT=$(git rev-parse --abbrev-ref HEAD)
 mkdir -p plans
 cat > plans/plan.md << 'EOF'
@@ -456,7 +456,7 @@ EOF
 echo "plans/" >> .gitignore
 git add .gitignore
 git -c commit.gpgsign=false commit -q -m "Gitignore"
-# Try to create branch with colon (YAML-unsafe) - git may reject this
+# 尝试创建带冒号的分支（YAML 不安全）- git 可能会拒绝
 if git checkout -q -b "feature:test" 2>/dev/null; then
     set +e
     RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "plans/plan.md" 2>&1)
@@ -469,14 +469,14 @@ if git checkout -q -b "feature:test" 2>/dev/null; then
     fi
     git checkout -q "$BRANCH_TEST_DEFAULT" 2>/dev/null || true
 else
-    # Git itself rejected the branch name, which is also fine
+    # Git 本身拒绝了分支名称，这也没问题
     pass "Branch with colon rejected (by git)"
 fi
 
-# Test 9.6: Reject branch names with hash (YAML comment)
+# 测试 9.6：拒绝带井号的分支名称（YAML 注释）
 echo "Test 9.6: Reject branch with hash (YAML comment)"
 git checkout -q "$BRANCH_TEST_DEFAULT" 2>/dev/null || true
-# Try to create a branch with hash - some git versions may not allow this
+# 尝试创建带井号的分支 - 某些 git 版本可能不允许
 if git checkout -q -b "test#comment" 2>/dev/null; then
     set +e
     RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "plans/plan.md" 2>&1)
@@ -492,7 +492,7 @@ else
     pass "Branch with hash rejected (by git)"
 fi
 
-# Test 9.7: Reject branch names with quotes
+# 测试 9.7：拒绝带引号的分支名称
 echo "Test 9.7: Reject branch with quotes (YAML-unsafe)"
 git checkout -q "$BRANCH_TEST_DEFAULT" 2>/dev/null || true
 if git checkout -q -b 'test"quote' 2>/dev/null; then
@@ -514,7 +514,7 @@ echo ""
 echo "=== Test: Plan File Content Validation ==="
 echo ""
 
-# Test 9.8: Reject plan file with only blank lines
+# 测试 9.8：拒绝只有空行的计划文件
 echo "Test 9.8: Reject plan with only blank lines"
 cd "$TEST_DIR"
 rm -rf content-test 2>/dev/null || true
@@ -527,7 +527,7 @@ echo "init" > init.txt
 git add init.txt
 git -c commit.gpgsign=false commit -q -m "Initial"
 mkdir -p plans
-# Create plan with only blank lines (6 lines total to pass the 5-line minimum)
+# 创建只有空行的计划（总共 6 行以通过 5 行最小值）
 printf '\n\n\n\n\n\n' > plans/blank-plan.md
 echo "plans/" >> .gitignore
 git add .gitignore
@@ -542,9 +542,9 @@ else
     fail "Blank plan rejection" "exit 1 with insufficient content error" "$RESULT"
 fi
 
-# Test 9.9: Reject plan file with only few non-blank lines
+# 测试 9.9：拒绝只有很少非空行的计划文件
 echo "Test 9.9: Reject plan with too few non-blank lines"
-# Create plan with mostly blank lines and only 2 non-blank lines
+# 创建大部分为空行且只有 2 个非空行的计划
 cat > plans/sparse-plan.md << 'EOF'
 # Title
 
@@ -563,7 +563,7 @@ else
     fail "Sparse plan rejection" "exit 1 with insufficient content error" "$RESULT"
 fi
 
-# Test 9.9.1: Reject plan file with only HTML comments
+# 测试 9.9.1：拒绝只有 HTML 注释的计划文件
 echo "Test 9.9.1: Reject plan with only HTML comments"
 cat > plans/comment-plan.md << 'EOF'
 <!-- HTML comment line 1 -->
@@ -586,7 +586,7 @@ else
     fail "HTML-comment-only plan rejection" "exit 1 with insufficient content error" "$RESULT"
 fi
 
-# Test 9.9.2: Reject plan file with only shell/markdown comments (# lines)
+# 测试 9.9.2：拒绝只有 shell/markdown 注释（# 行）的计划文件
 echo "Test 9.9.2: Reject plan with only # comments"
 cat > plans/hash-comment-plan.md << 'EOF'
 # This is a comment line 1
@@ -606,8 +606,8 @@ else
     fail "#-comment-only plan rejection" "exit 1 with insufficient content error" "$RESULT"
 fi
 
-# Test 9.10: Accept plan with enough non-blank content
-# Note: Lines starting with # are treated as comments, so we use plain text
+# 测试 9.10：接受有足够非空内容的计划
+# 注意：以 # 开头的行被视为注释，所以我们使用纯文本
 echo "Test 9.10: Accept plan with sufficient non-blank content"
 cat > plans/good-plan.md << 'EOF'
 Good Plan
@@ -626,15 +626,15 @@ set +e
 RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "plans/good-plan.md" 2>&1)
 EXIT_CODE=$?
 set -e
-# Should not fail due to content validation (may fail later for other reasons like codex)
+# 不应该因内容验证而失败（可能因其他原因如 codex 而失败）
 if ! echo "$RESULT" | grep -q "insufficient content"; then
     pass "Valid plan with sufficient content accepted"
 else
     fail "Valid plan acceptance" "no insufficient content error" "$RESULT"
 fi
 
-# Test 9.10.1: Accept plan with single-line HTML comments and valid content
-# Regression test: single-line HTML comments should NOT trigger multi-line comment mode
+# 测试 9.10.1：接受带单行 HTML 注释和有效内容的计划
+# 回归测试：单行 HTML 注释不应触发多行注释模式
 echo "Test 9.10.1: Accept plan with single-line HTML comments + valid content"
 cat > plans/single-line-html-comment-plan.md << 'EOF'
 <!-- This is a single-line HTML comment -->
@@ -652,7 +652,7 @@ set +e
 RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" "plans/single-line-html-comment-plan.md" 2>&1)
 EXIT_CODE=$?
 set -e
-# Should not fail due to content validation - single-line comments should be skipped properly
+# 不应该因内容验证而失败 - 单行注释应该被正确跳过
 if ! echo "$RESULT" | grep -q "insufficient content"; then
     pass "Plan with single-line HTML comments + valid content accepted"
 else
@@ -669,18 +669,18 @@ cd "$TEST_DIR"
 setup_test_repo
 mock_codex
 set +e
-# This should fail validation (not actually run), but pass CLI parsing
+# 这应该失败验证（不实际运行），但通过 CLI 解析
 RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" --plan-file "plans/test-plan.md" 2>&1)
 EXIT_CODE=$?
 set -e
-# Should get past CLI parsing - either run or fail on some validation
+# 应该通过 CLI 解析 - 要么运行要么在某些验证上失败
 if ! echo "$RESULT" | grep -q "requires a file path"; then
     pass "--plan-file option accepted"
 else
     fail "--plan-file option" "option accepted" "$RESULT"
 fi
 
-# Test 11: Both --plan-file and positional should fail
+# 测试 11：同时使用 --plan-file 和位置参数应该失败
 echo "Test 11: Reject both --plan-file and positional"
 rm -rf "$TEST_DIR/.humanize/rlcr" 2>/dev/null || true
 set +e
@@ -697,9 +697,9 @@ echo ""
 echo "=== Test: Codex Parameter Validation ==="
 echo ""
 
-# Test 12: Reject codex model with YAML-unsafe characters
-# Note: colon is used as delimiter (model:effort), so test with $ which stays in model portion
-echo "Test 12: Reject codex model with YAML-unsafe characters"
+# 测试 12：拒绝带 YAML 不安全字符的 codex 模型
+# 注意：冒号用作分隔符（model:effort），所以用 $ 测试，它会留在 model 部分
+echo "测试 12：拒绝带 YAML 不安全字符的 codex 模型"
 setup_test_repo
 mock_codex
 rm -rf "$TEST_DIR/.humanize/rlcr" 2>/dev/null || true
@@ -713,8 +713,8 @@ else
     fail "Codex model validation" "exit 1 with invalid characters error" "$RESULT"
 fi
 
-# Test 13: Reject codex effort with YAML-unsafe characters
-echo "Test 13: Reject codex effort with YAML-unsafe characters"
+# 测试 13：拒绝带 YAML 不安全字符的 codex effort
+echo "测试 13：拒绝带 YAML 不安全字符的 codex effort"
 rm -rf "$TEST_DIR/.humanize/rlcr" 2>/dev/null || true
 set +e
 RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" --codex-model "gpt-5.5:high#comment" "plans/test-plan.md" 2>&1)
@@ -726,13 +726,13 @@ else
     fail "Codex effort validation" "exit 1 with invalid codex effort error" "$RESULT"
 fi
 
-# Test 14: Accept valid codex model with dots and hyphens
+# 测试 14：接受带点和连字符的有效 codex 模型
 echo "Test 14: Accept valid codex model (alphanumeric, dots, hyphens)"
 set +e
 RESULT=$("$PROJECT_ROOT/scripts/setup-rlcr-loop.sh" --codex-model "gpt-5.5:medium" "plans/test-plan.md" 2>&1)
 EXIT_CODE=$?
 set -e
-# Should not fail due to model/effort validation (may fail later for other reasons)
+# 不应该因 model/effort 验证而失败（可能因其他原因而失败）
 if ! echo "$RESULT" | grep -q "invalid characters"; then
     pass "Valid codex model accepted"
 else

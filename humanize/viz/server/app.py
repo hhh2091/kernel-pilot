@@ -1,7 +1,7 @@
-"""Humanize Viz — Flask application.
+"""Humanize Viz — Flask 应用。
 
-Serves the SPA frontend, REST API for session data, and WebSocket
-for real-time file change notifications.
+提供 SPA 前端、会话数据的 REST API 以及
+实时文件变更通知的 WebSocket 服务。
 """
 
 import os
@@ -16,7 +16,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory, abort
 from flask_sock import Sock
 from werkzeug.utils import safe_join
 
-# Add server directory to path
+# 将服务器目录添加到路径
 sys.path.insert(0, os.path.dirname(__file__))
 from parser import list_sessions, parse_session, read_plan_file, is_valid_session
 from analyzer import compute_analytics
@@ -28,18 +28,16 @@ import log_streamer
 app = Flask(__name__, static_folder=None)
 sock = Sock(app)
 
-# Global state
+# 全局状态
 PROJECT_DIR = '.'
 STATIC_DIR = '.'
 BIND_HOST = '127.0.0.1'
 AUTH_TOKEN = ''
-# Set by main() when `--trust-proxy` (or HUMANIZE_VIZ_TRUST_PROXY=1)
-# is supplied. Acknowledges that a TLS-terminating reverse proxy is
-# in front of the server, which lets the CSRF host/port matcher
-# honor `X-Forwarded-Proto` for scheme-based port resolution.
-# Localhost-bound dev mode always leaves this False so attacker-
-# supplied `X-Forwarded-Proto` headers cannot trick a direct-
-# connect dashboard into thinking it's HTTPS.
+# 由 main() 在提供 `--trust-proxy`（或 HUMANIZE_VIZ_TRUST_PROXY=1）
+# 时设置。确认服务器前面有 TLS 终止反向代理，使 CSRF 主机/端口
+# 匹配器可以正确处理 `X-Forwarded-Proto` 以进行基于协议的端口解析。
+# 本地主机绑定的开发模式始终保持为 False，以防止攻击者提供的
+# `X-Forwarded-Proto` 头欺骗直连仪表板认为其为 HTTPS。
 TRUST_PROXY = False
 _session_cache = {}
 _cache_lock = threading.Lock()
@@ -49,17 +47,17 @@ _watcher = None
 
 
 def _is_localhost_bind():
-    """Return True when the server is bound to a loopback interface."""
+    """当服务器绑定到回环接口时返回 True。"""
     return BIND_HOST in ('127.0.0.1', '::1', 'localhost')
 
 
 def _request_token():
-    """Extract the bearer token from an incoming Flask request.
+    """从传入的 Flask 请求中提取 bearer 令牌。
 
-    Honors both the standard ``Authorization: Bearer <tok>`` header (used
-    by the SPA's ``fetch`` calls) and the ``?token=<tok>`` query parameter
-    (used by the SSE ``EventSource`` client because browsers cannot set
-    arbitrary headers on EventSource).
+    同时支持标准的 ``Authorization: Bearer <tok>`` 头（SPA 的
+    ``fetch`` 调用使用）和 ``?token=<tok>`` 查询参数（SSE
+    ``EventSource`` 客户端使用，因为浏览器无法在 EventSource
+    上设置任意头）。
     """
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
@@ -70,15 +68,13 @@ def _request_token():
 
 
 def _request_authorized():
-    """True iff the current request may access protected endpoints.
+    """当前请求是否有权访问受保护的端点。
 
-    Fail-closed defense-in-depth: ``main()`` refuses to start a
-    non-loopback bind without a token, but any code path that skips
-    ``main()`` (module import plus a bespoke ``app.run`` wrapper, a
-    future test harness, an alternate entry point) would otherwise
-    pass every request through. Treat an empty AUTH_TOKEN on a
-    non-loopback bind as "no credential was configured, deny" rather
-    than "no credential was configured, allow".
+    纵深防御的默认拒绝策略：``main()`` 拒绝在没有令牌的情况下
+    启动非回环绑定，但任何跳过 ``main()`` 的代码路径（模块导入加
+    上自定义 ``app.run`` 包装器、未来的测试框架、替代入口点）
+    都会让每个请求通过。将非回环绑定上的空 AUTH_TOKEN 视为
+    "未配置凭据，拒绝"而不是"未配置凭据，允许"。
     """
     if _is_localhost_bind():
         return True
@@ -91,29 +87,26 @@ def _get_rlcr_dir():
     return os.path.join(PROJECT_DIR, '.humanize', 'rlcr')
 
 
-# Session ids flow into the frontend's inline onclick template
-# literals:
+# 会话 ID 会流入前端的内联 onclick 模板字面量：
 #   onclick="navigate('#/session/${s.id}')"
 #   onclick="opsPreviewIssue('${s.id}')"
-# so any id containing a JS-string metacharacter (quote, backtick,
-# backslash, angle bracket, newline, etc.) would let hostile disk
-# state break out of the surrounding string and inject script.
-# setup-rlcr-loop.sh generates ids that match
-# `YYYY-MM-DD_HH-MM-SS`, but some test fixtures and legacy
-# recoveries use simpler slugs like `2026-04-17_CL`. Accept the
-# full superset of safe characters (ASCII letters, digits,
-# underscore, dash, period — with extra rules rejecting `..`,
-# leading-dot, and path separators) so those still work while
-# every character outside that set is refused up-front.
+# 因此任何包含 JS 字符串元字符（引号、反引号、反斜杠、
+# 尖括号、换行符等）的 ID 都会让恶意磁盘状态突破周围
+# 的字符串并注入脚本。setup-rlcr-loop.sh 生成匹配
+# `YYYY-MM-DD_HH-MM-SS` 的 ID，但一些测试固件和旧版
+# 恢复使用更简单的 slug，如 `2026-04-17_CL`。接受安全
+# 字符的完整超集（ASCII 字母、数字、下划线、连字符、
+# 句点——附加规则拒绝 `..`、前导点和路径分隔符）以便
+# 这些仍然有效，同时预先拒绝该集合之外的每个字符。
 _SESSION_ID_RE = re.compile(r'^[A-Za-z0-9_.\-]+$')
 
 
 def _is_safe_session_id(session_id):
-    """Return True iff ``session_id`` only uses the safe alphabet.
+    """当 ``session_id`` 仅使用安全字母表时返回 True。
 
-    Rejects anything with path separators, parent-traversal
-    markers, leading dots, or characters that could escape a JS
-    string literal in the frontend's inline onclick handlers.
+    拒绝包含路径分隔符、父目录遍历标记、前导点或可能
+    在前端内联 onclick 处理程序中转义 JS 字符串字面量的
+    字符的任何内容。
     """
     if not session_id or len(session_id) > 128:
         return False
@@ -125,27 +118,24 @@ def _is_safe_session_id(session_id):
 
 
 def _get_session_dir(session_id):
-    """Resolve a session_id to its on-disk directory, or None.
+    """将 session_id 解析为其磁盘目录，或返回 None。
 
-    Defense-in-depth path validation: every session-scoped route
-    (detail, plan, report, generate-report, cancel, SSE log stream)
-    passes a user-controlled session_id through here. Without these
-    checks a request like `/api/sessions/..` would resolve to
-    `.humanize/..` = the project's `.humanize/` parent, and any
-    stray directory under `.humanize/rlcr` (e.g. a `cache/` dir)
-    would bypass the 404 contract and let downstream parsers read
-    arbitrary files.
+    纵深防御路径验证：每个会话范围的路由（detail、plan、report、
+    generate-report、cancel、SSE 日志流）都将用户控制的 session_id
+    传递到此处。没有这些检查，像 `/api/sessions/..` 这样的请求
+    会解析为 `.humanize/..` = 项目的 `.humanize/` 父目录，而
+    `.humanize/rlcr` 下的任何杂散目录（例如 `cache/` 目录）
+    都会绕过 404 契约并让下游解析器读取任意文件。
 
-    Reject:
-      - session_id that does not match the canonical
-        ``YYYY-MM-DD_HH-MM-SS`` shape (covers path separators, `..`,
-        dotfiles, and anything that could escape from a JS string
-        literal in the frontend's inline onclick handlers)
-      - candidates that resolve outside the RLCR dir after
-        realpath normalisation (defense against symlink escapes)
-      - directories that exist but are not actually RLCR sessions
-        (parser.is_valid_session requires state.md or a terminal
-        *-state.md file)
+    拒绝：
+      - 不匹配规范 ``YYYY-MM-DD_HH-MM-SS`` 格式的 session_id
+        （涵盖路径分隔符、`..`、点文件以及可能从前端内联 onclick
+        处理程序中的 JS 字符串字面量转义的任何内容）
+      - 在 realpath 规范化后解析到 RLCR 目录之外的候选项
+        （防御符号链接逃逸）
+      - 存在但实际不是 RLCR 会话的目录
+        （parser.is_valid_session 需要 state.md 或终端
+        *-state.md 文件）
     """
     if not _is_safe_session_id(session_id):
         return None
@@ -153,8 +143,8 @@ def _get_session_dir(session_id):
     candidate = os.path.join(rlcr_dir, session_id)
     if not os.path.isdir(candidate):
         return None
-    # Resolve both sides to compare against symlinks. The candidate
-    # must still live under the rlcr dir after normalisation.
+    # 解析两边以与符号链接进行比较。候选项在规范化后
+    # 必须仍然位于 rlcr 目录下。
     try:
         rlcr_real = os.path.realpath(rlcr_dir)
         cand_real = os.path.realpath(candidate)
@@ -169,7 +159,7 @@ def _get_session_dir(session_id):
 
 
 def _get_session(session_id, force_refresh=False):
-    """Get session data with caching."""
+    """获取会话数据（带缓存）。"""
     with _cache_lock:
         if not force_refresh and session_id in _session_cache:
             return _session_cache[session_id]
@@ -185,7 +175,7 @@ def _get_session(session_id, force_refresh=False):
 
 
 def _invalidate_cache(session_id=None):
-    """Invalidate cache for a session or all sessions."""
+    """使会话或所有会话的缓存失效。"""
     with _cache_lock:
         if session_id:
             _session_cache.pop(session_id, None)
@@ -194,7 +184,7 @@ def _invalidate_cache(session_id=None):
 
 
 def broadcast_message(message):
-    """Send a message to all connected WebSocket clients."""
+    """向所有已连接的 WebSocket 客户端发送消息。"""
     dead = set()
     with _ws_lock:
         clients = set(_ws_clients)
@@ -207,14 +197,14 @@ def broadcast_message(message):
 
     if dead:
         with _ws_lock:
-            # Mutate in-place via difference_update instead of `-=`.
-            # `_ws_clients -= dead` would rebind the name, which makes
-            # Python treat `_ws_clients` as a function-local variable
-            # throughout broadcast_message and raise UnboundLocalError
-            # at the earlier `set(_ws_clients)` read.
+            # 通过 difference_update 而不是 `-=` 就地修改。
+            # `_ws_clients -= dead` 会重新绑定名称，这使得 Python
+            # 在整个 broadcast_message 中将 `_ws_clients` 视为
+            # 函数局部变量，并在之前的 `set(_ws_clients)` 读取时
+            # 抛出 UnboundLocalError。
             _ws_clients.difference_update(dead)
 
-    # Invalidate cache for the affected session
+    # 使受影响会话的缓存失效
     try:
         data = json.loads(message)
         _invalidate_cache(data.get('session_id'))
@@ -222,18 +212,18 @@ def broadcast_message(message):
         pass
 
 
-# --- Auth middleware (T11) ---
+# --- 认证中间件 (T11) ---
 
-# Endpoints that remain reachable without a token even in remote mode.
-# The static SPA shell and the health probe must stay open so the
-# browser can fetch index.html and report liveness; everything else
-# (session data, SSE streams, mutators) is gated.
+# 即使在远程模式下也无需令牌即可访问的端点。
+# 静态 SPA 外壳和健康检查探针必须保持开放，以便浏览器
+# 可以获取 index.html 并报告存活性；其他所有内容
+# （会话数据、SSE 流、变更器）都受到门控。
 _AUTH_OPEN_PREFIXES = ('/api/health',)
 
 
 def _is_open_path(path):
     if path == '/' or not path.startswith('/api/'):
-        # Static asset path served by the SPA fallback.
+        # SPA 回退提供的静态资源路径。
         return True
     for prefix in _AUTH_OPEN_PREFIXES:
         if path.startswith(prefix):
@@ -251,31 +241,28 @@ def _default_port_for_scheme(scheme):
 
 
 def _effective_request_scheme():
-    """Return the wire-level scheme the browser actually used.
+    """返回浏览器实际使用的线路级协议。
 
-    Behind a TLS-terminating reverse proxy (the `--trust-proxy`
-    deployment mode), Flask sees the back-channel request as plain
-    HTTP — `request.scheme` is `http`, so the default-port lookup
-    below would collapse to 80 even though the browser spoke to the
-    proxy on 443. That mismatch turns every browser Origin of
-    `https://host` into a 403 at `_origin_matches_request()` because
-    the computed request port (80) differs from the origin port
-    (443), which in turn blocks cancel / generate-report / GitHub-
-    issue submissions in the standard HTTPS-behind-proxy deployment.
+    在 TLS 终止反向代理后面（`--trust-proxy` 部署模式），
+    Flask 将后端通道请求视为纯 HTTP — `request.scheme` 为
+    `http`，因此下面的默认端口查找会缩减为 80，即使浏览器
+    通过 443 与代理通信。这种不匹配将每个浏览器的
+    `https://host` Origin 在 `_origin_matches_request()` 处
+    变为 403，因为计算的请求端口（80）与 Origin 端口（443）
+    不同，这反过来阻止了标准 HTTPS 代理部署中的
+    cancel / generate-report / GitHub-issue 提交。
 
-    When `TRUST_PROXY` is True, honor `X-Forwarded-Proto`
-    (populated by every reasonable reverse proxy) for scheme
-    resolution so the default-port calculation lines up with the
-    browser's view. Anything other than explicit `https` falls back
-    to Flask's own `request.scheme` so HTTP proxy deployments keep
-    working. When `TRUST_PROXY` is False we ignore the header
-    entirely — otherwise an attacker on a direct-connect localhost
-    dashboard could flip our scheme view with a crafted header.
+    当 `TRUST_PROXY` 为 True 时，遵从 `X-Forwarded-Proto`
+    （由每个合理的反向代理填充）进行协议解析，以便默认端口
+    计算与浏览器视图一致。除显式 `https` 以外的任何内容
+    回退到 Flask 自己的 `request.scheme`，因此 HTTP 代理
+    部署继续工作。当 `TRUST_PROXY` 为 False 时，我们完全
+    忽略该头——否则直连本地主机仪表板上的攻击者可以通过
+    精心构造的头来翻转我们的协议视图。
     """
     if TRUST_PROXY:
         forwarded = (request.headers.get('X-Forwarded-Proto') or '').strip().lower()
-        # Some proxies comma-separate when multiple hops exist; the
-        # first entry is the one the client hit.
+        # 某些代理在存在多跳时用逗号分隔；第一个条目是客户端命中的。
         if forwarded:
             forwarded = forwarded.split(',', 1)[0].strip()
         if forwarded == 'https':
@@ -286,19 +273,18 @@ def _effective_request_scheme():
 
 
 def _parse_request_host_port():
-    """Return ``(host, port)`` for the current request's Host header.
+    """返回当前请求 Host 头的 ``(host, port)``。
 
-    ``request.host`` is the value the browser actually used to reach
-    the dashboard (e.g. ``server.example.com:18000``), which may
-    differ from the configured ``BIND_HOST`` in wildcard deployments
-    such as ``--host 0.0.0.0``. Same-origin checks must compare
-    against this value, not against the bind, so remote browsers can
-    actually issue cross-host writes.
+    ``request.host`` 是浏览器实际用于访问仪表板的值
+    （例如 ``server.example.com:18000``），在通配符部署
+    （如 ``--host 0.0.0.0``）中可能与配置的 ``BIND_HOST``
+    不同。同源检查必须与此值进行比较，而不是与绑定进行
+    比较，以便远程浏览器实际上可以发出跨主机写入。
 
-    IPv6 hosts in HTTP Host headers are bracketed per RFC 7230
-    (``[::1]:18000`` for the loopback bind), but ``urlparse(Origin)
-    .hostname`` returns the unbracketed form (``::1``). Strip the
-    brackets after the host/port split so the comparison matches.
+    HTTP Host 头中的 IPv6 主机按 RFC 7230 用方括号括起来
+    （回环绑定的 ``[::1]:18000``），但 ``urlparse(Origin)
+    .hostname`` 返回无括号的形式（``::1``）。在主机/端口
+    拆分后去掉方括号，以便比较匹配。
     """
     scheme = _effective_request_scheme()
     raw = (request.host or '').lower()
@@ -319,16 +305,14 @@ def _parse_request_host_port():
 
 
 def _origin_matches_request(origin_value):
-    """True when ``origin_value`` points at the same host:port the
-    browser actually used for this request.
+    """当 ``origin_value`` 指向浏览器实际用于此请求的相同 host:port 时为 True。
 
-    Comparing to the request's own ``Host`` header (rather than the
-    configured ``BIND_HOST``) is what lets ``--host 0.0.0.0`` remote
-    deployments work: the bind is a wildcard but the browser sends
-    the machine's real hostname, so a literal-bind comparison would
-    reject every cross-host POST as cross-origin. Loopback aliases
-    (localhost/127.0.0.1/::1) are treated as equivalent so the user
-    is not pinned to whichever alias they happened to type.
+    与请求自身的 ``Host`` 头（而不是配置的 ``BIND_HOST``）
+    进行比较是让 ``--host 0.0.0.0`` 远程部署工作的原因：
+    绑定是通配符，但浏览器发送机器的真实主机名，因此字面
+    绑定比较会将每个跨主机 POST 视为跨域而拒绝。回环别名
+    （localhost/127.0.0.1/::1）被视为等效，因此用户不会
+    被固定到他们碰巧输入的别名。
     """
     if not origin_value:
         return False
@@ -342,12 +326,11 @@ def _origin_matches_request(origin_value):
     origin_host = (parsed.hostname or '').lower()
     if not origin_host:
         return False
-    # ``urlparse`` succeeds for malformed Origin values like
-    # ``http://host:bad`` or ``http://host:999999``; the port is only
-    # validated when ``.port`` is accessed, which raises ValueError.
-    # Treat such values as non-matching so ``_enforce_csrf_protection``
-    # returns a controlled 403 instead of letting the exception bubble
-    # up as a 500.
+    # ``urlparse`` 对格式错误的 Origin 值（如 ``http://host:bad``
+    # 或 ``http://host:999999``）也能成功；端口仅在访问 ``.port``
+    # 时被验证，这会引发 ValueError。将此类值视为不匹配，以便
+    # ``_enforce_csrf_protection`` 返回受控的 403，而不是让异常
+    # 冒泡为 500。
     try:
         origin_port = parsed.port or _default_port_for_scheme(parsed.scheme)
     except ValueError:
@@ -362,14 +345,13 @@ def _origin_matches_request(origin_value):
 
 
 def _enforce_csrf_protection():
-    """Reject cross-origin writes regardless of bind / auth posture.
+    """无论绑定/认证姿态如何，拒绝跨域写入。
 
-    Remote-mode deployments are still further gated by the auth
-    middleware (token check); CSRF is layered on top so a stolen
-    token cannot be exploited from an arbitrary origin either.
-    Localhost binds were the original gap Codex flagged: without this
-    layer, any webpage open in the same browser could POST to
-    127.0.0.1:<port> mutating endpoints.
+    远程模式部署仍然受到认证中间件（令牌检查）的进一步
+    门控；CSRF 在此基础上分层，因此被盗的令牌也不能从
+    任意来源被利用。本地主机绑定是 Codex 最初标记的缺口：
+    没有这一层，同一浏览器中打开的任何网页都可以向
+    127.0.0.1:<port> 变更端点发送 POST 请求。
     """
     if request.method not in _MUTATING_METHODS:
         return None
@@ -385,23 +367,21 @@ def _enforce_csrf_protection():
         if _origin_matches_request(referer):
             return None
         return jsonify({'error': 'cross-origin write rejected'}), 403
-    # No Origin AND no Referer header: browsers always set at least
-    # one of them on cross-site form/fetch POSTs, so the absence
-    # almost certainly means the request came from a same-origin
-    # script that suppressed both, a server-to-server tool such as
-    # curl, or our own Flask test_client. Allow it; the auth layer
-    # still gates remote requests via token.
+    # 没有 Origin 也没有 Referer 头：浏览器在跨站表单/fetch POST
+    # 上总是设置至少其中一个，因此缺失几乎肯定意味着请求来自
+    # 同源脚本（抑制了两者）、服务器到服务器工具（如 curl）
+    # 或我们自己的 Flask test_client。允许它；认证层仍然通过
+    # 令牌门控远程请求。
     return None
 
 
 @app.before_request
 def _enforce_auth_and_csrf():
-    """Combined auth + CSRF gate.
+    """组合认证 + CSRF 门控。
 
-    Order matters: the CSRF layer runs first so cross-origin writes
-    are rejected even if the request happens to carry a valid token
-    (defense in depth). The auth layer then enforces the bearer
-    token in remote mode for every protected endpoint.
+    顺序很重要：CSRF 层先运行，因此即使请求碰巧携带了
+    有效令牌，跨域写入也会被拒绝（纵深防御）。然后认证
+    层在远程模式下为每个受保护的端点强制执行 bearer 令牌。
     """
     csrf_response = _enforce_csrf_protection()
     if csrf_response is not None:
@@ -415,7 +395,7 @@ def _enforce_auth_and_csrf():
     return jsonify({'error': 'unauthorized'}), 401
 
 
-# --- Static file serving ---
+# --- 静态文件服务 ---
 
 @app.route('/')
 def index():
@@ -426,41 +406,40 @@ def index():
 def static_files(path):
     if path.startswith('api/'):
         abort(404)
-    # Reject traversal / absolute paths BEFORE probing the filesystem.
-    # The earlier implementation did ``os.path.isfile(os.path.join(
-    # STATIC_DIR, path))`` for any client-supplied ``path``, which
-    # turned an intentionally-open endpoint into an unauthenticated
-    # filesystem-existence oracle: a request containing ``..``
-    # segments took the ``send_from_directory`` branch (404) when the
-    # target existed, but fell through to the SPA fallback (200) when
-    # it did not. Werkzeug's ``safe_join`` returns ``None`` for any
-    # path that would escape STATIC_DIR, so we skip the probe entirely
-    # in that case and go straight to the SPA fallback — the response
-    # is identical whether the traversal target existed or not.
+    # 在探测文件系统之前拒绝遍历/绝对路径。
+    # 之前的实现对任何客户端提供的 ``path`` 执行
+    # ``os.path.isfile(os.path.join(STATIC_DIR, path))``，
+    # 这将有意开放的端点变成了未经认证的文件系统存在性
+    # 预言机：包含 ``..`` 段的请求在目标存在时进入
+    # ``send_from_directory`` 分支（404），但在不存在时
+    # 回退到 SPA 回退（200）。Werkzeug 的 ``safe_join``
+    # 对任何会逃逸 STATIC_DIR 的路径返回 ``None``，
+    # 因此在这种情况下我们完全跳过探测，直接转到 SPA
+    # 回退——无论遍历目标是否存在，响应都是相同的。
     safe_path = safe_join(STATIC_DIR, path)
     if safe_path is not None and os.path.isfile(safe_path):
         return send_from_directory(STATIC_DIR, path)
-    # SPA fallback
+    # SPA 回退
     return send_from_directory(STATIC_DIR, 'index.html')
 
 
-# --- Health check ---
+# --- 健康检查 ---
 
 @app.route('/api/health')
 def health():
     return jsonify({'status': 'ok'})
 
 
-# --- Project Listing (read-only; CLI-fixed single-project model per DEC-3) ---
+# --- 项目列表（只读；按 DEC-3 的 CLI 固定单项目模型）---
 #
-# T10 backend cleanup: the legacy server-global project switcher (which
-# allowed any client to mutate PROJECT_DIR for ALL connected clients
-# and persisted to ~/.humanize/viz-projects.json) has been removed in
-# favor of one server per project. Project selection is now CLI-fixed
-# at startup via `humanize monitor web --project <path>`. The
-# read-only /api/projects endpoint stays for frontend compatibility
-# during the Round 5 UI refactor; it returns ONLY the project the
-# server was started with and never mutates the projects file.
+# T10 后端清理：旧版服务器全局项目切换器（允许任何客户端
+# 为所有已连接客户端修改 PROJECT_DIR 并持久化到
+# ~/.humanize/viz-projects.json）已被移除，改为每个项目一个
+# 服务器。项目选择现在在启动时通过
+# `humanize monitor web --project <path>` 由 CLI 固定。
+# 只读 /api/projects 端点在第 5 轮 UI 重构期间保留以保持
+# 前端兼容性；它仅返回服务器启动时使用的项目，且从不
+# 修改项目文件。
 
 
 @app.route('/api/projects')
@@ -504,19 +483,17 @@ def api_projects_removed():
 @app.route('/api/sessions')
 def api_sessions():
     sessions = list_sessions(PROJECT_DIR)
-    # Return summary-level data (no full round content). cache_logs is
-    # included because the home-page multi-session live-pane feature
-    # needs it to pick a log filename and open the SSE stream; without
-    # it every active card degrades to the WAITING state regardless of
-    # whether cache logs actually exist.
+    # 返回摘要级数据（不含完整轮次内容）。cache_logs 被包含在内，
+    # 因为首页多会话实时窗格功能需要它来选择日志文件名并打开
+    # SSE 流；没有它，每个活跃卡片都会降级为 WAITING 状态，
+    # 无论缓存日志是否实际存在。
     #
-    # Filter out any on-disk directory whose name does not match the
-    # canonical session-id shape before emitting. This is the second
-    # line of defence for the inline-onclick XSS vector Codex flagged
-    # — a session directory created by hand with a name like
-    # `2026-04-18_00-34-17'); alert(1); //` should never reach the
-    # frontend where `onclick="navigate('#/session/${s.id}')"` would
-    # break out of the JS string.
+    # 在发送之前过滤掉任何名称不匹配规范会话 ID 形状的
+    # 磁盘目录。这是 Codex 标记的内联 onclick XSS 向量的
+    # 第二道防线——手工创建的名称如
+    # `2026-04-18_00-34-17'); alert(1); //` 的会话目录
+    # 不应该到达前端，那里 `onclick="navigate('#/session/${s.id}')"`
+    # 会突破 JS 字符串。
     summaries = []
     for s in sessions:
         if not _is_safe_session_id(s.get('id', '')):
@@ -532,9 +509,9 @@ def api_sessions():
             'started_at': s['started_at'],
             'last_verdict': s['last_verdict'],
             'drift_status': s['drift_status'],
-            # Extra state fields so the home-page active card can
-            # match the `humanize monitor rlcr` status bar line-for-line
-            # without forcing clients to hit /api/sessions/<id>.
+            # 额外的状态字段，使首页活跃卡片可以逐行匹配
+            # `humanize monitor rlcr` 状态栏，而无需强制客户端
+            # 访问 /api/sessions/<id>。
             'codex_model': s.get('codex_model', ''),
             'codex_effort': s.get('codex_effort', ''),
             'ask_codex_question': s.get('ask_codex_question', False),
@@ -585,13 +562,12 @@ def api_session_report(session_id):
     if not session:
         abort(404)
     report = session.get('methodology_report')
-    # parse_session always populates methodology_report via
-    # _to_bilingual, which returns {'zh': None, 'en': None} when no
-    # report file exists. The previous `if not report:` never fired
-    # because that dict is truthy, so the route returned 200 with an
-    # empty payload and clients couldn't distinguish "report missing"
-    # from "report loaded successfully but empty". Require at least
-    # one of zh / en to carry content before returning 200.
+    # parse_session 始终通过 _to_bilingual 填充 methodology_report，
+    # 当报告文件不存在时返回 {'zh': None, 'en': None}。之前的
+    # `if not report:` 从未触发，因为该字典是真值，所以路由
+    # 返回 200 和空负载，客户端无法区分"报告缺失"和"报告
+    # 加载成功但为空"。在返回 200 之前要求 zh / en 至少一个
+    # 携带内容。
     if not isinstance(report, dict) or not (report.get('zh') or report.get('en')):
         abort(404)
     return jsonify({'content': report})
@@ -599,15 +575,13 @@ def api_session_report(session_id):
 
 @app.route('/api/analytics')
 def api_analytics():
-    # Drop any on-disk session whose directory name does not match
-    # the canonical shape before feeding it into the analyzer. The
-    # Analytics page's comparison table renders ``session_id`` into
-    # an inline ``onclick="navigate('#/session/${id}')"`` template
-    # and cell HTML; without this filter a crafted directory name
-    # containing quote/JS metacharacters would reach the browser
-    # and could break out of the attribute or inject script, which
-    # is the exact vector ``/api/sessions`` already guards against.
-    # Matching the same filter here keeps both surfaces consistent.
+    # 在将磁盘会话输入分析器之前，过滤掉任何目录名称不匹配
+    # 规范形状的会话。分析页面的比较表将 ``session_id`` 渲染到
+    # 内联 ``onclick="navigate('#/session/${id}')`` 模板和单元格
+    # HTML 中；没有这个过滤器，包含引号/JS 元字符的精心构造的
+    # 目录名会到达浏览器，并可能突破属性或注入脚本，这正是
+    # ``/api/sessions`` 已经防御的向量。在此匹配相同的过滤器
+    # 保持两个表面一致。
     sessions = [
         s for s in list_sessions(PROJECT_DIR)
         if _is_safe_session_id(s.get('id', ''))
@@ -617,21 +591,18 @@ def api_analytics():
 
 
 def _report_is_stale(session_dir, report_path):
-    """True when the on-disk methodology report predates any round
-    summary / review-result under ``session_dir``.
+    """当磁盘上的方法论报告早于 ``session_dir`` 下的任何轮次
+    摘要/审查结果时为 True。
 
-    The cached report was generated against an earlier snapshot of
-    the session; any new summary or review file that lands after
-    its mtime invalidates it. Activities after the report:
-      - a new round's summary was written (loop kept going)
-      - an existing round's review-result changed (verdict flipped)
-    Either way, returning the stale cached text on /generate-report
-    would feed Codex/users an analysis of a session that has since
-    moved on.
+    缓存的报告是针对会话的早期快照生成的；在其 mtime 之后
+    落地的任何新摘要或审查文件都会使其失效。报告之后的活动：
+      - 写入了新轮次的摘要（循环继续进行）
+      - 现有轮次的审查结果发生了变化（判决翻转）
+    无论哪种方式，在 /generate-report 上返回过时的缓存文本
+    都会向 Codex/用户提供一个已经继续前进的会话的分析。
 
-    Returns False when the report is missing or empty (caller will
-    generate from scratch), or when it's present and at least as
-    new as every source file.
+    当报告缺失或为空（调用者将从头生成）时，或当报告存在
+    且至少与每个源文件一样新时返回 False。
     """
     try:
         report_mtime = os.path.getmtime(report_path)
@@ -651,14 +622,13 @@ def _report_is_stale(session_dir, report_path):
 
 @app.route('/api/sessions/<session_id>/generate-report', methods=['POST'])
 def api_generate_report(session_id):
-    """Generate a methodology analysis report by invoking local Claude CLI.
+    """通过调用本地 Claude CLI 生成方法论分析报告。
 
-    The ``?force=1`` query parameter bypasses the "report already
-    exists" shortcut and always re-runs Claude. Without it the
-    route still re-runs when the cached report predates any round
-    summary or review-result file — the old "exists => done" path
-    let users see stale analyses on sessions that had advanced
-    since the last preview.
+    ``?force=1`` 查询参数绕过"报告已存在"的快捷方式并始终
+    重新运行 Claude。没有它时，当缓存的报告早于任何轮次
+    摘要或审查结果文件时，路由仍会重新运行——旧的
+    "存在 => 完成"路径让用户在自上次预览以来已推进的
+    会话上看到过时的分析。
     """
     session_dir = _get_session_dir(session_id)
     if not session_dir:
@@ -667,10 +637,9 @@ def api_generate_report(session_id):
     report_path = os.path.join(session_dir, 'methodology-analysis-report.md')
     force_regen = request.args.get('force', '').strip() in ('1', 'true', 'yes')
 
-    # Serve the cached report only when it's present, non-empty,
-    # and still newer than every source file that contributes to
-    # the analysis. A stale cache would otherwise survive indefinitely
-    # across new rounds on an active session.
+    # 仅当缓存报告存在、非空且仍然比每个贡献于分析的源文件
+    # 更新时才提供缓存报告。否则，过时的缓存会在活跃会话的
+    # 新轮次中无限期存在。
     if (not force_regen
             and os.path.exists(report_path)
             and os.path.getsize(report_path) > 0
@@ -678,7 +647,7 @@ def api_generate_report(session_id):
         with open(report_path, 'r', encoding='utf-8') as f:
             return jsonify({'status': 'exists', 'content': f.read()})
 
-    # Collect round summaries and review results (sorted numerically by round number)
+    # 收集轮次摘要和审查结果（按轮次号数字排序）
     import glob as _glob
     import re as _re_local
 
@@ -707,7 +676,7 @@ def api_generate_report(session_id):
     if not summaries and not reviews:
         return jsonify({'error': 'No round data to analyze'}), 400
 
-    # Build the analysis prompt
+    # 构建分析提示
     prompt = f"""Analyze the following RLCR development records from a PURE METHODOLOGY perspective.
 
 CRITICAL SANITIZATION RULES — your output MUST NOT contain:
@@ -753,14 +722,13 @@ Output format: Write a structured markdown report following this exact structure
 --- REVIEW RESULTS ---
 {chr(10).join(reviews[-10:])}
 """
-    # `_sort_round_files` returns entries in ascending round order
-    # (round 0, round 1, ...), so [-10:] picks the LATEST 10 rounds.
-    # Methodology signals — stagnation, drift, finalization — surface
-    # in the late phase of long sessions; taking [:10] would drop
-    # exactly the rounds that matter most for a session longer than
-    # ten rounds. Sessions with <=10 rounds are unaffected.
+    # `_sort_round_files` 按升序轮次顺序返回条目
+    # （第 0 轮、第 1 轮、...），因此 [-10:] 选择最新的 10 轮。
+    # 方法论信号——停滞、漂移、最终化——在长会话的后期阶段
+    # 浮现；取 [:10] 会丢弃对于超过十轮的会话最重要的轮次。
+    # 轮次 <=10 的会话不受影响。
 
-    # Invoke Claude CLI in pipe mode
+    # 以管道模式调用 Claude CLI
     try:
         result = subprocess.run(
             ['claude', '-p', '--model', 'sonnet', '--output-format', 'text'],
@@ -781,11 +749,11 @@ Output format: Write a structured markdown report following this exact structure
         if not report_content:
             return jsonify({'error': 'Claude returned empty response'}), 500
 
-        # Save the report
+        # 保存报告
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report_content)
 
-        # Invalidate session cache so the report is picked up
+        # 使会话缓存失效以便报告被拾取
         _invalidate_cache(session_id)
 
         return jsonify({'status': 'generated', 'content': report_content})
@@ -799,19 +767,19 @@ Output format: Write a structured markdown report following this exact structure
 
 
 def _find_cancel_script():
-    """Resolve cancel-rlcr-loop.sh from plugin layout or env."""
-    # Check env override first
+    """从插件布局或环境变量解析 cancel-rlcr-loop.sh。"""
+    # 首先检查环境变量覆盖
     env_script = os.environ.get('HUMANIZE_CANCEL_SCRIPT', '')
     if env_script and os.path.isfile(env_script):
         return env_script
 
-    # Sibling path within the same humanize plugin repo (viz/server/../../scripts/)
+    # 同一人形插件仓库中的兄弟路径 (viz/server/../../scripts/)
     server_dir = os.path.dirname(os.path.abspath(__file__))
     sibling = os.path.normpath(os.path.join(server_dir, '..', '..', 'scripts', 'cancel-rlcr-loop.sh'))
     if os.path.isfile(sibling):
         return sibling
 
-    # Search standard plugin cache locations
+    # 搜索标准插件缓存位置
     search_paths = [
         os.path.expanduser('~/.claude/plugins/cache/PolyArch/humanize'),
         os.path.expanduser('~/.claude/plugins/marketplaces/humania'),
@@ -831,15 +799,14 @@ def _find_cancel_script():
 
 
 def _find_session_cancel_script():
-    """Locate the session-scoped cancel helper from the plugin install.
+    """从插件安装中定位会话范围的取消辅助程序。
 
-    Mirrors the same lookup semantics as ``_find_cancel_script``: env
-    override first, then the sibling repo path (this file's grandparent
-    plus ``scripts/``), then the standard plugin cache locations. Without
-    the sibling and broader cache-path checks the route would 500 in any
-    deployment where ``CLAUDE_PLUGIN_ROOT`` is not set, which is the
-    common case when the dashboard is launched via
-    ``humanize monitor web`` from another terminal.
+    与 ``_find_cancel_script`` 相同的查找语义：环境变量覆盖优先，
+    然后是兄弟仓库路径（此文件的祖父目录加 ``scripts/``），
+    然后是标准插件缓存位置。没有兄弟路径和更广泛的缓存路径
+    检查，路由在任何未设置 ``CLAUDE_PLUGIN_ROOT`` 的部署中
+    都会 500，这是从另一个终端通过 ``humanize monitor web``
+    启动仪表板时的常见情况。
     """
     env_script = os.environ.get('HUMANIZE_CANCEL_SESSION_SCRIPT', '')
     if env_script and os.path.isfile(env_script):
@@ -872,13 +839,12 @@ def _find_session_cancel_script():
 
 @app.route('/api/sessions/cancel', methods=['POST'])
 def api_cancel_session_missing_id():
-    """Reachable 400 for the missing-session-id contract from criterion C-7.
+    """从标准 C-7 的缺失会话 ID 契约的可达 400。
 
-    Flask routing requires the ``<session_id>`` segment in the main
-    cancel route to match at all, so a request without it would
-    otherwise 404 before any handler ran. This explicit no-id route
-    surfaces the documented 400 contract and lets clients (and tests)
-    distinguish "you forgot the id" from "the id does not exist".
+    Flask 路由要求主取消路由中的 ``<session_id>`` 段完全匹配，
+    因此没有它的请求会在任何处理程序运行之前返回 404。
+    这个显式的无 ID 路由公开了记录的 400 契约，并让客户端
+    （和测试）区分"你忘记了 ID"和"ID 不存在"。
     """
     return jsonify({
         'error': 'session_id is required',
@@ -905,15 +871,13 @@ def api_cancel_session(session_id):
             'expected_script': 'scripts/cancel-rlcr-session.sh',
         }), 500
 
-    # The helper requires --force when the session is in the
-    # finalizing phase to avoid silent cancellation; without --force it
-    # exits with code 2. Forward it so dashboard cancel works for every
-    # phase the helper supports (active / analyzing / finalizing).
+    # 当会话处于最终化阶段时，辅助程序需要 --force 以避免静默
+    # 取消；没有 --force 它会以代码 2 退出。转发它以便仪表板
+    # 取消适用于辅助程序支持的每个阶段（active / analyzing / finalizing）。
     #
-    # `--project` MUST be passed explicitly so the helper does not
-    # fall back to ``CLAUDE_PROJECT_DIR`` (which the dashboard
-    # process may inherit from the shell that launched it, pointing
-    # at an entirely different workspace).
+    # `--project` 必须显式传递，以便辅助程序不会回退到
+    # ``CLAUDE_PROJECT_DIR``（仪表板进程可能从启动它的 shell
+    # 继承，指向完全不同的工作区）。
     helper_args = [cancel_script, '--project', PROJECT_DIR, '--session-id', session_id]
     if status == 'finalizing':
         helper_args.append('--force')
@@ -947,16 +911,15 @@ _FORBIDDEN_CATEGORIES = [
     ('branch_name', _re.compile(r'\b(?:feat|fix|hotfix|release|bugfix)/\w+')),
     ('branch_name', _re.compile(r'\bmain|master|develop\b')),
     ('code_definition', _re.compile(r'\bdef \w+|function \w+|class \w+')),
-    # Code-shaped imports only. The previous `\b(?:import|require|from)
-    # \s+\w+` pattern matched ordinary English prose like
-    # "drifted from the original plan structure", which flagged the
-    # built-in `plan_execution` methodology observation and caused
-    # /api/sessions/<id>/github-issue to reject already-sanitized
-    # payloads with a false-positive warning. Anchor each variant to
-    # a context that only appears in code:
-    #   - Python `import x` / `import x.y` at line start
-    #   - Python `from x.y import z` at line start
-    #   - JS/Node `require("…")` call syntax
+    # 仅匹配代码形式的导入。之前的 `\b(?:import|require|from)
+    # \s+\w+` 模式匹配了普通英语散文，如 "drifted from the
+    # original plan structure"，这标记了内置的 `plan_execution`
+    # 方法论观察并导致 /api/sessions/<id>/github-issue 以误报
+    # 警告拒绝已清理的负载。将每个变体锚定到仅出现在代码中的
+    # 上下文：
+    #   - Python `import x` / `import x.y` 在行首
+    #   - Python `from x.y import z` 在行首
+    #   - JS/Node `require("…")` 调用语法
     ('import_statement', _re.compile(r'^\s*import\s+[\w.]+', _re.MULTILINE)),
     ('import_statement', _re.compile(r'^\s*from\s+[\w.]+\s+import\b', _re.MULTILINE)),
     ('import_statement', _re.compile(r'\brequire\s*\(')),
@@ -973,8 +936,8 @@ _FORBIDDEN_CATEGORIES = [
 
 
 def _scan_for_forbidden_tokens(text):
-    """Return dict of {category: count} for forbidden patterns found in text.
-    Never returns the matched strings themselves to prevent leakage."""
+    """返回文本中找到的禁止模式的 {category: count} 字典。
+    从不返回匹配的字符串本身以防止泄漏。"""
     violations = {}
     for category, pattern in _FORBIDDEN_CATEGORIES:
         matches = pattern.findall(text)
@@ -984,16 +947,15 @@ def _scan_for_forbidden_tokens(text):
 
 
 def _is_english_only(text):
-    """Check that text is predominantly ASCII/English (>95% ASCII chars)."""
+    """检查文本是否主要为 ASCII/英文（>95% ASCII 字符）。"""
     if not text:
         return True
     ascii_count = sum(1 for c in text if ord(c) < 128)
     return (ascii_count / len(text)) > 0.95
 
 
-# Constrained methodology taxonomy — observations are classified into
-# these generic categories. Only the category label and a generic phrasing
-# are emitted into the issue; no report prose passes through.
+# 受限的方法论分类法——观察被分类到这些通用类别中。
+# 只有类别标签和通用措辞被输出到问题中；没有报告散文通过。
 _METHODOLOGY_CATEGORIES = {
     'iteration_efficiency': 'Iteration efficiency pattern observed: rounds showed uneven productivity distribution.',
     'feedback_loop': 'Feedback loop quality issue: reviewer-implementer communication could be improved.',
@@ -1019,7 +981,7 @@ _CATEGORY_KEYWORDS = {
 
 
 def _classify_observation(text):
-    """Classify a report observation into a methodology category."""
+    """将报告观察分类到方法论类别中。"""
     lower = text.lower()
     best_cat = 'general'
     best_score = 0
@@ -1032,24 +994,25 @@ def _classify_observation(text):
 
 
 def _build_sanitized_issue(session):
-    """Build a sanitized GitHub issue payload following issue #62 format.
+    """按照 issue #62 格式构建清理后的 GitHub issue 负载。
 
-    Uses constrained methodology taxonomy — no report prose passes through.
-    Returns dict with 'title', 'body', and 'warnings' keys, or None if no report.
-    Warnings contain only category names and counts, never matched strings.
+    使用受限的方法论分类法——没有报告散文通过。
+    返回包含 'title'、'body' 和 'warnings' 键的字典，
+    如果没有报告则返回 None。
+    警告仅包含类别名称和计数，从不包含匹配的字符串。
     """
     report_obj = session.get('methodology_report', {})
-    # Prefer English report; fall back to Chinese
+    # 优先使用英文报告；回退到中文
     report = (report_obj or {}).get('en') or (report_obj or {}).get('zh') or ''
     if not report:
         return None
 
-    # Source diagnostics (informational only — do NOT gate outbound)
+    # 源诊断（仅供参考——不要门控出站）
     source_diagnostics = {}
     if not _is_english_only(report):
         source_diagnostics['non_english'] = 1
 
-    # Extract raw observations and suggestions from report structure
+    # 从报告结构中提取原始观察和建议
     raw_observations = []
     raw_suggestions = []
     current_section = None
@@ -1079,36 +1042,35 @@ def _build_sanitized_issue(session):
             if stripped and not stripped.startswith('#') and not stripped.startswith('|') and not stripped.startswith('---'):
                 raw_observations.append(stripped)
 
-    # Log source-level findings as diagnostics (not blocking)
+    # 将源级发现记录为诊断（不阻塞）
     for obs in raw_observations:
         violations = _scan_for_forbidden_tokens(obs)
         for cat, count in violations.items():
             source_diagnostics[cat] = source_diagnostics.get(cat, 0) + count
 
-    # Classify observations into methodology categories (no prose passes through)
+    # 将观察分类到方法论类别中（没有散文通过）
     category_counts = {}
     for obs in raw_observations:
         category = _classify_observation(obs)
         category_counts[category] = category_counts.get(category, 0) + 1
 
-    # Classify suggestions into methodology categories (no raw text passes through)
+    # 将建议分类到方法论类别中（没有原始文本通过）
     suggestion_categories = {}
     for cols in raw_suggestions:
         combined = ' '.join(cols)
         cat = _classify_observation(combined)
         suggestion_categories[cat] = suggestion_categories.get(cat, 0) + 1
 
-    # Build title from dominant category (no report text)
+    # 从主要类别构建标题（无报告文本）
     dominant_cat = max(category_counts, key=category_counts.get) if category_counts else 'general'
     title = f"RLCR: {dominant_cat.replace('_', ' ').capitalize()} pattern identified"
 
-    # Build issue #62 body using ONLY taxonomy-derived phrasing
+    # 仅使用分类法派生的措辞构建 issue #62 正文
     s = session
-    # ``current_round`` is a 0-based index, not a round *count*. Using
-    # it verbatim printed ``0-round`` for sessions that only finished
-    # round 0 and under-reported every other session by one. The
-    # parser-built ``rounds`` list is the authoritative count — its
-    # length matches ``max_disk_round + 1``.
+    # ``current_round`` 是从 0 开始的索引，而不是轮次*计数*。
+    # 逐字使用它会对只完成了第 0 轮的会话打印 ``0-round``，
+    # 并且对每个其他会话少报一轮。解析器构建的 ``rounds`` 列表
+    # 是权威计数——其长度匹配 ``max_disk_round + 1``。
     round_total = len(s.get('rounds') or [])
     body_lines = [
         '## Context\n',
@@ -1139,11 +1101,10 @@ def _build_sanitized_issue(session):
     body_lines.append('## Quantitative Summary\n')
     body_lines.append('| Metric | Value |')
     body_lines.append('|--------|-------|')
-    # Reuse the ``round_total`` count computed for the Context section
-    # above — ``s["current_round"]`` is a 0-based index, so a raw read
-    # here would under-report every session (0 for a single-round
-    # session, N-1 for an N-round session) in the Quantitative
-    # Summary table that downstream issue readers rely on.
+    # 复用上面为 Context 部分计算的 ``round_total`` 计数——
+    # ``s["current_round"]`` 是从 0 开始的索引，因此这里的
+    # 原始读取会在下游问题读者依赖的定量摘要表中少报每个
+    # 会话（单轮会话为 0，N 轮会话为 N-1）。
     body_lines.append(f'| Total rounds | {round_total} |')
     body_lines.append(f'| Exit reason | {s["status"].capitalize()} |')
     if s.get('ac_total', 0) > 0:
@@ -1155,9 +1116,8 @@ def _build_sanitized_issue(session):
 
     body = '\n'.join(body_lines)
 
-    # OUTBOUND VALIDATION: only the final generated title/body determine
-    # whether the payload is safe to send. Source-report findings are
-    # informational and do NOT gate the outbound path.
+    # 出站验证：只有最终生成的标题/正文决定负载是否可以安全
+    # 发送。源报告的发现仅供参考，不出站路径不门控。
     outbound_warnings = {}
 
     final_violations = _scan_for_forbidden_tokens(body)
@@ -1188,7 +1148,7 @@ def api_sanitized_issue(session_id):
     if not payload:
         abort(404)
 
-    # Outbound gate: only block if the FINAL generated payload has warnings
+    # 出站门控：仅在最终生成的负载有警告时才阻止
     if payload.get('warnings'):
         return jsonify({
             'title': payload['title'],
@@ -1198,7 +1158,7 @@ def api_sanitized_issue(session_id):
             'requires_review': True,
         })
 
-    # Clean payload — include source diagnostics as informational
+    # 清洁负载——将源诊断作为信息包含
     result = {
         'title': payload['title'],
         'body': payload['body'],
@@ -1218,7 +1178,7 @@ def api_github_issue(session_id):
     if not payload:
         return jsonify({'error': 'No methodology report available'}), 400
 
-    # Block submission and redact body when sanitization warnings exist
+    # 当存在清理警告时阻止提交并编辑正文
     if payload.get('warnings'):
         return jsonify({
             'error': 'Sanitization check failed. Review the methodology report manually and remove project-specific content before sending.',
@@ -1229,7 +1189,7 @@ def api_github_issue(session_id):
     title = payload['title']
     body = payload['body']
 
-    # Check if gh is available
+    # 检查 gh 是否可用
     try:
         subprocess.run(['gh', '--version'], capture_output=True, timeout=5, check=True)
     except (subprocess.SubprocessError, FileNotFoundError):
@@ -1257,38 +1217,36 @@ def api_github_issue(session_id):
         }), 500
 
 
-# --- Per-session SSE log streaming (per docs/streaming-protocol.md) ---
+# --- 每会话 SSE 日志流（按 docs/streaming-protocol.md）---
 
 _LOG_BASENAME_RE = re.compile(
     r"^round-\d+-(?:codex|gemini)-(?:run|review)\.log$"
 )
 
-# Polling cadence inside the SSE generator. Combined with the 64 KiB
-# snapshot chunk size, this gives the contract's median-latency
-# budget plenty of head-room (median << 2.0s under nominal load).
+# SSE 生成器内的轮询节奏。结合 64 KiB 快照块大小，
+# 这为契约的中位延迟预算提供了充足的余量（正常负载下中位 << 2.0s）。
 _SSE_POLL_INTERVAL_SECONDS = 0.25
 _SSE_HEARTBEAT_INTERVAL_SECONDS = 15.0
 
-# Process-lifetime registry of LogStream instances. The registry
-# implementation lives in log_streamer.py so it can be tested without
-# needing the Flask import path; see docstring there for the
-# correctness rationale (Codex Round 2 review caught a reconnect bug
-# where per-request LogStream construction lost retained history).
+# LogStream 实例的进程生命周期注册表。注册表实现位于
+# log_streamer.py 中，以便无需 Flask 导入路径即可测试；
+# 参见那里的文档字符串了解正确性原理（Codex 第 2 轮审查
+# 发现了一个重连 bug，其中每请求的 LogStream 构造丢失了
+# 保留的历史）。
 _log_stream_registry = log_streamer.LogStreamRegistry()
-# Ref-counted registry of per-cache-directory log watchers. Each live
-# SSE generator calls _acquire_cache_watcher on entry and the matching
-# _release_cache_watcher in its finally block, so the observer (and
-# its inotify handle) is torn down on the last client disconnect. The
-# pre-fix implementation only started watchers and never stopped them,
-# so long-running dashboard processes leaked one watcher thread per
-# unique cache directory the user ever browsed.
+# 每缓存目录日志监视器的引用计数注册表。每个活跃的 SSE
+# 生成器在入口调用 _acquire_cache_watcher，在其 finally 块中
+# 调用匹配的 _release_cache_watcher，因此在最后一个客户端
+# 断开连接时观察者（及其 inotify 句柄）被拆除。修复前的
+# 实现只启动监视器而从不停止它们，因此长时间运行的仪表板
+# 进程为用户浏览过的每个唯一缓存目录泄漏一个监视器线程。
 _cache_watchers = {}
 _cache_watcher_refcounts = {}
 _cache_watchers_lock = threading.Lock()
 
 
 def _sse_frame(event):
-    """Render one event dict as the SSE wire format from the contract."""
+    """将一个事件字典渲染为契约中的 SSE 线路格式。"""
     payload = {k: v for k, v in event.items() if k != 'id'}
     return (
         f"event: {event['type']}\n"
@@ -1301,16 +1259,15 @@ def _is_terminal_status(status):
     return status not in (None, '', 'active', 'analyzing', 'finalizing', 'unknown')
 
 
-# Terminal-state marker filenames produced by the RLCR loop. Only
-# truly-terminal markers belong here: the SSE generator closes the
-# stream as soon as any of these appear, and the dashboard still
-# treats ``methodology-analysis-state.md`` / ``finalize-state.md``
-# as running (``analyzing`` / ``finalizing`` status, still cancellable,
-# still emitting live log bytes). Including those markers in this
-# list used to cause the live log pane to EOF the moment a session
-# entered finalize or analysis, so the finalize-phase / methodology-
-# report output never reached the browser. The list must stay in
-# lock-step with ``_is_terminal_status`` above.
+# RLCR 循环产生的终端状态标记文件名。只有真正的终端标记
+# 属于此处：SSE 生成器在其中任何一个出现时立即关闭流，
+# 仪表板仍将 ``methodology-analysis-state.md`` /
+# ``finalize-state.md`` 视为运行中（``analyzing`` /
+# ``finalizing`` 状态，仍可取消，仍输出实时日志字节）。
+# 将这些标记包含在此列表中曾导致实时日志窗格在会话进入
+# 最终化或分析时立即 EOF，因此最终化阶段/方法论报告输出
+# 永远不会到达浏览器。该列表必须与上面的 ``_is_terminal_status``
+# 保持同步。
 _TERMINAL_STATE_FILES = (
     'complete-state.md',
     'cancel-state.md',
@@ -1321,28 +1278,24 @@ _TERMINAL_STATE_FILES = (
 
 
 def _session_is_terminal_cheap(session_id):
-    """Fast path for the SSE EOF check.
+    """SSE EOF 检查的快速路径。
 
-    The 250 ms SSE poll loop used to call ``_get_session(session_id,
-    force_refresh=True)`` every tick, which re-runs the full
-    parse_session pipeline (re-scans every round file, parses the
-    goal tracker, re-reads the methodology report, and shells out to
-    ``git`` once or twice for the git-status summary). On long
-    sessions with many rounds and multiple live SSE clients, that
-    quickly becomes the bottleneck.
+    250 毫秒的 SSE 轮询循环过去每个 tick 都调用
+    ``_get_session(session_id, force_refresh=True)``，
+    这会重新运行完整的 parse_session 管道（重新扫描每个轮次
+    文件、解析目标跟踪器、重新读取方法论报告，并为 git-status
+    摘要调用 ``git`` 一两次）。在有许多轮次和多个活跃 SSE
+    客户端的长会话上，这很快成为瓶颈。
 
-    Terminal state is trivially detectable from on-disk markers:
-    whenever any *-state.md file other than state.md is present the
-    loop has stopped writing logs. Check that directly so the hot
-    loop doesn't drag the full parser behind it. False negatives
-    just defer the EOF by one poll cycle; they never corrupt the
-    stream because the file-system watcher still drives every
-    append.
+    终止状态可以很容易地从磁盘标记检测：每当 state.md 以外的
+    任何 *-state.md 文件存在时，循环已停止写入日志。直接检查
+    这一点，以便热循环不会拖拽完整的解析器。假阴性只是将 EOF
+    推迟一个轮询周期；它们不会损坏流，因为文件系统监视器
+    仍然驱动每个追加操作。
     """
     session_dir = _get_session_dir(session_id)
     if not session_dir:
-        # The directory vanished or was renamed — treat as terminal
-        # so the SSE generator closes cleanly.
+        # 目录消失或被重命名——视为终端，以便 SSE 生成器干净地关闭。
         return True
     for name in _TERMINAL_STATE_FILES:
         if os.path.isfile(os.path.join(session_dir, name)):
@@ -1351,18 +1304,16 @@ def _session_is_terminal_cheap(session_id):
 
 
 def _acquire_cache_watcher(cache_dir):
-    """Reserve a cache watcher for one active SSE stream.
+    """为一个活跃的 SSE 流保留缓存监视器。
 
-    Starts at most one CacheLogWatcher per cache directory and
-    increments a per-directory refcount so concurrent SSE clients on
-    the same session share the observer. Paired with
-    :func:`_release_cache_watcher`, which stops the watcher when the
-    last client releases it. The watcher's callback runs the matching
-    LogStream's poll inline so file-system events drive the stream in
-    addition to the SSE handler's own 250 ms poll loop. Best-effort
-    on startup: if the cache directory does not exist yet the
-    watcher does not start and the SSE handler continues to drive
-    everything via its poll loop.
+    每个缓存目录最多启动一个 CacheLogWatcher，并增加每目录
+    的引用计数，以便同一会话上的并发 SSE 客户端共享观察者。
+    与 :func:`_release_cache_watcher` 配对，后者在最后一个
+    客户端释放时停止监视器。监视器的回调内联运行匹配的
+    LogStream 的轮询，因此文件系统事件除了 SSE 处理程序自己的
+    250 毫秒轮询循环外还驱动流。启动时尽最大努力：如果缓存
+    目录尚不存在，监视器不会启动，SSE 处理程序继续通过其
+    轮询循环驱动一切。
     """
     with _cache_watchers_lock:
         _cache_watcher_refcounts[cache_dir] = (
@@ -1377,7 +1328,7 @@ def _acquire_cache_watcher(cache_dir):
                 try:
                     stream.poll()
                 except Exception:
-                    # Watcher callbacks must not crash the observer thread.
+                    # 监视器回调不得使观察者线程崩溃。
                     pass
 
         watcher = CacheLogWatcher(cache_dir, callback)
@@ -1386,14 +1337,13 @@ def _acquire_cache_watcher(cache_dir):
 
 
 def _release_cache_watcher(cache_dir):
-    """Release one reservation; stop the watcher on the final release.
+    """释放一个保留；在最终释放时停止监视器。
 
-    Called from the SSE generator's ``finally`` block so an observer
-    is torn down when its last client disconnects (normal EOF,
-    connection close, or server shutdown). Without this pairing the
-    observer thread and inotify handle outlive every session a user
-    ever browsed, which exhausts ``fs.inotify.max_user_watches`` on
-    long-running dashboard processes.
+    从 SSE 生成器的 ``finally`` 块调用，以便在最后一个客户端
+    断开连接时（正常 EOF、连接关闭或服务器关闭）拆除观察者。
+    没有这种配对，观察者线程和 inotify 句柄会比用户浏览过的
+    每个会话存活更长时间，这会在长时间运行的仪表板进程中
+    耗尽 ``fs.inotify.max_user_watches``。
     """
     with _cache_watchers_lock:
         remaining = _cache_watcher_refcounts.get(cache_dir, 0) - 1
@@ -1407,22 +1357,21 @@ def _release_cache_watcher(cache_dir):
         try:
             watcher.stop()
         except Exception:
-            # Best-effort cleanup: a failed observer stop must not
-            # take down the request that triggered the release.
+            # 尽最大努力清理：失败的观察者停止不得使触发
+            # 释放的请求崩溃。
             pass
 
 
 def _acquire_log_stream(session_id, basename):
-    """Acquire the shared LogStream for ``(session_id, basename)``.
+    """获取 ``(session_id, basename)`` 的共享 LogStream。
 
-    Increments the registry refcount so the caller owns one release.
-    The caller (the SSE route) MUST pair this with
-    :func:`_release_log_stream` and
-    :func:`_acquire_cache_watcher` / :func:`_release_cache_watcher`
-    around the generator body so stream + watcher lifetimes track
-    active SSE consumers instead of process lifetime. Without the
-    release, the registry retains the 256-event deque (often large
-    base64 payloads) for every session the user ever browsed.
+    增加注册表引用计数，以便调用者拥有一个释放。
+    调用者（SSE 路由）必须将其与 :func:`_release_log_stream`
+    和 :func:`_acquire_cache_watcher` / :func:`_release_cache_watcher`
+    配对在生成器主体周围，以便流 + 监视器的生命周期跟踪
+    活跃的 SSE 消费者而不是进程生命周期。没有释放，注册表
+    会为用户浏览过的每个会话保留 256 事件双端队列（通常是
+    大的 base64 负载）。
     """
     cache_dir = rlcr_sources.cache_dir_for_session(PROJECT_DIR, session_id)
     stream = _log_stream_registry.acquire(cache_dir, session_id, basename)
@@ -1430,22 +1379,22 @@ def _acquire_log_stream(session_id, basename):
 
 
 def _release_log_stream(session_id, basename):
-    """Release one :func:`_acquire_log_stream` reservation."""
+    """释放一个 :func:`_acquire_log_stream` 保留。"""
     _log_stream_registry.release(session_id, basename)
 
 
 @app.route('/api/sessions/<session_id>/logs/<basename>')
 def stream_session_log(session_id, basename):
-    """Per-session, per-file SSE stream per the streaming protocol.
+    """按流式协议的每会话、每文件 SSE 流。
 
-    Implements the snapshot+append+resync+eof event sequence frozen in
-    docs/streaming-protocol.md, including Last-Event-Id reconnect with
-    the documented 256-event retention. Remote-mode authentication is
-    enforced by the @app.before_request middleware: in remote mode the
-    request must carry a valid bearer token (`Authorization: Bearer`
-    header for fetch-style calls, `?token=` query parameter for SSE
-    EventSource clients per DEC-4); missing or invalid token returns
-    401. Localhost-bound deployments skip the auth check.
+    实现冻结在 docs/streaming-protocol.md 中的
+    snapshot+append+resync+eof 事件序列，包括具有记录的
+    256 事件保留的 Last-Event-Id 重连。远程模式认证由
+    @app.before_request 中间件强制执行：在远程模式下，请求
+    必须携带有效的 bearer 令牌（fetch 风格调用的
+    `Authorization: Bearer` 头，SSE EventSource 客户端按
+    DEC-4 的 `?token=` 查询参数）；缺失或无效的令牌返回 401。
+    本地主机绑定的部署跳过认证检查。
     """
     if not _LOG_BASENAME_RE.match(basename):
         abort(400)
@@ -1454,10 +1403,9 @@ def stream_session_log(session_id, basename):
         abort(404)
 
     stream = _acquire_log_stream(session_id, basename)
-    # Resolve the cache directory once up-front so the generator's
-    # watcher acquire/release pair references the same key. The
-    # registry helper derives it internally; re-derive here so the
-    # cache-watcher refcount key matches the stream registry's.
+    # 预先解析缓存目录一次，以便生成器的监视器获取/释放对
+    # 引用相同的键。注册表辅助程序内部派生它；在此重新派生
+    # 以便缓存监视器引用计数键与流注册表的匹配。
     cache_dir = rlcr_sources.cache_dir_for_session(PROJECT_DIR, session_id)
 
     last_event_id = 0
@@ -1469,20 +1417,19 @@ def stream_session_log(session_id, basename):
             last_event_id = 0
 
     def generate():
-        # Reserve the per-cache-dir watcher for the lifetime of this
-        # stream. The paired release in the finally block below is
-        # what lets long-running dashboard instances stop leaking
-        # inotify handles (one per distinct session the user browses)
-        # after clients disconnect. The log-stream refcount acquired
-        # at route entry is released here too so its retention deque
-        # can be freed once the last client has seen EOF.
+        # 为此流的生命周期保留每缓存目录监视器。下面 finally
+        # 块中的配对释放是让长时间运行的仪表板实例在客户端
+        # 断开连接后停止泄漏 inotify 句柄（用户浏览的每个
+        # 不同会话一个）的原因。在路由入口获取的日志流引用
+        # 计数也在此处释放，以便在最后一个客户端看到 EOF 后
+        # 可以释放其保留双端队列。
         _acquire_cache_watcher(cache_dir)
         try:
             client_last_id = last_event_id
 
-            # Initial event delivery: replay if the client has a Last-Event-Id,
-            # else fresh snapshot. The route never falls through to a poll
-            # that would emit the file body as `append` from offset 0.
+            # 初始事件交付：如果客户端有 Last-Event-Id 则重放，
+            # 否则新鲜快照。路由永远不会落入会将文件正文作为
+            # 从偏移 0 的 `append` 发出的轮询。
             if client_last_id > 0:
                 replayed, in_window = stream.replay(client_last_id)
                 for event in replayed:
@@ -1497,12 +1444,11 @@ def stream_session_log(session_id, basename):
                     yield _sse_frame(event)
                     client_last_id = event['id']
 
-            # Steady-state loop. Drive poll() (may be a no-op if the cache
-            # watcher or another concurrent handler already polled), then
-            # forward any retained events newer than what this client has
-            # already sent. Using the deque as the source of truth means
-            # multiple concurrent SSE clients on the same stream all
-            # receive every event without racing on _offset.
+            # 稳态循环。驱动 poll()（如果缓存监视器或其他并发
+            # 处理程序已经轮询过，可能是空操作），然后转发任何
+            # 比此客户端已发送的更新的保留事件。使用双端队列
+            # 作为事实来源意味着同一流上的多个并发 SSE 客户端
+            # 都接收每个事件而不会在 _offset 上竞争。
             last_heartbeat = time.time()
             while True:
                 stream.poll()
@@ -1515,10 +1461,10 @@ def stream_session_log(session_id, basename):
                         yield _sse_frame(event)
                         client_last_id = event['id']
 
-                # Cheap disk probe instead of a full parse_session on
-                # every SSE tick. Avoids re-scanning round files, goal
-                # tracker, and the `git status` subprocesses just to
-                # decide whether to emit EOF.
+                # 廉价的磁盘探测，而不是在每个 SSE tick 上进行
+                # 完整的 parse_session。避免为了决定是否发出 EOF
+                # 而重新扫描轮次文件、目标跟踪器和 `git status`
+                # 子进程。
                 if _session_is_terminal_cheap(session_id):
                     for event in stream.mark_eof():
                         yield _sse_frame(event)
@@ -1531,14 +1477,12 @@ def stream_session_log(session_id, basename):
                     last_heartbeat = now
                 time.sleep(_SSE_POLL_INTERVAL_SECONDS)
         finally:
-            # Runs on normal EOF return, GeneratorExit (client
-            # disconnect), or any propagated exception, so the
-            # refcount always balances the earlier acquire. The
-            # log-stream release evicts the stream's retention deque
-            # once its final client disconnects AND EOF has already
-            # been delivered; active sessions without a current
-            # client stay resident so reconnects get the replay
-            # window the streaming contract requires.
+            # 在正常 EOF 返回、GeneratorExit（客户端断开连接）
+            # 或任何传播的异常时运行，因此引用计数始终平衡
+            # 之前的获取。日志流释放在其最终客户端断开连接
+            # 且 EOF 已经交付后驱逐流的保留双端队列；没有当前
+            # 客户端的活跃会话保持驻留，以便重连获得流式契约
+            # 要求的重放窗口。
             _release_cache_watcher(cache_dir)
             _release_log_stream(session_id, basename)
 
@@ -1552,12 +1496,11 @@ def stream_session_log(session_id, basename):
 
 @sock.route('/ws')
 def websocket(ws):
-    # T11 / DEC-4: WebSocket transport is restricted to localhost. In
-    # remote mode (host != 127.0.0.1) the dashboard MUST use SSE for
-    # log streams (over HTTPS with `?token=` auth), so the WebSocket
-    # control channel is rejected entirely. Browsers cannot send
-    # arbitrary auth headers on WebSocket upgrades, which is the root
-    # reason behind DEC-4.
+    # T11 / DEC-4：WebSocket 传输仅限于本地主机。在远程模式
+    # （host != 127.0.0.1）下，仪表板必须使用 SSE 进行日志流
+    # （通过 HTTPS 带 `?token=` 认证），因此 WebSocket 控制
+    # 通道被完全拒绝。浏览器无法在 WebSocket 升级上发送任意
+    # 认证头，这是 DEC-4 背后的根本原因。
     if not _is_localhost_bind():
         try:
             ws.close(reason='WebSocket transport disabled in remote mode')
@@ -1565,15 +1508,14 @@ def websocket(ws):
             pass
         return
 
-    # Cross-origin WebSocket rejection. The HTTP side of the app
-    # gates mutating routes through `_enforce_csrf_protection`, but
-    # browsers happily let arbitrary pages open a WebSocket to
-    # ws://localhost:<port>/ws with no Origin check from the server.
-    # A `cancel_session` message over that connection would kill an
-    # active loop with zero auth prompt. Reuse the same request-host
-    # matcher so the localhost dashboard's own Origin keeps working
-    # while hostile origins (pages served by other projects in the
-    # same browser) are closed before they can send anything.
+    # 跨域 WebSocket 拒绝。应用的 HTTP 端通过
+    # `_enforce_csrf_protection` 门控变更路由，但浏览器乐于
+    # 让任意页面打开到 ws://localhost:<port>/ws 的 WebSocket，
+    # 服务器没有 Origin 检查。通过该连接的 `cancel_session`
+    # 消息会在零认证提示下杀死活跃循环。复用相同的请求主机
+    # 匹配器，以便本地主机仪表板自己的 Origin 继续工作，
+    # 而敌对 Origin（同一浏览器中其他项目提供的页面）在
+    # 发送任何内容之前被关闭。
     origin = request.headers.get('Origin', '').strip()
     if origin and not _origin_matches_request(origin):
         try:
@@ -1596,17 +1538,14 @@ def websocket(ws):
                     if sid:
                         session = _get_session(sid)
                         if session and session.get('status') in _CANCELLABLE_STATUSES:
-                            # Route through the session-scoped helper
-                            # instead of the project-global cancel.
-                            # Match the REST route's --force handling
-                            # so finalizing sessions can be cancelled.
+                            # 通过会话范围的辅助程序而不是项目全局
+                            # 取消进行路由。匹配 REST 路由的 --force
+                            # 处理，以便最终化的会话可以被取消。
                             cancel_script = _find_session_cancel_script()
                             if cancel_script:
-                                # Mirror the REST route: pass --project
-                                # explicitly so the helper does not
-                                # fall back to a stray
-                                # CLAUDE_PROJECT_DIR inherited from
-                                # the launching shell.
+                                # 镜像 REST 路由：显式传递 --project
+                                # 以便辅助程序不会回退到从启动 shell
+                                # 继承的杂散 CLAUDE_PROJECT_DIR。
                                 helper_args = [
                                     cancel_script,
                                     '--project', PROJECT_DIR,
@@ -1614,12 +1553,10 @@ def websocket(ws):
                                 ]
                                 if session.get('status') == 'finalizing':
                                     helper_args.append('--force')
-                                # Match the REST cancel route: require a
-                                # zero exit code before invalidating
-                                # cache. A non-zero exit means the helper
-                                # did not actually cancel the session, so
-                                # refreshing the dashboard would mask the
-                                # failure.
+                                # 匹配 REST 取消路由：在使缓存失效
+                                # 之前要求零退出代码。非零退出意味着
+                                # 辅助程序实际上没有取消会话，因此
+                                # 刷新仪表板会掩盖失败。
                                 try:
                                     subprocess.run(
                                         helper_args,
@@ -1639,10 +1576,10 @@ def websocket(ws):
             _ws_clients.discard(ws)
 
 
-# --- Main ---
+# --- 主程序 ---
 
 def _resolve_auth_token(cli_token):
-    """Pick the effective bearer token from the CLI flag or env var."""
+    """从 CLI 标志或环境变量中选择有效的 bearer 令牌。"""
     if cli_token:
         return cli_token
     return os.environ.get('HUMANIZE_VIZ_TOKEN', '').strip()
@@ -1690,16 +1627,13 @@ def main():
         )
         sys.exit(2)
 
-    # Plain-HTTP Flask + ?token= bearer auth is safe on loopback
-    # (nothing ever leaves the host), but leaks the token in
-    # cleartext the moment the bind is externally reachable. Require
-    # an explicit operator acknowledgement that a TLS-terminating
-    # reverse proxy is in front of the server before accepting a
-    # non-loopback bind. The flag / env var is a load-bearing
-    # declaration: without it we'd rather refuse to start than hand
-    # out an insecure dashboard URL. TRUST_PROXY is resolved above
-    # and also drives the CSRF port-matcher's X-Forwarded-Proto
-    # handling.
+    # 纯 HTTP Flask + ?token= bearer 认证在回环上是安全的
+    # （没有任何东西离开主机），但一旦绑定可从外部访问就会
+    # 以明文泄漏令牌。在接受非回环绑定之前，要求操作员
+    # 明确认可服务器前面有 TLS 终止反向代理。该标志/环境
+    # 变量是承重声明：没有它，我们宁愿拒绝启动也不愿分发
+    # 不安全的仪表板 URL。TRUST_PROXY 在上面解析，还驱动
+    # CSRF 端口匹配器的 X-Forwarded-Proto 处理。
     if not _is_localhost_bind() and not TRUST_PROXY:
         print(
             "Error: binding to a non-localhost host requires a TLS-terminating\n"
@@ -1711,11 +1645,11 @@ def main():
         )
         sys.exit(2)
 
-    # Start file watcher
+    # 启动文件监视器
     _watcher = SessionWatcher(PROJECT_DIR, broadcast_message)
     _watcher.start()
 
-    # Pre-populate cache
+    # 预填充缓存
     list_sessions(PROJECT_DIR)
 
     visible_host = BIND_HOST if not _is_localhost_bind() else 'localhost'

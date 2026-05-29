@@ -1,33 +1,30 @@
 #!/usr/bin/env bash
 #
-# Deterministic project-root resolver for all humanize hooks and scripts.
+# 所有 humanize 钩子和脚本的确定性项目根解析器。
 #
-# Resolution priority:
-#   1. linked git worktree toplevel when it differs from CLAUDE_PROJECT_DIR
-#   2. CLAUDE_PROJECT_DIR (Claude session root)
-#   3. git rev-parse --show-toplevel (nearest enclosing repo)
-#   4. Non-zero return.
+# 解析优先级：
+#   1. 链接的 git worktree toplevel，当它与 CLAUDE_PROJECT_DIR 不同时
+#   2. CLAUDE_PROJECT_DIR（Claude 会话根）
+#   3. git rev-parse --show-toplevel（最近的包含仓库）
+#   4. 非零返回。
 #
-# CLAUDE_PROJECT_DIR is normally the authoritative session root. Hooks and
-# helper scripts are often executed from the plugin checkout while targeting a
-# different project, so blindly preferring the plugin repo's git toplevel makes
-# active loop state and project config disappear.
+# CLAUDE_PROJECT_DIR 通常是权威的会话根。钩子和辅助脚本通常从插件检出执行，
+# 同时目标是不同的项目，因此盲目优先使用插件仓库的 git toplevel 会使
+# 活跃循环状态和项目配置消失。
 #
-# The exception is a linked git worktree: explore-idea workers can inherit the
-# coordinator's CLAUDE_PROJECT_DIR while running inside their own worktree. In
-# that case the current checkout is the safer root.
+# 例外是链接的 git worktree：explore-idea workers 可以继承协调器的
+# CLAUDE_PROJECT_DIR，同时在自己的 worktree 中运行。在这种情况下，
+# 当前检出是更安全的根。
 #
-# pwd is intentionally NOT used as a fallback: it drifts with `cd`
-# invocations during a session and silently causes state.md lookups
-# under .humanize/rlcr/ to miss the active loop directory.
+# 故意不使用 pwd 作为回退：它在会话期间随 `cd` 调用漂移，
+# 并静默导致 .humanize/rlcr/ 下的 state.md 查找错过活跃循环目录。
 #
-# The resolved path is passed through realpath so symlinked prefixes
-# (e.g. /Users/x vs /private/Users/x on macOS, or /var vs /private/var)
-# do not diverge between setup-time and hook-time resolution.
+# 解析的路径通过 realpath 传递，以便符号链接的前缀
+# （例如 /Users/x vs /private/Users/x 在 macOS 上，或 /var vs /private/var）
+# 在设置时和钩子时解析之间不会不同。
 #
-# Path-comparison sites in validators must mirror this by canonicalizing
-# the user-provided side as well; use the companion `canonicalize_path`
-# helper below.
+# 验证器中的路径比较站点必须通过规范化用户提供的侧来镜像这一点；
+# 使用下面的 companion `canonicalize_path` 辅助函数。
 #
 
 if [[ -n "${_HUMANIZE_PROJECT_ROOT_SOURCED:-}" ]]; then
@@ -37,13 +34,13 @@ _HUMANIZE_PROJECT_ROOT_SOURCED=1
 
 # resolve_project_root
 #
-# Prints the resolved project root to stdout. Returns 0 on success,
-# 1 when neither CLAUDE_PROJECT_DIR nor a git toplevel is available.
+# 将解析的项目根打印到 stdout。成功时返回 0，
+# 当 CLAUDE_PROJECT_DIR 和 git toplevel 都不可用时返回 1。
 #
-# Callers that must have a project root should handle the failure:
+# 必须有项目根的调用者应处理失败：
 #
-#   PROJECT_ROOT="$(resolve_project_root)" || exit 0   # hook: allow natural stop
-#   PROJECT_ROOT="$(resolve_project_root)" || {        # setup: hard error
+#   PROJECT_ROOT="$(resolve_project_root)" || exit 0   # 钩子：允许自然停止
+#   PROJECT_ROOT="$(resolve_project_root)" || {        # 设置：硬错误
 #       echo "Error: cannot determine humanize project root" >&2
 #       exit 1
 #   }
@@ -77,20 +74,17 @@ resolve_project_root() {
 
 # canonicalize_path_prefix
 #
-# Resolves symlinks ONLY in the parent directory and reattaches the
-# original basename verbatim. This is the right helper for comparing
-# user-supplied filenames against an expected path inside a known
-# directory: a symlink at /tmp/alias pointing at /real/loop/state.md
-# MUST NOT canonicalize to /real/loop/state.md for comparison purposes,
-# because `mv` operates on the link path itself. Resolving only the
-# parent still lets a symlinked project prefix (e.g. /var vs /private/var
-# on macOS) match a canonical expected path.
+# 仅在父目录中解析符号链接并逐字重新附加原始 basename。
+# 这是将用户提供的文件名与已知目录内的预期路径进行比较的正确辅助函数：
+# /tmp/alias 指向 /real/loop/state.md 的符号链接不能规范化为
+# /real/loop/state.md 进行比较，因为 `mv` 操作链接路径本身。
+# 仅解析父目录仍然让符号链接的项目前缀（例如 /var vs /private/var 在 macOS 上）
+# 匹配规范的预期路径。
 #
-# If realpath on the parent fails, falls back to returning the input
-# path unchanged (prefix cannot be canonicalized -> caller's comparison
-# will correctly fail against a canonical expected path).
+# 如果父目录的 realpath 失败，则回退到返回输入路径不变
+# （前缀无法规范化 -> 调用者的比较将正确失败于规范的预期路径）。
 #
-# Empty input prints nothing and returns 0.
+# 空输入不打印任何内容并返回 0。
 #
 canonicalize_path_prefix() {
     local path="$1"
@@ -120,18 +114,15 @@ canonicalize_path_prefix() {
 
 # canonicalize_path
 #
-# Prints the realpath of the input path. If the path itself does not
-# exist yet (common for write validation before the file is created),
-# canonicalizes the parent directory and reattaches the basename.
-# If realpath is unavailable and python3 is missing, prints the input
-# path verbatim.
+# 打印输入路径的 realpath。如果路径本身尚不存在
+# （在文件创建之前的写入验证中很常见），则规范化父目录并重新附加 basename。
+# 如果 realpath 不可用且 python3 缺失，则逐字打印输入路径。
 #
-# SECURITY NOTE: This helper dereferences symlinks at the leaf when
-# the leaf exists. Do NOT use it to authorize a user-supplied path
-# against an expected filename -- use canonicalize_path_prefix instead,
-# which only resolves the parent.
+# 安全说明：此辅助函数在叶子存在时取消引用叶子处的符号链接。
+# 不要使用它来授权用户提供的路径与预期文件名 -- 改用
+# canonicalize_path_prefix，它仅解析父目录。
 #
-# Empty input prints nothing and returns 0.
+# 空输入不打印任何内容并返回 0。
 #
 canonicalize_path() {
     local path="$1"
@@ -146,7 +137,7 @@ canonicalize_path() {
         return 0
     fi
 
-    # Path does not exist: canonicalize parent, reattach basename.
+    # 路径不存在：规范化父目录，重新附加 basename。
     local parent base
     parent=$(dirname -- "$path")
     base=$(basename -- "$path")

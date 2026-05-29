@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Tests for explore-idea worker result contract.
+# explore-idea worker 结果契约的测试。
 #
-# Verifies the structural contract of the worker prompt template:
-#   - Template file exists
-#   - Contains result sentinel markers
-#   - Contains required placeholder variables
-#   - Contains required result JSON fields
-#   - Hard constraints are present
+# 验证 worker 提示模板的结构契约：
+#   - 模板文件存在
+#   - 包含结果哨兵标记
+#   - 包含必需的占位符变量
+#   - 包含必需的结果 JSON 字段
+#   - 硬约束存在
 #
 
 set -euo pipefail
@@ -23,10 +23,10 @@ echo "Worker Result Contract Tests"
 echo "=========================================="
 echo ""
 
-echo "--- Template Existence ---"
+echo "--- 模板存在性 ---"
 echo ""
 
-# Template file exists
+# 模板文件存在
 if [[ -f "$WORKER_PROMPT" ]]; then
     pass "worker-prompt.md template exists"
 else
@@ -34,24 +34,24 @@ else
 fi
 
 echo ""
-echo "--- Sentinel Markers ---"
+echo "--- 哨兵标记 ---"
 echo ""
 
-# Result sentinel begin marker
+# 结果哨兵开始标记
 if grep -q "=== EXPLORE_RESULT_JSON_BEGIN ===" "$WORKER_PROMPT"; then
     pass "template contains EXPLORE_RESULT_JSON_BEGIN sentinel"
 else
     fail "template contains EXPLORE_RESULT_JSON_BEGIN sentinel"
 fi
 
-# Result sentinel end marker
+# 结果哨兵结束标记
 if grep -q "=== EXPLORE_RESULT_JSON_END ===" "$WORKER_PROMPT"; then
     pass "template contains EXPLORE_RESULT_JSON_END sentinel"
 else
     fail "template contains EXPLORE_RESULT_JSON_END sentinel"
 fi
 
-# Sentinels appear in correct order (BEGIN before END)
+# 哨兵按正确顺序出现（BEGIN 在 END 之前）
 BEGIN_LINE=$(grep -n "=== EXPLORE_RESULT_JSON_BEGIN ===" "$WORKER_PROMPT" | head -1 | cut -d: -f1)
 END_LINE=$(grep -n "=== EXPLORE_RESULT_JSON_END ===" "$WORKER_PROMPT" | head -1 | cut -d: -f1)
 if [[ -n "$BEGIN_LINE" && -n "$END_LINE" && "$BEGIN_LINE" -lt "$END_LINE" ]]; then
@@ -61,7 +61,7 @@ else
 fi
 
 echo ""
-echo "--- Placeholder Variables ---"
+echo "--- 占位符变量 ---"
 echo ""
 
 REQUIRED_PLACEHOLDERS=(
@@ -91,10 +91,10 @@ for placeholder in "${REQUIRED_PLACEHOLDERS[@]}"; do
 done
 
 echo ""
-echo "--- Result JSON Fields ---"
+echo "--- 结果 JSON 字段 ---"
 echo ""
 
-# Required result JSON fields
+# 必需的结果 JSON 字段
 REQUIRED_FIELDS=(
     "schema_version"
     "run_id"
@@ -130,10 +130,10 @@ for field in "${REQUIRED_FIELDS[@]}"; do
 done
 
 echo ""
-echo "--- Hard Constraints ---"
+echo "--- 硬约束 ---"
 echo ""
 
-# Hard constraints section
+# 硬约束部分
 if grep -q "Hard Constraints" "$WORKER_PROMPT"; then
     pass "template has Hard Constraints section"
 else
@@ -159,29 +159,28 @@ else
         "found"
 fi
 
-# No nested Skills constraint
+# 无嵌套技能约束
 if grep -q "nested Skills" "$WORKER_PROMPT" || grep -q "No nested" "$WORKER_PROMPT"; then
     pass "template forbids nested skills/slash commands"
 else
     fail "template forbids nested skills/slash commands"
 fi
 
-# No git push constraint: require explicitly prohibitive wording, not a passing
-# incidental mention of the command.
+# 无 git push 约束：要求明确禁止的措辞，而非附带提及命令。
 if grep -q "No git push" "$WORKER_PROMPT" && grep -qi "Do not push .*remote" "$WORKER_PROMPT"; then
     pass "template forbids git push"
 else
     fail "template forbids git push" "explicit no-push phrasing" "missing"
 fi
 
-# ask-codex.sh scope constraint
+# ask-codex.sh 范围约束
 if grep -q "CLAUDE_PROJECT_DIR" "$WORKER_PROMPT"; then
     pass "template requires CLAUDE_PROJECT_DIR scoping for Codex calls"
 else
     fail "template requires CLAUDE_PROJECT_DIR scoping"
 fi
 
-# Explicit review model placeholder, without pinning the exact model in tests.
+# 显式审查模型占位符，不在测试中固定确切模型。
 if grep -q -- '--codex-model "<CODEX_REVIEW_MODEL_SPEC>"' "$WORKER_PROMPT"; then
     pass "template uses explicit CODEX_REVIEW_MODEL_SPEC placeholder for Codex review"
 else
@@ -190,7 +189,7 @@ else
         "missing"
 fi
 
-# Branch naming format
+# 分支命名格式
 if grep -q "explore/<RUN_ID>/<DIR_SLUG>" "$WORKER_PROMPT"; then
     pass "template enforces branch naming format explore/<RUN_ID>/<DIR_SLUG>"
 else

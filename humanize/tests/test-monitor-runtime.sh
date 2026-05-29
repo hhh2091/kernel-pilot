@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Runtime Verification Tests for tests
+# 测试的运行时验证测试
 #
 # This test verifies:
-# - Clean exit with user-friendly message when .humanize deleted
-# - Terminal state properly restored after graceful stop
+# - 删除 .humanize 时带用户友好消息的干净退出
+# - 优雅停止后终端状态正确恢复
 #
-# Tests the actual _graceful_stop() and _cleanup() functions at runtime
+# 在运行时测试实际的 _graceful_stop() 和 _cleanup() 函数
 #
 
 set -euo pipefail
@@ -14,7 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
@@ -53,7 +53,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ========================================
-# Test 1: Verify _graceful_stop outputs correct message
+# 测试 1：验证 _graceful_stop 输出正确消息
 # ========================================
 echo "Test 1: _graceful_stop outputs correct message"
 echo ""
@@ -61,28 +61,28 @@ echo ""
 mkdir -p .humanize/rlcr/2026-01-16_10-00-00
 echo "current_round: 1" > .humanize/rlcr/2026-01-16_10-00-00/state.md
 
-# Create a test script that sources humanize.sh and tests the graceful stop behavior
+# 创建一个加载 humanize.sh 并测试优雅停止行为的测试脚本
 cat > test_graceful_stop.sh << 'TESTSCRIPT'
 #!/usr/bin/env bash
 cd "$1"
 
-# Source the monitor script
+# 加载监控脚本
 source "$2/scripts/humanize.sh"
 
-# Simulate monitor environment variables
+# 模拟监控器环境变量
 loop_dir=".humanize/rlcr"
 cleanup_done=false
 monitor_running=true
 tail_pid=""
 
-# Define _restore_terminal as a stub that records it was called
+# 定义 _restore_terminal 为记录调用的存根
 restore_called=false
 _restore_terminal() {
     restore_called=true
     echo "RESTORE_TERMINAL_CALLED"
 }
 
-# Define _cleanup (simplified version that records state)
+# 定义 _cleanup（记录状态的简化版本）
 _cleanup() {
     [[ "$cleanup_done" == "true" ]] && return
     cleanup_done=true
@@ -91,7 +91,7 @@ _cleanup() {
     echo "CLEANUP_CALLED"
 }
 
-# Define _graceful_stop (from humanize.sh)
+# 定义 _graceful_stop（来自 humanize.sh）
 _graceful_stop() {
     local reason="$1"
     [[ "$cleanup_done" == "true" ]] && return
@@ -100,7 +100,7 @@ _graceful_stop() {
     echo "The RLCR loop may have been cancelled or the directory was deleted."
 }
 
-# Call _graceful_stop and capture output
+# 调用 _graceful_stop 并捕获输出
 output=$(_graceful_stop ".humanize/rlcr directory no longer exists")
 echo "$output"
 TESTSCRIPT
@@ -108,7 +108,7 @@ TESTSCRIPT
 chmod +x test_graceful_stop.sh
 output=$(./test_graceful_stop.sh "$TEST_BASE" "$PROJECT_ROOT" 2>&1)
 
-# Verify the output contains expected messages
+# 验证输出包含预期消息
 if echo "$output" | grep -q "RESTORE_TERMINAL_CALLED"; then
     pass "_restore_terminal was called"
 else
@@ -134,7 +134,7 @@ else
 fi
 
 # ========================================
-# Test 2: Verify cleanup prevents double execution
+# 测试 2：验证清理防止重复执行
 # ========================================
 echo ""
 echo "Test 2: Verify cleanup prevents double execution"
@@ -158,7 +158,7 @@ _graceful_stop() {
     echo "GRACEFUL_STOP"
 }
 
-# Call multiple times
+# 多次调用
 _graceful_stop "test1"
 _graceful_stop "test2"
 _cleanup
@@ -177,7 +177,7 @@ else
 fi
 
 # ========================================
-# Test 3: Verify main loop directory check triggers graceful stop
+# 测试 3：验证主循环目录检查触发优雅停止
 # ========================================
 echo ""
 echo "Test 3: Main loop directory deletion detection"
@@ -202,7 +202,7 @@ _graceful_stop() {
     echo "GRACEFUL_STOP: $1"
 }
 
-# Simulate the main loop check pattern from humanize.sh
+# 模拟 humanize.sh 中的主循环检查模式
 check_loop_dir() {
     if [[ ! -d "$loop_dir" ]]; then
         _graceful_stop ".humanize/rlcr directory no longer exists"
@@ -211,17 +211,17 @@ check_loop_dir() {
     return 1
 }
 
-# First check - directory exists
+# 第一次检查 - 目录存在
 if check_loop_dir; then
     echo "STOPPED"
 else
     echo "CONTINUING"
 fi
 
-# Delete directory
+# 删除目录
 rm -rf .humanize/rlcr
 
-# Second check - directory gone
+# 第二次检查 - 目录已消失
 if check_loop_dir; then
     echo "STOPPED_AFTER_DELETE"
 else
@@ -251,25 +251,25 @@ else
 fi
 
 # ========================================
-# Test 4: Verify terminal restore sequence
+# 测试 4：验证终端恢复序列
 # ========================================
 echo ""
-echo "Test 4: Terminal restore sequence"
+echo "测试 4：终端恢复序列"
 echo ""
 
-# This test verifies the _restore_terminal function is called
-# and would reset the scroll region
+# 此测试验证 _restore_terminal 函数被调用
+# 并会重置滚动区域
 
 cat > test_terminal_restore.sh << 'TESTSCRIPT'
 #!/usr/bin/env bash
-# Test that _restore_terminal is defined and callable
+# 测试 _restore_terminal 已定义且可调用
 
 cd "$1"
 source "$2/scripts/humanize.sh"
 
-# The function should be defined after sourcing
+# 加载后函数应该已定义
 # We can't actually test tput in non-interactive mode, but we can verify
-# the function definition exists in the source
+# 源代码中存在函数定义
 
 if grep -q "_restore_terminal()" "$2/scripts/humanize.sh"; then
     echo "FUNCTION_DEFINED"
@@ -280,7 +280,7 @@ if grep -q 'printf "\\033\[r"' "$2/scripts/humanize.sh"; then
 fi
 
 if grep -q '_restore_terminal' "$2/scripts/humanize.sh" | grep -q '_cleanup'; then
-    # Check that _cleanup calls _restore_terminal
+    # 检查 _cleanup 调用 _restore_terminal
     if grep -A5 "_cleanup()" "$2/scripts/humanize.sh" | grep -q "_restore_terminal"; then
         echo "CLEANUP_CALLS_RESTORE"
     fi
@@ -302,8 +302,8 @@ else
     fail "Scroll region reset" "Reset command not found"
 fi
 
-# Verify _cleanup calls _restore_terminal by checking the source
-# Use -A30 to capture the full _cleanup function body
+# 通过检查源代码验证 _cleanup 调用 _restore_terminal
+# 使用 -A30 捕获完整的 _cleanup 函数体
 if grep -A30 "^    _cleanup()" "$PROJECT_ROOT/scripts/humanize.sh" | grep -q "_restore_terminal"; then
     pass "_cleanup calls _restore_terminal"
 else
@@ -311,7 +311,7 @@ else
 fi
 
 # ========================================
-# Test 5: Verify _graceful_stop calls _cleanup (per R1.2)
+# 测试 5：验证 _graceful_stop 调用 _cleanup（按 R1.2）
 # ========================================
 echo ""
 echo "Test 5: _graceful_stop calls _cleanup (R1.2 compliance)"
@@ -324,15 +324,15 @@ else
 fi
 
 # ========================================
-# Test 6: Verify SIGINT (Ctrl+C) triggers cleanup - bash
+# 测试 6：验证 SIGINT (Ctrl+C) 触发清理 - bash
 # ========================================
 echo ""
-echo "Test 6: SIGINT triggers cleanup in bash"
+echo "测试 6：SIGINT 在 bash 中触发清理"
 echo ""
 
 cat > test_sigint_bash.sh << 'TESTSCRIPT'
 #!/usr/bin/env bash
-# Test that SIGINT triggers cleanup in bash mode
+# 测试 SIGINT 在 bash 模式下触发清理
 
 cleanup_done=false
 cleanup_triggered=false
@@ -344,10 +344,10 @@ _cleanup() {
     echo "CLEANUP_BY_SIGINT"
 }
 
-# Probe whether SIGINT is deliverable in this shell context.
-# In parallel test runners (background processes), POSIX mandates SIGINT=SIG_IGN;
-# bash cannot receive the signal even after installing a trap.
-# Detection: install a probe, send SIGINT to self, wait briefly.
+# 探测 SIGINT 在此 shell 上下文中是否可传递。
+# 在并行测试运行器（后台进程）中，POSIX 规定 SIGINT=SIG_IGN；
+# 即使安装了 trap，bash 也无法接收信号。
+# 检测：安装探测器，向自身发送 SIGINT，短暂等待。
 _sigint_deliverable=false
 _probe() { _sigint_deliverable=true; }
 trap '_probe' INT 2>/dev/null
@@ -356,24 +356,24 @@ sleep 0.15
 trap - INT 2>/dev/null
 
 if [[ "$_sigint_deliverable" == "false" ]]; then
-    # SIGINT=SIG_IGN in this context (parallel runner background process).
-    # Runtime delivery cannot be tested here; static verification is in Test 7.
+    # 在此上下文中 SIGINT=SIG_IGN（并行运行器后台进程）。
+    # 此处无法测试运行时传递；静态验证在测试 7 中。
     echo "CLEANUP_BY_SIGINT"
     echo "SIGINT_HANDLED"
     exit 0
 fi
 
-# Set up trap like humanize.sh does
+# 像 humanize.sh 一样设置 trap
 trap '_cleanup' INT TERM
 
-# Send SIGINT to self after a brief moment
+# 发送 SIGINT to self after a brief moment
 (
     sleep 0.1
     kill -INT $$
 ) &
 child_pid=$!
 
-# Wait for signal (up to 5 seconds); parallel CI runners can be slow.
+# 等待信号（最多 5 秒）；并行 CI 运行器可能较慢。
 for i in {1..50}; do
     sleep 0.1
     if [[ "$cleanup_triggered" == "true" ]]; then
@@ -381,7 +381,7 @@ for i in {1..50}; do
     fi
 done
 
-# Cleanup the background job if still running
+# 如果后台任务仍在运行则清理
 kill $child_pid 2>/dev/null || true
 wait $child_pid 2>/dev/null || true
 
@@ -400,27 +400,27 @@ else
 fi
 
 # ========================================
-# Test 7: Verify signal handlers are set up for bash
+# 测试 7：验证 bash 的信号处理器已设置
 # ========================================
 echo ""
-echo "Test 7: Signal handler setup verification (bash)"
+echo "测试 7：信号处理器设置验证（bash）"
 echo ""
 
-# Check that trap '_cleanup' INT TERM is in the source for bash
+# 检查 bash 源代码中是否有 trap '_cleanup' INT TERM
 if grep -E "trap '_cleanup' INT TERM" "$PROJECT_ROOT/scripts/humanize.sh" >/dev/null; then
     pass "Bash trap for INT TERM is set up"
 else
     fail "Bash trap setup" "trap '_cleanup' INT TERM not found"
 fi
 
-# Check that zsh TRAPINT is defined
+# 检查 zsh TRAPINT 是否已定义
 if grep -E "TRAPINT\(\)" "$PROJECT_ROOT/scripts/humanize.sh" >/dev/null; then
     pass "Zsh TRAPINT function is defined"
 else
     fail "Zsh TRAPINT" "TRAPINT() not found"
 fi
 
-# Check that zsh TRAPTERM is defined
+# 检查 zsh TRAPTERM 是否已定义
 if grep -E "TRAPTERM\(\)" "$PROJECT_ROOT/scripts/humanize.sh" >/dev/null; then
     pass "Zsh TRAPTERM function is defined"
 else
@@ -428,13 +428,13 @@ else
 fi
 
 # ========================================
-# Test 8: Verify cleanup resets traps to prevent re-triggering
+# 测试 8：验证清理重置 trap 以防止重复触发
 # ========================================
 echo ""
 echo "Test 8: Cleanup resets traps "
 echo ""
 
-# Check that cleanup resets traps
+# 检查清理是否重置 trap
 if grep -A10 "_cleanup()" "$PROJECT_ROOT/scripts/humanize.sh" | grep -E "trap - INT TERM" >/dev/null; then
     pass "_cleanup resets traps to prevent re-triggering"
 else
@@ -442,22 +442,22 @@ else
 fi
 
 # ========================================
-# Test 9: Real zsh SIGINT test
+# 测试 9：真实 zsh SIGINT 测试
 # ========================================
 echo ""
 echo "Test 9: Real zsh SIGINT test"
 echo ""
 
-# Only run if zsh is available
+# 仅在 zsh 可用时运行
 if command -v zsh &>/dev/null; then
     cat > test_sigint_zsh.zsh << 'TESTSCRIPT'
 #!/usr/bin/env zsh
-# Test that SIGINT triggers cleanup in zsh mode using TRAPINT
+# 测试 SIGINT 在 zsh 模式下使用 TRAPINT 触发清理
 
 cleanup_done=false
 cleanup_triggered=false
 
-# zsh uses TRAPINT function for INT handling
+# zsh 使用 TRAPINT 函数处理 INT
 TRAPINT() {
     [[ "$cleanup_done" == "true" ]] && return 130
     cleanup_done=true
@@ -466,14 +466,14 @@ TRAPINT() {
     return 130
 }
 
-# Send SIGINT to self after a brief moment
+# 片刻后向自身发送 SIGINT
 (
     sleep 0.1
     kill -INT $$
 ) &
 child_pid=$!
 
-# Wait for signal (up to 5 seconds); parallel CI runners can be slow.
+# 等待信号（最多 5 秒）；并行 CI 运行器可能较慢。
 for i in {1..50}; do
     sleep 0.1
     if [[ "$cleanup_triggered" == "true" ]]; then
@@ -481,7 +481,7 @@ for i in {1..50}; do
     fi
 done
 
-# Cleanup the background job if still running
+# 如果后台任务仍在运行则清理
 kill $child_pid 2>/dev/null || true
 wait $child_pid 2>/dev/null || true
 
@@ -491,13 +491,13 @@ fi
 TESTSCRIPT
 
     chmod +x test_sigint_zsh.zsh
-    # Run in subshell to prevent SIGINT propagation to parent
+    # 在子 shell 中运行以防止 SIGINT 传播到父进程
     output=$(bash -c 'trap "" INT; zsh test_sigint_zsh.zsh 2>&1' || true)
 
     if echo "$output" | grep -q "CLEANUP_BY_SIGINT_ZSH"; then
         pass "SIGINT triggers TRAPINT cleanup in zsh"
     else
-        # zsh might handle signals differently, check if it at least ran
+        # zsh 可能以不同方式处理信号，检查它是否至少运行了
         if echo "$output" | grep -q "ZSH_SIGINT_HANDLED"; then
             pass "SIGINT triggers TRAPINT cleanup in zsh"
         else
@@ -509,7 +509,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================"
@@ -522,7 +522,7 @@ if [[ $TESTS_FAILED -eq 0 ]]; then
     echo ""
     echo -e "${GREEN}All runtime verification tests passed!${NC}"
     echo ""
-    echo "Verified: Clean exit with user-friendly message"
+    echo "已验证：带用户友好消息的干净退出"
     echo "Verified: Terminal state properly restored via _cleanup -> _restore_terminal"
     exit 0
 else

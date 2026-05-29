@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Tests for ask-codex.sh - one-shot consultation with mock Codex
+# ask-codex.sh 测试 - 使用模拟 Codex 的一次性咨询
 #
-# All tests use a mock codex binary (no real Codex calls).
-# Mock behavior is controlled via exported environment variables:
-#   MOCK_CODEX_EXIT_CODE - exit code the mock returns (default: 0)
-#   MOCK_CODEX_STDOUT    - text the mock writes to stdout
-#   MOCK_CODEX_STDERR    - text the mock writes to stderr
+# 所有测试使用模拟的 codex 二进制文件（不进行真实的 Codex 调用）。
+# 模拟行为通过导出的环境变量控制：
+#   MOCK_CODEX_EXIT_CODE - 模拟返回的退出码（默认：0）
+#   MOCK_CODEX_STDOUT    - 模拟写入 stdout 的文本
+#   MOCK_CODEX_STDERR    - 模拟写入 stderr 的文本
 #
 
 set -euo pipefail
@@ -23,42 +23,42 @@ echo "=========================================="
 echo ""
 
 # ========================================
-# Setup: mock codex binary and test project
+# 设置：模拟 codex 二进制文件和测试项目
 # ========================================
 
 setup_test_dir
 
-# Create a mock git repo as PROJECT_ROOT
+# 创建一个模拟 git 仓库作为 PROJECT_ROOT
 MOCK_PROJECT="$TEST_DIR/project"
 init_test_git_repo "$MOCK_PROJECT"
 
-# Create mock codex binary directory
+# 创建模拟 codex 二进制文件目录
 MOCK_BIN_DIR="$TEST_DIR/mock-bin"
 mkdir -p "$MOCK_BIN_DIR"
 
 cat > "$MOCK_BIN_DIR/codex" << 'MOCK_EOF'
 #!/usr/bin/env bash
-# Mock codex binary for testing ask-codex.sh
-# Controlled via environment variables.
+# 用于测试 ask-codex.sh 的模拟 codex 二进制文件
+# 通过环境变量控制。
 if [[ -n "${MOCK_CODEX_STDERR:-}" ]]; then
     echo "$MOCK_CODEX_STDERR" >&2
 fi
 if [[ -n "${MOCK_CODEX_STDOUT:-}" ]]; then
     echo "$MOCK_CODEX_STDOUT"
 fi
-# Consume stdin so the pipe doesn't break
+# 消耗 stdin 以避免管道中断
 cat > /dev/null
 exit "${MOCK_CODEX_EXIT_CODE:-0}"
 MOCK_EOF
 chmod +x "$MOCK_BIN_DIR/codex"
 
-# Export mock variables so child processes (the mock codex) can see them
+# 导出模拟变量，使子进程（模拟 codex）可以看到它们
 export MOCK_CODEX_EXIT_CODE=""
 export MOCK_CODEX_STDOUT=""
 export MOCK_CODEX_STDERR=""
 
-# Reset mock state between tests; also clears the skill dir so that
-# find...sort|tail -1 always picks the single dir from the next invocation.
+# 在测试之间重置模拟状态；同时清除 skill 目录，使
+# find...sort|tail -1 总是选取下一次调用的单个目录。
 reset_mock() {
     export MOCK_CODEX_EXIT_CODE="0"
     export MOCK_CODEX_STDOUT=""
@@ -66,19 +66,19 @@ reset_mock() {
     rm -rf "$MOCK_PROJECT/.humanize/skill" 2>/dev/null || true
 }
 
-# Override XDG_CACHE_HOME for run_ask_codex_capturing_dir; set to a non-writable path
-# to exercise the fallback cache branch (CACHE_DIR=$SKILL_DIR/cache).
+# 覆盖 run_ask_codex_capturing_dir 的 XDG_CACHE_HOME；设置为不可写路径
+# 以练习回退缓存分支（CACHE_DIR=$SKILL_DIR/cache）。
 RUN_XDG_CACHE_HOME="$TEST_DIR/cache"
 
-# Helper: run ask-codex with a controllable XDG_CACHE_HOME, capture stderr, and
-# derive the exact project-local skill dir for that invocation.
-# Sets RUN_EXIT_CODE (int) and RUN_SKILL_DIR (path, empty on resolution failure).
+# 辅助函数：使用可控的 XDG_CACHE_HOME 运行 ask-codex，捕获 stderr，并
+# 推导该调用的确切项目本地 skill 目录。
+# 设置 RUN_EXIT_CODE（整数）和 RUN_SKILL_DIR（路径，解析失败时为空）。
 #
-# Primary: "ask-codex: response saved to .../output.md" (emitted on success, always
-#   project-local regardless of which cache layout was used).
-# Fallback A: "ask-codex: cache=.../skill-<id>"  -> normal layout
-# Fallback B: "ask-codex: cache=.../.humanize/skill/<id>/cache" -> fallback layout
-# If none of the above match, RUN_SKILL_DIR is set to "" (explicit failure).
+# 主要："ask-codex: response saved to .../output.md"（成功时发出，始终
+#   项目本地，无论使用了哪种缓存布局）。
+# 回退 A："ask-codex: cache=.../skill-<id>"  -> 正常布局
+# 回退 B："ask-codex: cache=.../.humanize/skill/<id>/cache" -> 回退布局
+# 如果以上都不匹配，RUN_SKILL_DIR 被设置为 ""（显式失败）。
 run_ask_codex_capturing_dir() {
     local run_stderr output_path cache_path skill_basename
     RUN_EXIT_CODE=0
@@ -108,7 +108,7 @@ run_ask_codex_capturing_dir() {
     esac
 }
 
-# Helper: run ask-codex with mock codex in PATH, inside mock project
+# 辅助函数：在模拟项目内使用 PATH 中的模拟 codex 运行 ask-codex
 run_ask_codex() {
     (
         cd "$MOCK_PROJECT"
@@ -119,13 +119,13 @@ run_ask_codex() {
 }
 
 # ========================================
-# Validation Tests
+# 验证测试
 # ========================================
 
 echo "--- Validation Tests ---"
 echo ""
 
-# Test: empty question
+# 测试：空问题
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]] && echo "$OUTPUT" | grep -q "No question or task provided"; then
@@ -134,7 +134,7 @@ else
     fail "empty question exits 1 with error message" "exit 1 + error" "exit=$EXIT_CODE"
 fi
 
-# Test: --help exits 0
+# 测试：--help 以 0 退出
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex --help 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]] && echo "$OUTPUT" | grep -q "USAGE"; then
@@ -143,7 +143,7 @@ else
     fail "--help exits 0 with usage info" "exit 0 + USAGE" "exit=$EXIT_CODE"
 fi
 
-# Test: unknown option exits 1
+# 测试：未知选项以 1 退出
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex --bad-flag test 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]] && echo "$OUTPUT" | grep -q "Unknown option"; then
@@ -152,7 +152,7 @@ else
     fail "unknown option exits 1" "exit 1 + Unknown option" "exit=$EXIT_CODE"
 fi
 
-# Test: --codex-model without argument
+# 测试：--codex-model 无参数
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex --codex-model 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]] && echo "$OUTPUT" | grep -q "requires a MODEL:EFFORT"; then
@@ -161,7 +161,7 @@ else
     fail "--codex-model without argument exits 1" "exit 1" "exit=$EXIT_CODE"
 fi
 
-# Test: --codex-timeout without argument
+# 测试：--codex-timeout 无参数
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex --codex-timeout 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]] && echo "$OUTPUT" | grep -q "requires a number"; then
@@ -170,7 +170,7 @@ else
     fail "--codex-timeout without argument exits 1" "exit 1" "exit=$EXIT_CODE"
 fi
 
-# Test: --codex-timeout non-numeric
+# 测试：--codex-timeout 非数字
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex --codex-timeout abc test 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]] && echo "$OUTPUT" | grep -q "must be a positive integer"; then
@@ -179,7 +179,7 @@ else
     fail "--codex-timeout non-numeric exits 1" "exit 1" "exit=$EXIT_CODE"
 fi
 
-# Test: invalid model characters
+# 测试：无效的模型字符
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex --codex-model 'bad;model' test 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]] && echo "$OUTPUT" | grep -q "invalid characters"; then
@@ -188,7 +188,7 @@ else
     fail "invalid model characters exits 1" "exit 1" "exit=$EXIT_CODE"
 fi
 
-# Test: invalid effort characters
+# 测试：无效的 effort 字符
 EXIT_CODE=0
 OUTPUT=$(run_ask_codex --codex-model 'model:bad;effort' test 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]] && echo "$OUTPUT" | grep -q "invalid characters"; then
@@ -198,14 +198,14 @@ else
 fi
 
 # ========================================
-# Successful Run Tests
+# 成功运行测试
 # ========================================
 
 echo ""
 echo "--- Successful Run Tests ---"
 echo ""
 
-# Test: successful codex response appears on stdout
+# 测试：成功的 codex 响应出现在 stdout
 reset_mock
 export MOCK_CODEX_STDOUT="This is the answer"
 STDOUT=$(run_ask_codex "What is 1+1?" 2>/dev/null)
@@ -215,7 +215,7 @@ else
     fail "successful run outputs codex response to stdout" "This is the answer" "$STDOUT"
 fi
 
-# Test: successful run creates output.md in skill dir
+# 测试：成功运行在 skill 目录中创建 output.md
 SKILL_DIRS_BEFORE=$(find "$MOCK_PROJECT/.humanize/skill" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort)
 reset_mock
 export MOCK_CODEX_STDOUT="Test output for file"
@@ -228,21 +228,21 @@ else
     fail "successful run creates output.md with codex response" "output.md with content" "dir=$NEW_DIR"
 fi
 
-# Test: successful run creates metadata.md with status: success
+# 测试：成功运行创建 status: success 的 metadata.md
 if [[ -n "$NEW_DIR" ]] && [[ -f "$NEW_DIR/metadata.md" ]] && grep -q "status: success" "$NEW_DIR/metadata.md"; then
     pass "successful run creates metadata.md with status: success"
 else
     fail "successful run creates metadata.md with status: success"
 fi
 
-# Test: successful run creates input.md with the question
+# 测试：成功运行创建包含问题的 input.md
 if [[ -n "$NEW_DIR" ]] && [[ -f "$NEW_DIR/input.md" ]] && grep -q "file test" "$NEW_DIR/input.md"; then
     pass "successful run saves question to input.md"
 else
     fail "successful run saves question to input.md"
 fi
 
-# Test: successful run exits 0
+# 测试：成功运行以 0 退出
 reset_mock
 export MOCK_CODEX_STDOUT="ok"
 EXIT_CODE=0
@@ -254,14 +254,14 @@ else
 fi
 
 # ========================================
-# Error Handling Tests
+# 错误处理测试
 # ========================================
 
 echo ""
 echo "--- Error Handling Tests ---"
 echo ""
 
-# Test: codex non-zero exit propagates
+# 测试：codex 非零退出传播
 reset_mock
 export MOCK_CODEX_EXIT_CODE="42"
 export MOCK_CODEX_STDERR="something broke"
@@ -273,7 +273,7 @@ else
     fail "codex non-zero exit code propagates" "exit 42" "exit=$EXIT_CODE"
 fi
 
-# Test: codex error creates metadata with status: error
+# 测试：codex 错误创建 status: error 的 metadata
 LATEST_DIR=$(find "$MOCK_PROJECT/.humanize/skill" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort | tail -1)
 if [[ -n "$LATEST_DIR" ]] && [[ -f "$LATEST_DIR/metadata.md" ]] && grep -q "status: error" "$LATEST_DIR/metadata.md"; then
     pass "codex error creates metadata with status: error"
@@ -281,7 +281,7 @@ else
     fail "codex error creates metadata with status: error"
 fi
 
-# Test: codex empty response exits 1
+# 测试：codex 空响应以 1 退出
 reset_mock
 export MOCK_CODEX_STDOUT=""
 EXIT_CODE=0
@@ -292,7 +292,7 @@ else
     fail "empty codex response exits 1" "exit 1" "exit=$EXIT_CODE"
 fi
 
-# Test: empty response creates metadata with status: empty_response
+# 测试：空响应创建 status: empty_response 的 metadata
 LATEST_DIR=$(find "$MOCK_PROJECT/.humanize/skill" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort | tail -1)
 if [[ -n "$LATEST_DIR" ]] && [[ -f "$LATEST_DIR/metadata.md" ]] && grep -q "status: empty_response" "$LATEST_DIR/metadata.md"; then
     pass "empty response creates metadata with status: empty_response"
@@ -300,7 +300,7 @@ else
     fail "empty response creates metadata with status: empty_response"
 fi
 
-# Test: codex timeout (exit 124) is handled
+# 测试：codex 超时（退出码 124）被处理
 reset_mock
 export MOCK_CODEX_EXIT_CODE="124"
 EXIT_CODE=0
@@ -311,7 +311,7 @@ else
     fail "timeout exit 124 is handled with error message" "exit 124 + timed out" "exit=$EXIT_CODE"
 fi
 
-# Test: timeout creates metadata with status: timeout
+# 测试：超时创建 status: timeout 的 metadata
 LATEST_DIR=$(find "$MOCK_PROJECT/.humanize/skill" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort | tail -1)
 if [[ -n "$LATEST_DIR" ]] && [[ -f "$LATEST_DIR/metadata.md" ]] && grep -q "status: timeout" "$LATEST_DIR/metadata.md"; then
     pass "timeout creates metadata with status: timeout"
@@ -320,14 +320,14 @@ else
 fi
 
 # ========================================
-# Directory Uniqueness Tests
+# 目录唯一性测试
 # ========================================
 
 echo ""
 echo "--- Directory Uniqueness Tests ---"
 echo ""
 
-# Test: two rapid calls produce different skill directories
+# 测试：两次快速调用产生不同的 skill 目录
 DIRS_BEFORE=$(find "$MOCK_PROJECT/.humanize/skill" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort)
 
 reset_mock
@@ -349,7 +349,7 @@ else
     fail "two concurrent calls create distinct skill directories" ">=2 new dirs" "$NEW_DIR_COUNT new dirs"
 fi
 
-# Test: cache directories are also unique
+# 测试：缓存目录也是唯一的
 CACHE_BASE="$TEST_DIR/cache/humanize"
 if [[ -d "$CACHE_BASE" ]]; then
     CACHE_DIRS=$(find "$CACHE_BASE" -maxdepth 2 -mindepth 2 -type d -name "skill-*" 2>/dev/null | sort)
@@ -364,14 +364,14 @@ else
 fi
 
 # ========================================
-# Argument Parsing Tests
+# 参数解析测试
 # ========================================
 
 echo ""
 echo "--- Argument Parsing Tests ---"
 echo ""
 
-# Test: --codex-model MODEL:EFFORT sets both model and effort
+# 测试：--codex-model MODEL:EFFORT 设置模型和 effort
 reset_mock
 export MOCK_CODEX_STDOUT="model-test"
 run_ask_codex_capturing_dir --codex-model "custom-model:high" "model test"
@@ -383,7 +383,7 @@ else
     fail "--codex-model MODEL:EFFORT parses model and effort"
 fi
 
-# Test: --codex-model MODEL (no effort) uses default effort
+# 测试：--codex-model MODEL（无 effort）使用默认 effort
 reset_mock
 export MOCK_CODEX_STDOUT="effort-default-test"
 run_ask_codex_capturing_dir --codex-model "solo-model" "effort default test"
@@ -395,7 +395,7 @@ else
     fail "--codex-model MODEL without effort uses default high"
 fi
 
-# Test: -- separator treats remaining args as question
+# 测试：-- 分隔符将剩余参数视为问题
 reset_mock
 export MOCK_CODEX_STDOUT="separator-test"
 run_ask_codex_capturing_dir -- --not-a-flag "is question"
@@ -406,7 +406,7 @@ else
     fail "-- separator passes remaining args as question text"
 fi
 
-# Test: --codex-timeout is recorded in input.md
+# 测试：--codex-timeout 被记录到 input.md
 reset_mock
 export MOCK_CODEX_STDOUT="timeout-val"
 run_ask_codex_capturing_dir --codex-timeout 123 "timeout value test"
@@ -417,8 +417,8 @@ else
     fail "--codex-timeout value is recorded in input.md"
 fi
 
-# Test: run_ask_codex_capturing_dir resolves correct skill dir when home cache is not writable
-# (exercises the ask-codex.sh fallback branch: CACHE_DIR=$SKILL_DIR/cache)
+# 测试：当 home 缓存不可写时 run_ask_codex_capturing_dir 解析正确的 skill 目录
+# （练习 ask-codex.sh 的回退分支：CACHE_DIR=$SKILL_DIR/cache）
 READONLY_CACHE="$TEST_DIR/readonly-cache"
 mkdir -p "$READONLY_CACHE"
 chmod 444 "$READONLY_CACHE"
@@ -438,19 +438,19 @@ else
 fi
 
 # ========================================
-# Cache Directory Tests
+# 缓存目录测试
 # ========================================
 
 echo ""
 echo "--- Cache Directory Tests ---"
 echo ""
 
-# Test: cache directory contains expected files
+# 测试：缓存目录包含预期的文件
 reset_mock
 export MOCK_CODEX_STDOUT="cache-file-test"
 EXIT_CODE=0
 STDERR=$(run_ask_codex "cache test" 2>&1 >/dev/null) || EXIT_CODE=$?
-# Extract cache path from stderr
+# 从 stderr 提取缓存路径
 CACHE_PATH=$(echo "$STDERR" | grep "ask-codex: cache=" | sed 's/ask-codex: cache=//')
 if [[ -n "$CACHE_PATH" ]] && [[ -f "$CACHE_PATH/codex-run.cmd" ]]; then
     pass "cache directory contains codex-run.cmd"
@@ -471,28 +471,28 @@ else
 fi
 
 # ========================================
-# Skill Guidance Tests
+# Skill 指南测试
 # ========================================
 
 echo ""
 echo "--- Skill Guidance Tests ---"
 echo ""
 
-# Test: skill explicitly warns against unsafe bare $ARGUMENTS shell expansion
+# 测试：skill 显式警告不安全的裸 $ARGUMENTS shell 展开
 if grep -Fq 'Never run this unsafe form' "$ASK_CODEX_SKILL" && grep -Fq '"${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh" $ARGUMENTS' "$ASK_CODEX_SKILL"; then
     pass "skill warns against bare \$ARGUMENTS shell expansion"
 else
     fail "skill warns against bare \$ARGUMENTS shell expansion" "explicit unsafe-form warning" "missing"
 fi
 
-# Test: skill documents the safe quoted simple invocation
+# 测试：skill 记录了安全的引用简单调用
 if grep -Fq '"${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh" "$ARGUMENTS"' "$ASK_CODEX_SKILL"; then
     pass "skill quotes the question when no flags are present"
 else
     fail "skill quotes the question when no flags are present" "quoted simple invocation" "missing"
 fi
 
-# Test: skill explains that free-form text must be a quoted final argument
+# 测试：skill 说明自由文本必须是引用的最终参数
 if grep -Fq 'one quoted final argument' "$ASK_CODEX_SKILL"; then
     pass "skill requires one quoted final argument for free-form text"
 else
@@ -500,15 +500,15 @@ else
 fi
 
 # ========================================
-# Auto-Probe: Nested Hook Disable Tests
+# 自动探针：嵌套钩子禁用测试
 # ========================================
 
 echo ""
 echo "--- Auto-Probe: Nested Hook Disable Tests ---"
 echo ""
 
-# Setup: create a secondary mock codex binary directory for probe tests,
-# so the probe result is not cached from earlier tests.
+# 设置：为探针测试创建辅助模拟 codex 二进制目录，
+# 使探针结果不会从早期测试中缓存。
 PROBE_BIN_DIR="$TEST_DIR/probe-bin"
 PROBE_PROJECT="$TEST_DIR/probe-project"
 init_test_git_repo "$PROBE_PROJECT"
@@ -523,8 +523,8 @@ run_ask_codex_probe() {
     )
 }
 
-# Test A: when codex supports --disable, ask-codex.sh injects --disable hooks
-# Create a mock codex that echoes "--disable" in its --help output
+# 测试 A：当 codex 支持 --disable 时，ask-codex.sh 注入 --disable hooks
+# 创建一个在 --help 输出中回显 "--disable" 的模拟 codex
 cat > "$PROBE_BIN_DIR/codex" << 'PROBE_MOCK_SUPPORTS'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "--help" ]] || echo "$*" | grep -q -- '--help'; then
@@ -545,7 +545,7 @@ reset_mock
 export MOCK_CODEX_STDOUT="probe-test-supports"
 run_ask_codex_probe "probe disable test" > /dev/null 2>&1 || true
 
-# Check that the cached probe result is "yes" in the skill dir
+# 检查 skill 目录中缓存的探针结果是否为 "yes"
 PROBE_SKILL_DIR=$(find "$PROBE_PROJECT/.humanize/skill" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort | tail -1)
 if [[ -n "$PROBE_SKILL_DIR" ]] && [[ -f "$PROBE_SKILL_DIR/.codex-disable-hooks-supported" ]]; then
     PROBE_RESULT=$(cat "$PROBE_SKILL_DIR/.codex-disable-hooks-supported")
@@ -558,7 +558,7 @@ else
     fail "auto-probe: probe cache file created" "cache file exists" "not found"
 fi
 
-# Test B: when codex does NOT support --disable, probe result is "no"
+# 测试 B：当 codex 不支持 --disable 时，探针结果为 "no"
 PROBE_BIN_NO_DIR="$TEST_DIR/probe-bin-no"
 PROBE_PROJECT_NO="$TEST_DIR/probe-project-no"
 init_test_git_repo "$PROBE_PROJECT_NO"
@@ -603,7 +603,7 @@ else
     fail "auto-probe: probe cache file created for no-support case" "cache file exists" "not found"
 fi
 
-# Test C: ask-codex.sh script contains the probe implementation
+# 测试 C：ask-codex.sh 脚本包含探针实现
 if grep -q "CODEX_DISABLE_HOOKS_ARGS=(--disable hooks)" "$ASK_CODEX_SCRIPT" \
     && grep -q "codex-disable-hooks-supported" "$ASK_CODEX_SCRIPT"; then
     pass "ask-codex.sh contains nested hook disable auto-probe implementation"
@@ -612,7 +612,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 摘要
 # ========================================
 
 print_test_summary "Ask Codex Test Summary"

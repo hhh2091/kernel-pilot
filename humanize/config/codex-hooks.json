@@ -1,5 +1,5 @@
 {
-  "description": "Humanize Codex Hooks - Native Stop hooks for RLCR loops",
+  "description": "Humanize Codex Hook - RLCR 循环的原生 Stop hook",
   "hooks": {
     "Stop": [
       {

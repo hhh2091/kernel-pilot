@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
-# Restart the Humanize Viz dashboard server.
+# 重启 Humanize Viz 仪表盘服务器。
 #
-# Usage:
-#   viz-restart.sh <project_dir>                  # legacy positional
+# 用法：
+#   viz-restart.sh <project_dir>                  # 旧式位置参数
 #   viz-restart.sh --project <path> \
 #                  [--host <addr>] [--port <int>] \
 #                  [--auth-token <tok>] [--trust-proxy]
 #
-# Every flag the underlying viz-start.sh accepts is forwarded
-# verbatim. A plain `viz-restart.sh --project <path>` still works
-# and re-launches with viz-start.sh's defaults (loopback bind, no
-# auth); callers that started the daemon with custom --host /
-# --port / --auth-token / --trust-proxy must repeat those flags
-# here, otherwise the restarted daemon will silently drop back to
-# the defaults and the previous access URL / token stop working.
+# 底层 viz-start.sh 接受的所有标志都会原样转发。
+# 简单的 `viz-restart.sh --project <path>` 仍然有效，
+# 会使用 viz-start.sh 的默认值（回环绑定、无认证）重新启动；
+# 如果调用者启动守护进程时使用了自定义 --host / --port /
+# --auth-token / --trust-proxy，则必须在此处重复指定这些标志，
+# 否则重启后的守护进程会静默回退到默认值，
+# 之前的访问 URL / 令牌将失效。
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Parse every flag that viz-start.sh understands so restart is a
-# true equivalent of stop+start with the same configuration. The old
-# implementation only captured --project and silently dropped
-# --host / --port / --auth-token / --trust-proxy, which made a
-# non-loopback daemon quietly revert to localhost on restart.
+# 解析 viz-start.sh 能识别的所有标志，使重启真正等价于
+# 使用相同配置执行停止+启动。旧的实现只捕获 --project，
+# 静默丢弃 --host / --port / --auth-token / --trust-proxy，
+# 导致非回环守护进程在重启时悄悄回退到 localhost。
 PROJECT_DIR="."
 HOST=""
 PORT=""
@@ -42,8 +41,8 @@ while [[ $# -gt 0 ]]; do
 done
 PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 
-# Rebuild the viz-start argv in a deterministic order so the
-# restarted daemon sees exactly the same config the caller gave us.
+# 以确定性顺序重建 viz-start 的参数列表，
+# 使重启后的守护进程看到与调用者传入的完全相同的配置。
 START_ARGS=(--project "$PROJECT_DIR")
 [[ -n "$HOST" ]]    && START_ARGS+=(--host "$HOST")
 [[ -n "$PORT" ]]    && START_ARGS+=(--port "$PORT")

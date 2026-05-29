@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
 #
-# PostToolUse Bash Hook for RLCR loop
+# RLCR 循环的 PostToolUse Bash 钩子
 #
-# Records the Claude Code session_id into state.md immediately after setup.
-# This hook fires right after the setup script's Bash command completes.
+# 在设置后立即将 Claude Code session_id 记录到 state.md 中。
+# 此钩子在设置脚本的 Bash 命令完成后立即触发。
 #
-# Mechanism:
-# 1. Setup script creates .humanize/.pending-session-id with:
-#    Line 1: path to state.md
-#    Line 2: full resolved path of setup script (command signature)
-# 2. This hook checks for the signal file on every Bash PostToolUse event
-# 3. Boundary-aware match: verifies the Bash command is a valid invocation
-#    of the setup script path (path followed by end-of-string or whitespace),
-#    preventing false positives from substrings and concatenated forms
-# 4. Extracts session_id from hook JSON input
-# 5. Patches state.md with the session_id value using safe awk replacement
-# 6. Removes the signal file (one-shot mechanism)
+# 机制：
+# 1. 设置脚本创建 .humanize/.pending-session-id，包含：
+#    第 1 行：state.md 的路径
+#    第 2 行：设置脚本的完整解析路径（命令签名）
+# 2. 此钩子在每个 Bash PostToolUse 事件上检查信号文件
+# 3. 边界感知匹配：验证 Bash 命令是设置脚本路径的有效调用
+#    （路径后跟字符串结尾或空格），防止子字符串和连接形式的误报
+# 4. 从钩子 JSON 输入中提取 session_id
+# 5. 使用安全的 awk 替换将 session_id 值修补到 state.md 中
+# 6. 移除信号文件（一次性机制）
 #
-# This ensures session_id is recorded BEFORE any team members can be created,
-# so only the team leader (main session) is affected by RLCR loop hooks.
+# 这确保在任何团队成员可以创建之前记录 session_id，
+# 因此只有团队领导者（主会话）受 RLCR 循环钩子的影响。
 #
 
 set -euo pipefail
 
-# Read hook JSON input from stdin
+# 从 stdin 读取钩子 JSON 输入
 HOOK_INPUT=$(cat)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -36,16 +35,15 @@ if command -v jq >/dev/null 2>&1; then
     HOOK_CWD=$(printf '%s' "$HOOK_INPUT" | jq -r '.cwd // empty' 2>/dev/null || echo "")
 fi
 
-# Verify the Bash command is a real setup script invocation (not arbitrary text)
-# The command signature is the full resolved path of setup-rlcr-loop.sh.
-# We require the command to START with this path (quoted or unquoted),
-# preventing false positives like 'echo setup-rlcr-loop.sh' from consuming the signal.
+# 验证 Bash 命令是真正的设置脚本调用（不是任意文本）
+# 命令签名是 setup-rlcr-loop.sh 的完整解析路径。
+# 我们要求命令以此路径开头（带引号或不带引号），
+# 防止像 'echo setup-rlcr-loop.sh' 这样的误报消耗信号。
 matches_setup_command_signature() {
     local hook_command="$1"
     local command_signature="$2"
 
-    # Older signal files did not include a command signature. Preserve the
-    # previous behavior for those files.
+    # 较旧的信号文件不包含命令签名。为这些文件保留先前的行为。
     if [[ -z "$command_signature" ]]; then
         return 0
     fi
@@ -54,27 +52,26 @@ matches_setup_command_signature() {
         return 1
     fi
 
-    # Normalize consecutive slashes (e.g. "PolyArch//scripts" -> "PolyArch/scripts").
-    # CLAUDE_PLUGIN_ROOT may have a trailing slash, producing double slashes when
-    # concatenated with "/scripts/..." in the command template. The setup script
-    # normalizes its own path via cd+pwd (removing double slashes), but the
-    # tool_input.command preserves the original string. Without normalization,
-    # the string comparison below always fails and session_id is never written.
-    # See: https://github.com/PolyArch/humanize/issues/67
+    # 规范化连续斜杠（例如 "PolyArch//scripts" -> "PolyArch/scripts"）。
+    # CLAUDE_PLUGIN_ROOT 可能有尾部斜杠，在命令模板中与 "/scripts/..." 连接时
+    # 会产生双斜杠。设置脚本通过 cd+pwd 规范化自己的路径（移除双斜杠），
+    # 但 tool_input.command 保留原始字符串。如果不规范化，
+    # 下面的字符串比较总是失败，session_id 永远不会被写入。
+    # 参见：https://github.com/PolyArch/humanize/issues/67
     hook_command=$(printf '%s' "$hook_command" | tr -s '/')
     command_signature=$(printf '%s' "$command_signature" | tr -s '/')
 
-    # Boundary-aware match: command must be a valid setup invocation form.
-    # Requires the script path to be followed by end-of-string or any POSIX
-    # whitespace ([[:space:]]), preventing concatenated forms.
-    # Accepts: "/full/path/setup-rlcr-loop.sh" args  (quoted, space-delimited)
-    #          "/full/path/setup-rlcr-loop.sh"\targs  (quoted, tab-delimited)
-    #          "/full/path/setup-rlcr-loop.sh"        (quoted, no args)
-    #          /full/path/setup-rlcr-loop.sh args     (unquoted, space-delimited)
-    #          /full/path/setup-rlcr-loop.sh\targs    (unquoted, tab-delimited)
-    #          /full/path/setup-rlcr-loop.sh           (unquoted, no args)
-    # Rejects: "/full/path/setup-rlcr-loop.sh"foo     (no boundary after quote)
-    #          echo /full/path/setup-rlcr-loop.sh      (does not start with path)
+    # 边界感知匹配：命令必须是有效的设置调用形式。
+    # 要求脚本路径后跟字符串结尾或任何 POSIX 空白（[[:space:]]），
+    # 防止连接形式。
+    # 接受："/full/path/setup-rlcr-loop.sh" args  （带引号，空格分隔）
+    #        "/full/path/setup-rlcr-loop.sh"\targs  （带引号，制表符分隔）
+    #        "/full/path/setup-rlcr-loop.sh"        （带引号，无参数）
+    #        /full/path/setup-rlcr-loop.sh args     （不带引号，空格分隔）
+    #        /full/path/setup-rlcr-loop.sh\targs    （不带引号，制表符分隔）
+    #        /full/path/setup-rlcr-loop.sh           （不带引号，无参数）
+    # 拒绝："/full/path/setup-rlcr-loop.sh"foo     （引号后无边界）
+    #        echo /full/path/setup-rlcr-loop.sh      （不以路径开头）
     if [[ "$hook_command" == "\"${command_signature}\"" ]] || [[ "$hook_command" == "\"${command_signature}\""[[:space:]]* ]]; then
         return 0
     fi
@@ -128,9 +125,9 @@ try_select_signal_file() {
     return 1
 }
 
-# Locate the pending signal in the project associated with this hook event,
-# not merely the shell process cwd. This avoids stale signals from a previous
-# `cd` target claiming or blocking the setup command.
+# 定位与此钩子事件关联的项目中的待处理信号，
+# 而不仅仅是 shell 进程 cwd。这避免了先前 `cd` 目标的过期信号
+# 占用或阻止设置命令。
 PROJECT_ROOT=""
 SIGNAL_FILE=""
 try_select_signal_file "$HOOK_CWD" \
@@ -139,13 +136,13 @@ try_select_signal_file "$HOOK_CWD" \
     || true
 
 if [[ -z "$SIGNAL_FILE" ]]; then
-    # No pending session_id to record - this is the normal case
+    # 没有待记录的 session_id - 这是正常情况
     exit 0
 fi
 
-# Read the signal file contents
-# Line 1: state file path
-# Line 2: full resolved path of setup script (command signature)
+# 读取信号文件内容
+# 第 1 行：状态文件路径
+# 第 2 行：设置脚本的完整解析路径（命令签名）
 STATE_FILE_PATH=""
 COMMAND_SIGNATURE=""
 {
@@ -154,35 +151,35 @@ COMMAND_SIGNATURE=""
 } < "$SIGNAL_FILE"
 
 if [[ -z "$STATE_FILE_PATH" ]] || [[ ! -f "$STATE_FILE_PATH" ]]; then
-    # Signal file is empty or points to non-existent state file - clean up
+    # 信号文件为空或指向不存在的状态文件 - 清理
     rm -f "$SIGNAL_FILE"
     exit 0
 fi
 
-# Re-check the selected signal before consuming it. Candidate selection above
-# may have skipped stale signals from other roots, but this is the authorization gate.
+# 在消耗选定的信号之前重新检查。上面的候选选择可能已跳过来自其他根的过期信号，
+# 但这是授权门控。
 if ! matches_setup_command_signature "$HOOK_COMMAND" "$COMMAND_SIGNATURE"; then
-    # This Bash event is not from the setup script - do not consume signal
+    # 此 Bash 事件不是来自设置脚本 - 不消耗信号
     exit 0
 fi
 
-# Extract session_id from the hook JSON input
+# 从钩子 JSON 输入中提取 session_id
 SESSION_ID=""
 if command -v jq >/dev/null 2>&1; then
     SESSION_ID=$(printf '%s' "$HOOK_INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo "")
 fi
 
 if [[ -z "$SESSION_ID" ]]; then
-    # No session_id available in hook input - leave signal file for next attempt
+    # 钩子输入中没有可用的 session_id - 留下信号文件供下次尝试
     exit 0
 fi
 
-# Patch state.md: replace empty session_id with actual value
-# Only patch if session_id is currently empty (safety check)
+# 修补 state.md：用实际值替换空的 session_id
+# 仅在 session_id 当前为空时修补（安全检查）
 CURRENT_SESSION_ID=$(grep "^session_id:" "$STATE_FILE_PATH" 2>/dev/null | sed 's/session_id: *//' || echo "")
 
 if [[ -z "$CURRENT_SESSION_ID" ]]; then
-    # Use awk for safe replacement (handles special chars in SESSION_ID: /, &, etc.)
+    # 使用 awk 进行安全替换（处理 SESSION_ID 中的特殊字符：/、& 等）
     TEMP_FILE="${STATE_FILE_PATH}.tmp.$$"
     awk -v new_id="$SESSION_ID" '{
         if ($0 ~ /^session_id:$/) {
@@ -194,7 +191,7 @@ if [[ -z "$CURRENT_SESSION_ID" ]]; then
     mv "$TEMP_FILE" "$STATE_FILE_PATH"
 fi
 
-# Remove signal file (one-shot: session_id is now recorded)
+# 移除信号文件（一次性：session_id 现已记录）
 rm -f "$SIGNAL_FILE"
 
 exit 0

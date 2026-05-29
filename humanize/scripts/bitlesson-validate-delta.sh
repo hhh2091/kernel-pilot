@@ -180,11 +180,11 @@ extract_bitlesson_delta_block() {
 
 if ! extract_bitlesson_delta_block detect >/dev/null; then
     FALLBACK=$(cat <<'EOF'
-# BitLesson Delta Missing
+# 缺少 BitLesson Delta
 
-Your summary is missing the required `## BitLesson Delta` section.
+你的摘要中缺少必需的 `## BitLesson Delta` 部分。
 
-Required minimal format:
+必需的最小格式：
 ```markdown
 ## BitLesson Delta
 - Action: none|add|update
@@ -205,9 +205,9 @@ BITLESSON_ACTION=$(echo "$BITLESSON_ACTION_CANDIDATES" | awk 'NF{print; exit}')
 
 if [[ "$BITLESSON_ACTION_COUNT" -ne 1 ]] || [[ "$BITLESSON_ACTION" != "none" && "$BITLESSON_ACTION" != "add" && "$BITLESSON_ACTION" != "update" ]]; then
     FALLBACK=$(cat <<'EOF'
-# Invalid BitLesson Delta Action
+# 无效的 BitLesson Delta Action
 
-Your `## BitLesson Delta` section exists, but it must include one action:
+你的 `## BitLesson Delta` 部分存在，但必须包含一个 action：
 - `none`
 - `add`
 - `update`
@@ -242,9 +242,9 @@ fi
 if [[ "$BITLESSON_ACTION" == "none" ]]; then
     if [[ -n "$BITLESSON_IDS_RAW" ]] && [[ "$BITLESSON_IDS_UPPER" != "NONE" ]]; then
         FALLBACK=$(cat <<'EOF'
-# BitLesson Delta Inconsistent
+# BitLesson Delta 不一致
 
-`Action: none` requires `Lesson ID(s): NONE` (or leaving Lesson ID(s) empty).
+`Action: none` 要求 `Lesson ID(s): NONE`（或留空 Lesson ID(s)）。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-inconsistent.md" "$FALLBACK")
@@ -253,11 +253,11 @@ EOF
 
     if [[ "$CONCRETE_BITLESSON_COUNT" -eq 0 ]] && [[ "$BITLESSON_ALLOW_EMPTY_NONE" != "true" ]]; then
         FALLBACK=$(cat <<'EOF'
-# BitLesson Recording Required
+# 需要记录 BitLesson
 
-`Action: none` is not allowed in round {{CURRENT_ROUND}} when {{BITLESSON_FILE}} still has no concrete lesson entries.
+当 {{BITLESSON_FILE}} 仍然没有具体的课程条目时，第 {{CURRENT_ROUND}} 轮不允许使用 `Action: none`。
 
-If this round resolves issues discovered in previous rounds, add or update at least one reusable lesson and report `Action: add` or `Action: update`.
+如果本轮解决了前几轮发现的问题，请添加或更新至少一个可复用的课程，并报告 `Action: add` 或 `Action: update`。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-empty-kb.md" "$FALLBACK" \
@@ -268,9 +268,9 @@ EOF
 else
     if [[ -z "$BITLESSON_IDS_RAW" ]] || [[ "$BITLESSON_IDS_UPPER" == "NONE" ]]; then
         FALLBACK=$(cat <<'EOF'
-# BitLesson Delta Inconsistent
+# BitLesson Delta 不一致
 
-`Action: {{ACTION}}` requires concrete `Lesson ID(s)` (not `NONE`).
+`Action: {{ACTION}}` 要求具体的 `Lesson ID(s)`（不是 `NONE`）。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-inconsistent.md" "$FALLBACK" \
@@ -284,11 +284,11 @@ EOF
 
     if [[ -z "$BITLESSON_NOTES" ]] || [[ "$BITLESSON_NOTES" =~ $NOTES_PLACEHOLDER_REGEX ]]; then
         FALLBACK=$(cat <<'EOF'
-# BitLesson Delta Missing Notes
+# BitLesson Delta 缺少 Notes
 
-`Action: {{ACTION}}` requires a `Notes:` field explaining what changed and why.
+`Action: {{ACTION}}` 要求一个 `Notes:` 字段来解释更改了什么以及原因。
 
-The Notes field must not be empty or contain placeholder text like `[what changed and why]`.
+Notes 字段不得为空或包含占位符文本如 `[what changed and why]`。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-missing-notes.md" "$FALLBACK" \
@@ -298,9 +298,9 @@ EOF
 
     if [[ ! -f "$BITLESSON_FILE" ]]; then
         FALLBACK=$(cat <<'EOF'
-# BitLesson File Missing
+# BitLesson 文件缺失
 
-Summary declares `Action: {{ACTION}}`, but {{BITLESSON_FILE}} does not exist.
+摘要声明了 `Action: {{ACTION}}`，但 {{BITLESSON_FILE}} 不存在。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-inconsistent.md" "$FALLBACK" \
@@ -341,9 +341,9 @@ EOF
 
     if [[ "$HAS_ANY_ID" != "true" ]]; then
         FALLBACK=$(cat <<'EOF'
-# BitLesson Delta Inconsistent
+# BitLesson Delta 不一致
 
-`Action: {{ACTION}}` requires at least one concrete Lesson ID.
+`Action: {{ACTION}}` 要求至少一个具体的 Lesson ID。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-inconsistent.md" "$FALLBACK" \
@@ -353,12 +353,12 @@ EOF
 
     if [[ -n "$INVALID_IDS" ]]; then
         FALLBACK=$(cat <<'EOF'
-# Invalid BitLesson Lesson ID(s)
+# 无效的 BitLesson Lesson ID(s)
 
-The following IDs in `## BitLesson Delta` are invalid:
+`## BitLesson Delta` 中的以下 ID 无效：
 {{INVALID_IDS}}
 
-Expected format: `BL-YYYYMMDD-short-name`.
+期望格式：`BL-YYYYMMDD-short-name`。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-inconsistent.md" "$FALLBACK" \
@@ -368,12 +368,12 @@ EOF
 
     if [[ -n "$MISSING_IDS" ]]; then
         FALLBACK=$(cat <<'EOF'
-# BitLesson Entry Missing
+# BitLesson 条目缺失
 
-Summary declares `Action: {{ACTION}}`, but these Lesson ID(s) are not found in {{BITLESSON_FILE}}:
+摘要声明了 `Action: {{ACTION}}`，但这些 Lesson ID(s) 在 {{BITLESSON_FILE}} 中未找到：
 {{MISSING_IDS}}
 
-Add/update those entries in {{BITLESSON_FILE}} before exiting.
+请在退出前在 {{BITLESSON_FILE}} 中添加/更新这些条目。
 EOF
 )
         REASON=$(load_and_render_safe "$TEMPLATE_DIR" "block/bitlesson-delta-inconsistent.md" "$FALLBACK" \

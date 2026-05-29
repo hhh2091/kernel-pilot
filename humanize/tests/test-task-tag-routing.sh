@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Tests for task-tag routing in RLCR loop prompts
+# RLCR 循环提示中任务标签路由的测试
 #
-# Validates:
-# - round-0 prompt includes coding/analyze routing instructions
-# - goal-tracker Active Tasks table includes Tag/Owner columns
-# - stop hook keeps task-tag routing reminder in follow-up prompts
+# 验证：
+# - round-0 提示包含 coding/analyze 路由指令
+# - goal-tracker 活跃任务表包含 Tag/Owner 列
+# - 停止钩子在后续提示中保留任务标签路由提醒
 #
 
 set -euo pipefail
@@ -69,7 +69,7 @@ EOF
 }
 
 # ========================================
-# Test: round-0 prompt includes task-tag routing guidance
+# 测试：round-0 提示包含任务标签路由指导
 # ========================================
 
 setup_test_dir
@@ -115,7 +115,7 @@ else
 fi
 
 # ========================================
-# Stop hook follow-up prompt routing reminder
+# 停止钩子后续提示路由提醒
 # ========================================
 
 setup_stophook_repo() {
@@ -152,7 +152,7 @@ EOF
 
     local loop_dir="$repo_dir/.humanize/rlcr/2024-02-01_12-00-00"
     mkdir -p "$loop_dir"
-    # codex_model is intentionally omitted; the stop hook derives it from config defaults
+    # 故意省略 codex_model；停止钩子从配置默认值派生它
     cat > "$loop_dir/state.md" << EOF
 ---
 current_round: 0

@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
 #
-# Run all test suites for the Humanize plugin (parallel execution)
+# 运行 Humanize 插件的所有测试套件（并行执行）
 #
-# Usage: ./tests/run-all-tests.sh
+# 用法：./tests/run-all-tests.sh
 #
-# Each test suite runs in its own isolated temp directory, so parallel
-# execution is safe with no shared state or resource contention.
+# 每个测试套件在各自隔离的临时目录中运行，因此并行执行是安全的，
+# 不存在共享状态或资源竞争问题。
 #
-# Exit codes:
-#   0 - All tests passed
-#   1 - One or more tests failed
+# 退出码：
+#   0 - 所有测试通过
+#   1 - 一个或多个测试失败
 #
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Max parallel test jobs (throttle to avoid resource exhaustion in small CI runners).
-# Override with HUMANIZE_TEST_JOBS=<N>.
+# 最大并行测试任务数（限制以避免在小型 CI 运行器上资源耗尽）。
+# 可通过 HUMANIZE_TEST_JOBS=<N> 覆盖。
 default_jobs() {
     local n=4
     if command -v getconf >/dev/null 2>&1; then
         n=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
     fi
     [[ "$n" =~ ^[0-9]+$ ]] || n=4
-    # Cap by default to keep memory/process usage bounded.
+    # 默认上限以控制内存/进程使用量。
     [[ "$n" -gt 8 ]] && n=8
     [[ "$n" -lt 1 ]] && n=1
     echo "$n"
@@ -36,14 +36,14 @@ if ! [[ "$MAX_JOBS" =~ ^[0-9]+$ ]] || [[ "$MAX_JOBS" -lt 1 ]]; then
     exit 1
 fi
 
-# wait -n is available starting from bash 4.3
+# wait -n 从 bash 4.3 开始可用
 supports_wait_n() {
     local major="${BASH_VERSINFO[0]:-0}"
     local minor="${BASH_VERSINFO[1]:-0}"
     [[ "$major" -gt 4 ]] || ( [[ "$major" -eq 4 ]] && [[ "$minor" -ge 3 ]] )
 }
 
-# Colors for output
+# 输出颜色
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -56,7 +56,7 @@ echo "========================================"
 echo "Parallel jobs: $MAX_JOBS"
 echo ""
 
-# Test suites to run
+# 要运行的测试套件
 TEST_SUITES=(
     "test-template-loader.sh"
     "test-bash-validator-patterns.sh"
@@ -90,27 +90,27 @@ TEST_SUITES=(
     "test-codex-hook-install.sh"
     "test-unified-codex-config.sh"
     "test-disable-nested-codex-hooks.sh"
-    # Session ID and Agent Teams tests
+    # 会话 ID 和 Agent Teams 测试
     "test-session-id.sh"
     "test-agent-teams.sh"
-    # gen-idea companion JSON tests (PR-A)
+    # gen-idea 伴随 JSON 测试 (PR-A)
     "test-validate-gen-idea-io.sh"
     "test-directions-json-schema.sh"
     "test-gen-idea-dual-write.sh"
-    # explore-idea tests (PR-B)
+    # explore-idea 测试 (PR-B)
     "test-validate-explore-idea-io.sh"
     "test-worker-result-contract.sh"
     "test-explore-manifest.sh"
     "test-explore-command-structure.sh"
-    # Ask Codex tests
+    # Ask Codex 测试
     "test-ask-codex.sh"
-    # Bitlesson routing tests
+    # Bitlesson 路由测试
     "test-bitlesson-select-routing.sh"
-    # Provider routing tests
+    # 提供者路由测试
     "test-model-router.sh"
-    # Skill monitor tests
+    # Skill 监控测试
     "test-skill-monitor.sh"
-    # Viz dashboard tests
+    # 可视化仪表盘测试
     "test-viz.sh"
     "test-viz-isolation.sh"
     "test-streaming.sh"
@@ -120,7 +120,7 @@ TEST_SUITES=(
     "test-frontend-migration.sh"
     "test-rlcr-sources.sh"
     "test-style-compliance.sh"
-    # Robustness tests
+    # 健壮性测试
     "robustness/test-state-file-robustness.sh"
     "robustness/test-session-robustness.sh"
     "robustness/test-goal-tracker-robustness.sh"
@@ -139,24 +139,23 @@ TEST_SUITES=(
     "robustness/test-state-transition-robustness.sh"
 )
 
-# Tests that must be run with zsh (not bash)
+# 必须使用 zsh（而非 bash）运行的测试
 ZSH_TESTS=(
     "test-zsh-monitor-safety.sh"
 )
 
-# Signal-heavy runtime tests are more stable when they run after the
-# parallel batch finishes.
+# 信号密集的运行时测试在并行批次完成后运行更稳定。
 SERIAL_TESTS=(
     "test-monitor-runtime.sh"
 )
 
-# Temp directory for per-suite output files
+# 每个套件输出文件的临时目录
 OUTPUT_DIR=$(mktemp -d)
 trap "rm -rf $OUTPUT_DIR" EXIT
 
-# Provide a mock codex binary when the real one is not installed.
-# Tests only need codex to pass the `command -v codex` check in setup scripts;
-# tests that require specific codex behavior already create their own mocks.
+# 当真实 codex 未安装时提供模拟 codex 二进制文件。
+# 测试仅需要 codex 来通过设置脚本中的 `command -v codex` 检查；
+# 需要特定 codex 行为的测试已自行创建模拟对象。
 if ! command -v codex &>/dev/null; then
     mkdir -p "$OUTPUT_DIR/mock-bin"
     cat > "$OUTPUT_DIR/mock-bin/codex" << 'MOCK_CODEX'
@@ -167,8 +166,8 @@ MOCK_CODEX
     export PATH="$OUTPUT_DIR/mock-bin:$PATH"
 fi
 
-# Provide a portable `timeout` shim on platforms that lack it (e.g. macOS base install).
-# Uses python3 subprocess so stdin is preserved and exit code 124 is returned on timeout.
+# 在缺少 `timeout` 的平台上提供可移植的 shim（例如 macOS 基础安装）。
+# 使用 python3 子进程，保留 stdin 并在超时时返回退出码 124。
 if ! command -v timeout &>/dev/null; then
     mkdir -p "$OUTPUT_DIR/mock-bin"
     cat > "$OUTPUT_DIR/mock-bin/timeout" << 'TIMEOUT_SHIM'
@@ -189,7 +188,7 @@ TIMEOUT_SHIM
     export PATH="$OUTPUT_DIR/mock-bin:$PATH"
 fi
 
-# Check if a suite needs zsh
+# 检查套件是否需要 zsh
 needs_zsh() {
     local suite="$1"
     for zsh_test in "${ZSH_TESTS[@]}"; do
@@ -210,15 +209,15 @@ needs_serial() {
     return 1
 }
 
-# Format milliseconds as human-readable duration
+# 将毫秒格式化为人类可读的持续时间
 format_ms() {
     local ms="$1"
     local s=$((ms / 1000))
-    local frac=$(( (ms % 1000) / 100 ))  # tenths of a second
+    local frac=$(( (ms % 1000) / 100 ))  # 十分之一秒
     echo "${s}.${frac}s"
 }
 
-# Portable millisecond timestamp (date +%s%3N is GNU-only, not on macOS bash 3.2)
+# 可移植的毫秒级时间戳（date +%s%3N 仅限 GNU，macOS bash 3.2 不支持）
 ms_now() {
     python3 -c "import time; print(int(time.time()*1000))" 2>/dev/null \
         || echo "$(date +%s)000"
@@ -263,7 +262,7 @@ collect_suite_result() {
     elapsed_ms=$(cat "$time_file" 2>/dev/null || echo "0")
     elapsed_display=$(format_ms "$elapsed_ms")
 
-    # Strip ANSI escape codes and extract pass/fail counts
+    # 去除 ANSI 转义码并提取通过/失败计数
     output_stripped=$(echo "$output" | sed "s/${esc}\\[[0-9;]*m//g")
     passed=$(echo "$output_stripped" | grep -oE 'Passed:[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | tail -1 || echo "0")
     failed=$(echo "$output_stripped" | grep -oE 'Failed:[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | tail -1 || echo "0")
@@ -275,7 +274,7 @@ collect_suite_result() {
         FAILED_SUITES+=("$suite")
         line=$(echo -e "${RED}FAILED${NC}: $suite (exit code: $exit_code, failed: $failed, ${elapsed_display})")
         printf '%d\t%s\n' "$elapsed_ms" "$line" >> "$SORT_FILE"
-        # Preserve the full suite log so CI surfaces the exact failing assertion.
+        # 保留完整的套件日志，以便 CI 显示确切的失败断言。
         printf '%s\n' "$output" > "$OUTPUT_DIR/${safe_name}.detail"
     else
         zsh_label=""
@@ -285,9 +284,9 @@ collect_suite_result() {
     fi
 }
 
-# Launch all test suites in parallel, except signal-heavy runtime tests which
-# run serially after the parallel batch finishes. PIDs and skip reasons are
-# stored under OUTPUT_DIR instead of associative arrays so bash 3.2 works.
+# 并行启动所有测试套件，但信号密集的运行时测试除外，
+# 它们在并行批次完成后串行运行。PID 和跳过原因存储在 OUTPUT_DIR 中，
+# 而非关联数组，以兼容 bash 3.2。
 ACTIVE_PIDS=()
 SERIAL_SUITES=()
 
@@ -322,11 +321,11 @@ for suite in "${TEST_SUITES[@]}"; do
     echo $! > "$OUTPUT_DIR/${safe_name}.pid"
     ACTIVE_PIDS+=($!)
 
-    # Throttle background jobs
+    # 限制后台任务数
     while [[ "${#ACTIVE_PIDS[@]}" -ge "$MAX_JOBS" ]]; do
         if supports_wait_n; then
             wait -n 2>/dev/null || true
-            # Prune finished PIDs from ACTIVE_PIDS
+            # 从 ACTIVE_PIDS 中清除已完成的 PID
             still_running=()
             for pid in "${ACTIVE_PIDS[@]}"; do
                 if kill -0 "$pid" 2>/dev/null; then
@@ -335,18 +334,18 @@ for suite in "${TEST_SUITES[@]}"; do
             done
             ACTIVE_PIDS=(${still_running[@]+"${still_running[@]}"})
         else
-            # Fallback: wait for the oldest PID (less efficient but portable in older bash)
+            # 回退：等待最旧的 PID（效率较低但兼容旧版 bash）
             wait "${ACTIVE_PIDS[0]}" 2>/dev/null || true
             ACTIVE_PIDS=("${ACTIVE_PIDS[@]:1}")
         fi
     done
 done
 
-# Wait for parallel suites and collect results.
+# 等待并行套件并收集结果。
 TOTAL_PASSED=0
 TOTAL_FAILED=0
 FAILED_SUITES=()
-# Sortable file: elapsed_ms<TAB>display_line
+# 可排序文件：elapsed_ms<TAB>display_line
 SORT_FILE="$OUTPUT_DIR/sortable.txt"
 : > "$SORT_FILE"
 
@@ -365,7 +364,7 @@ for suite in "${TEST_SUITES[@]}"; do
     collect_suite_result "$suite" "$safe_name" "$out_file" "$exit_file" "$time_file"
 done
 
-# Run serial suites after the parallel batch finishes.
+# 在并行批次完成后运行串行套件。
 for suite in "${SERIAL_SUITES[@]}"; do
     safe_name="$(echo "$suite" | tr '/' '_')"
     out_file="$OUTPUT_DIR/${safe_name}.out"
@@ -376,7 +375,7 @@ for suite in "${SERIAL_SUITES[@]}"; do
     collect_suite_result "$suite" "$safe_name" "$out_file" "$exit_file" "$time_file"
 done
 
-# Print skipped suites first
+# 先打印被跳过的套件
 for suite in "${TEST_SUITES[@]}"; do
     safe_name="$(echo "$suite" | tr '/' '_')"
     skip_file="$OUTPUT_DIR/${safe_name}.skip"
@@ -386,7 +385,7 @@ for suite in "${TEST_SUITES[@]}"; do
     fi
 done
 
-# Print results sorted by elapsed time (fastest first)
+# 按耗时排序打印结果（最快的在前）
 sort -t$'\t' -k1,1n "$SORT_FILE" | cut -f2-
 
 echo ""

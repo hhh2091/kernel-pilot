@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
 # validate-explore-idea-io.sh
-# Validates all inputs for the explore-idea command before any dispatch side effects.
+# 在任何调度副作用之前验证 explore-idea 命令的所有输入。
 #
-# Usage: validate-explore-idea-io.sh <input-path> [OPTIONS]
+# 用法: validate-explore-idea-io.sh <input-path> [OPTIONS]
 #
-# Input:
-#   <input-path>  Path to a .directions.json file, or a draft .md file with a companion
-#                 .directions.json (resolved as <draft>.directions.json).
+# 输入:
+#   <input-path>  .directions.json 文件的路径，或带有伴随 .directions.json 的草稿 .md 文件
+#                 （解析为 <draft>.directions.json）。
 #
-# Options:
-#   --directions <ids>          Comma-separated direction_id or source_index values.
-#                               Default: first min(6, total) by display_order.
-#   --concurrency <N>           Parallel worker count. Default: 6. Max: 10.
-#   --max-worker-iterations <N> Per-worker iteration cap. Default: 2. Max: 3.
-#   --worker-timeout-min <N>    Worker timeout in minutes. Default: 60. Max: 60.
-#   --codex-timeout-min <N>     Codex call timeout in minutes. Default: 20. Max: 20.
+# 选项:
+#   --directions <ids>          逗号分隔的 direction_id 或 source_index 值。
+#                               默认: 按 display_order 取前 min(6, total) 个。
+#   --concurrency <N>           并行工作器数量。默认: 6。最大: 10。
+#   --max-worker-iterations <N> 每个工作器的迭代上限。默认: 2。最大: 3。
+#   --worker-timeout-min <N>    工作器超时（分钟）。默认: 60。最大: 60。
+#   --codex-timeout-min <N>     Codex 调用超时（分钟）。默认: 20。最大: 20。
 #
-# Exit codes:
-#   0 - Validation passed; structured output emitted on stdout
-#   1 - Missing required input argument
-#   2 - Input file not found or unreadable
-#   3 - Input path is a .md file but companion .directions.json is missing
-#   4 - Input is not .directions.json or .md
-#   5 - Directions JSON schema validation failed
-#   6 - Invalid arguments (caps exceeded, bad direction selectors, duplicate selectors)
-#   7 - Git checkout state invalid (missing BASE_COMMIT or dirty-checkout hard-fail)
-#   8 - Run directory already exists (collision)
-#   9 - Required template file missing (plugin configuration error)
+# 退出码:
+#   0 - 验证通过；结构化输出发送到标准输出
+#   1 - 缺少必需的输入参数
+#   2 - 输入文件未找到或不可读
+#   3 - 输入路径是 .md 文件但缺少伴随的 .directions.json
+#   4 - 输入不是 .directions.json 或 .md
+#   5 - Directions JSON 架构验证失败
+#   6 - 无效参数（超出上限、错误的方向选择器、重复的选择器）
+#   7 - Git 检出状态无效（缺少 BASE_COMMIT 或脏检出硬失败）
+#   8 - 运行目录已存在（冲突）
+#   9 - 缺少必需的模板文件（插件配置错误）
 #
 # On success, emits key-value pairs on stdout followed by VALIDATION_SUCCESS:
 #   DIRECTIONS_JSON_FILE: <abs-path>

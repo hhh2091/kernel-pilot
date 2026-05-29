@@ -1,21 +1,21 @@
 #!/usr/bin/env zsh
 #
-# Zsh Runtime Safety Tests for humanize monitor
+# humanize monitor 的 Zsh 运行时安全测试
 #
-# This test MUST be executed by zsh to verify:
-# - No zsh "no matches found" errors
-# - Works correctly in zsh shell
+# 此测试必须由 zsh 执行以验证：
+# - 无 zsh "no matches found" 错误
+# - 在 zsh shell 中正常工作
 #
-# Tests the actual humanize.sh functions under zsh with empty/dotfile-only directories
+# 在 zsh 下使用空/仅点文件目录测试实际的 humanize.sh 函数
 #
 
-# Fail on errors
+# 错误时失败
 set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
 PROJECT_ROOT="${SCRIPT_DIR:h}"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -42,14 +42,14 @@ echo "Shell: $ZSH_VERSION"
 echo ""
 
 # ========================================
-# Test Setup: Create isolated test environment
+# 测试设置：创建隔离的测试环境
 # ========================================
 
 TEST_BASE="/tmp/test-zsh-humanize-$$"
 mkdir -p "$TEST_BASE"
 cd "$TEST_BASE"
 
-# Set up isolated cache directory to avoid permission issues
+# 设置隔离的缓存目录以避免权限问题
 export XDG_CACHE_HOME="$TEST_BASE/.cache"
 mkdir -p "$XDG_CACHE_HOME"
 
@@ -60,15 +60,15 @@ cleanup() {
 trap cleanup EXIT
 
 # ========================================
-# Test 1: Source humanize.sh under zsh
+# 测试 1：在 zsh 下加载 humanize.sh
 # ========================================
 echo "Test 1: Source humanize.sh under zsh"
 echo ""
 
-# Create a minimal test environment
+# 创建最小测试环境
 mkdir -p .humanize/rlcr
 
-# Source the script
+# 加载脚本
 source_output=$(source "$PROJECT_ROOT/scripts/humanize.sh" 2>&1) || true
 if [[ "$source_output" == *"no matches found"* ]]; then
     fail "Source humanize.sh" "Got 'no matches found' error: $source_output"
@@ -77,25 +77,25 @@ else
 fi
 
 # ========================================
-# Test 2: _find_latest_session with empty loop dir
+# 测试 2：空循环目录的 _find_latest_session
 # ========================================
 echo ""
 echo "Test 2: _find_latest_session with empty loop dir"
 echo ""
 
-# Create empty .humanize/rlcr directory
+# 创建空的 .humanize/rlcr 目录
 rm -rf .humanize/rlcr
 mkdir -p .humanize/rlcr
 
-# Source and call the function
+# 加载并调用函数
 (
     source "$PROJECT_ROOT/scripts/humanize.sh"
 
-    # Access the internal function via the monitor wrapper context
-    # We need to simulate the monitor environment
+    # 通过监控包装器上下文访问内部函数
+    # 我们需要模拟监控环境
     loop_dir=".humanize/rlcr"
 
-    # Define the function locally (same as in humanize.sh)
+    # 在本地定义函数（与 humanize.sh 中相同）
     _find_latest_session_test() {
         local latest_session=""
         if [[ ! -d "$loop_dir" ]]; then
@@ -124,7 +124,7 @@ mkdir -p .humanize/rlcr
 ) && pass "_find_latest_session with empty dir" || fail "_find_latest_session with empty dir" "Got glob error"
 
 # ========================================
-# Test 3: _find_latest_session with dotfiles only
+# 测试 3：仅点文件的 _find_latest_session
 # ========================================
 echo ""
 echo "Test 3: _find_latest_session with dotfiles only"
@@ -136,7 +136,7 @@ touch .humanize/rlcr/.hidden-file
 (
     loop_dir=".humanize/rlcr"
 
-    # Reuse the same function pattern from Test 2 (tests directory with only dotfiles)
+    # 重用测试 2 中的相同函数模式（测试仅包含点文件的目录）
     result=""
     while IFS= read -r session_dir; do
         [[ -z "$session_dir" ]] && continue
@@ -157,7 +157,7 @@ touch .humanize/rlcr/.hidden-file
 ) && pass "_find_latest_session with dotfiles only" || fail "_find_latest_session with dotfiles only" "Got glob error"
 
 # ========================================
-# Test 4: _find_state_file with no *-state.md files
+# 测试 4：无 *-state.md 文件的 _find_state_file
 # ========================================
 echo ""
 echo "Test 4: _find_state_file with no *-state.md files"
@@ -205,20 +205,20 @@ touch .humanize/rlcr/2026-01-16_10-00-00/other.md
 ) && pass "_find_state_file with no *-state.md" || fail "_find_state_file with no *-state.md" "Got glob error"
 
 # ========================================
-# Test 5: _find_latest_codex_log with empty cache
+# 测试 5：空缓存的 _find_latest_codex_log
 # ========================================
 echo ""
 echo "Test 5: _find_latest_codex_log with empty cache dir"
 echo ""
 
-# Create a session but no cache log files
+# 创建会话但没有缓存日志文件
 mkdir -p "$XDG_CACHE_HOME/humanize/test-project/2026-01-16_10-00-00"
 
 (
     loop_dir=".humanize/rlcr"
     cache_dir="$XDG_CACHE_HOME/humanize/test-project/2026-01-16_10-00-00"
 
-    # Simulate the cache log iteration
+    # 模拟缓存日志迭代
     found_count=0
     while IFS= read -r log_file; do
         [[ -z "$log_file" ]] && continue
@@ -237,13 +237,13 @@ mkdir -p "$XDG_CACHE_HOME/humanize/test-project/2026-01-16_10-00-00"
 rm -rf "$XDG_CACHE_HOME/humanize/test-project"
 
 # ========================================
-# Test 6: Full session directory iteration
+# 测试 6：完整会话目录迭代
 # ========================================
 echo ""
 echo "Test 6: Full session directory iteration"
 echo ""
 
-# Create valid session directories
+# 创建有效的会话目录
 mkdir -p .humanize/rlcr/2026-01-16_10-00-00
 mkdir -p .humanize/rlcr/2026-01-16_11-00-00
 
@@ -273,7 +273,7 @@ mkdir -p .humanize/rlcr/2026-01-16_11-00-00
 ) && pass "Full session iteration finds correct sessions" || fail "Full session iteration" "Wrong result"
 
 # ========================================
-# Test 7: Verify zsh is actually being used
+# 测试 7：验证实际使用的是 zsh
 # ========================================
 echo ""
 echo "Test 7: Verify zsh is actually being used"
@@ -286,32 +286,32 @@ else
 fi
 
 # ========================================
-# Test 8: Zsh-specific glob error would occur with old code
+# 测试 8：旧代码会出现 Zsh 特定的 glob 错误
 # ========================================
 echo ""
 echo "Test 8: Demonstrate zsh glob error (old code pattern)"
 echo ""
 
-# This test shows that the OLD code pattern WOULD fail in zsh
-# by attempting the problematic pattern and catching the error
+# 此测试显示旧代码模式会在 zsh 中失败，
+# 通过尝试有问题的模式并捕获错误
 rm -rf .humanize/rlcr
 mkdir -p .humanize/rlcr
 
 (
     setopt +o nomatch 2>/dev/null || true  # Don't fail on no match for this test
 
-    # OLD problematic pattern (should produce empty or error)
+    # 旧的问题模式（应产生空或错误）
     old_pattern_output=""
     old_pattern_error=""
 
-    # Try the old glob pattern that would fail
+    # 尝试会失败的旧 glob 模式
     if eval 'for x in .humanize/rlcr/*; do [[ -e "$x" ]] && old_pattern_output="$old_pattern_output $x"; done' 2>/dev/null; then
         echo "OK: Old pattern handled (but would error without nomatch option)"
     else
         echo "OK: Old pattern would have errored in strict zsh"
     fi
 
-    # NEW pattern with find never errors
+    # 使用 find 的新模式永不报错
     new_pattern_output=""
     while IFS= read -r x; do
         [[ -n "$x" ]] && new_pattern_output="$new_pattern_output $x"
@@ -321,7 +321,7 @@ mkdir -p .humanize/rlcr
 ) && pass "Glob vs find safety demonstration" || fail "Glob vs find demonstration" "Error"
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================"

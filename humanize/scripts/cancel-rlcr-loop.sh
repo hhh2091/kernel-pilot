@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 #
-# Cancel script for cancel-rlcr-loop
+# cancel-rlcr-loop 的取消脚本
 #
-# Cancels an active RLCR loop by creating a cancel signal file
-# and renaming the state file to cancel-state.md.
+# 通过创建取消信号文件并将状态文件重命名为 cancel-state.md
+# 来取消活跃的 RLCR 循环。
 #
-# Usage:
+# 用法:
 #   cancel-rlcr-loop.sh [--force]
 #
-# Exit codes:
-#   0 - Successfully cancelled
-#   1 - No active loop found
-#   2 - Finalize phase detected, confirmation required (use --force to override)
-#   3 - Other error
+# 退出码:
+#   0 - 成功取消
+#   1 - 未找到活跃循环
+#   2 - 检测到终结阶段，需要确认（使用 --force 覆盖）
+#   3 - 其他错误
 #
 
 set -euo pipefail
 
 # ========================================
-# Parse Arguments
+# 解析参数
 # ========================================
 
 FORCE="false"
@@ -63,10 +63,10 @@ HELP_EOF
 done
 
 # ========================================
-# Find Loop Directory
+# 查找循环目录
 # ========================================
 
-# Source shared loop library for find_active_loop and resolve_project_root
+# 导入共享循环库以获取 find_active_loop 和 resolve_project_root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 source "$SCRIPT_DIR/../hooks/lib/loop-common.sh"
 
@@ -77,17 +77,17 @@ PROJECT_ROOT="$(resolve_project_root)" || {
 }
 LOOP_BASE_DIR="$PROJECT_ROOT/.humanize/rlcr"
 
-# PRODUCT DECISION: Cancel operates globally (no session_id filtering).
+# 产品决策：取消操作全局执行（不按 session_id 过滤）。
 #
-# Cancel is invoked as a standalone Bash command via /cancel-rlcr-loop slash command.
-# Unlike hooks (PreToolUse, PostToolUse, Stop) which receive JSON with session_id,
-# this script has no access to the calling session's session_id.
+# 取消通过 /cancel-rlcr-loop 斜杠命令作为独立的 Bash 命令调用。
+# 与接收包含 session_id 的 JSON 的钩子（PreToolUse、PostToolUse、Stop）不同，
+# 此脚本无法访问调用会话的 session_id。
 #
-# This is intentional per AC-6: cancel is an explicit user action that should always
-# succeed regardless of which session invokes it. If a user types /cancel-rlcr-loop,
-# they want to cancel whatever loop is running in the current project directory.
+# 这是根据 AC-6 的有意设计：取消是一个显式的用户操作，无论哪个会话调用它
+# 都应该始终成功。如果用户输入 /cancel-rlcr-loop，他们想要取消当前项目
+# 目录中正在运行的任何循环。
 #
-# Find newest active loop directory (any session) using the same lookup as hooks
+# 使用与钩子相同的查找方式查找最新的活跃循环目录（任意会话）
 LOOP_DIR=$(find_active_loop "$LOOP_BASE_DIR")
 
 if [[ -z "$LOOP_DIR" ]]; then
@@ -97,7 +97,7 @@ if [[ -z "$LOOP_DIR" ]]; then
 fi
 
 # ========================================
-# Check Loop State
+# 检查循环状态
 # ========================================
 
 STATE_FILE="$LOOP_DIR/state.md"
@@ -121,19 +121,19 @@ else
 fi
 
 # ========================================
-# Extract Round Info
+# 提取轮次信息
 # ========================================
 
-# Extract current_round and max_iterations from the state file
+# 从状态文件中提取 current_round 和 max_iterations
 CURRENT_ROUND=$(grep -E '^current_round:' "$ACTIVE_STATE_FILE" | sed 's/^current_round:[[:space:]]*//' | tr -d ' ')
 MAX_ITERATIONS=$(grep -E '^max_iterations:' "$ACTIVE_STATE_FILE" | sed 's/^max_iterations:[[:space:]]*//' | tr -d ' ')
 
-# Default values if not found
+# 如果未找到则使用默认值
 CURRENT_ROUND=${CURRENT_ROUND:-"?"}
 MAX_ITERATIONS=${MAX_ITERATIONS:-"?"}
 
 # ========================================
-# Handle Finalize Phase
+# 处理终结阶段
 # ========================================
 
 if [[ "$LOOP_STATE" == "FINALIZE_PHASE" && "$FORCE" != "true" ]]; then
@@ -150,23 +150,23 @@ if [[ "$LOOP_STATE" == "FINALIZE_PHASE" && "$FORCE" != "true" ]]; then
 fi
 
 # ========================================
-# Perform Cancellation
+# 执行取消操作
 # ========================================
 
-# Create cancel signal file
+# 创建取消信号文件
 touch "$CANCEL_SIGNAL"
 
-# Clean up any pending session_id signal file (setup may not have completed)
+# 清理任何待处理的 session_id 信号文件（设置可能尚未完成）
 rm -f "$PROJECT_ROOT/.humanize/.pending-session-id"
 
-# Clean up methodology analysis marker files if present
+# 清理方法论分析标记文件（如果存在）
 rm -f "$LOOP_DIR/.methodology-exit-reason"
 
-# Rename state file to cancel-state.md
+# 将状态文件重命名为 cancel-state.md
 mv "$ACTIVE_STATE_FILE" "$LOOP_DIR/cancel-state.md"
 
 # ========================================
-# Output Result
+# 输出结果
 # ========================================
 
 if [[ "$LOOP_STATE" == "NORMAL_LOOP" ]]; then

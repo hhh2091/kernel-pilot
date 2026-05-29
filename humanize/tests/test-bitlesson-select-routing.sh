@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Tests for bitlesson-select.sh provider routing
+# bitlesson-select.sh 提供者路由测试
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/test-helpers.sh"
 BITLESSON_SELECT="$PROJECT_ROOT/scripts/bitlesson-select.sh"
-# Keep PATH isolation strict in missing-binary tests to avoid picking up
-# real codex/claude from user-local directories (e.g. ~/.nvm, ~/.local/bin).
-# On NixOS, the shell toolchain itself lives under /run/current-system/sw/bin.
+# 在缺失二进制测试中保持 PATH 隔离严格，避免从用户本地目录
+# （如 ~/.nvm、~/.local/bin）获取真实的 codex/claude。
+# 在 NixOS 上，shell 工具链本身位于 /run/current-system/sw/bin。
 SAFE_BASE_PATH="/run/current-system/sw/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 echo "=========================================="
@@ -16,7 +16,7 @@ echo "Bitlesson Select Routing Tests"
 echo "=========================================="
 echo ""
 
-# Helper: create a mock .humanize/bitlesson.md with required content
+# 辅助函数：创建带有必需内容的模拟 .humanize/bitlesson.md
 create_mock_bitlesson() {
     local dir="$1"
     mkdir -p "$dir/.humanize"
@@ -65,13 +65,13 @@ Source Rounds: 0
 EOF
 }
 
-# Helper: create a mock codex binary that outputs valid bitlesson-selector format
+# 辅助函数：创建输出有效 bitlesson-selector 格式的模拟 codex 二进制文件
 create_mock_codex() {
     local bin_dir="$1"
     mkdir -p "$bin_dir"
     cat > "$bin_dir/codex" <<'EOF'
 #!/usr/bin/env bash
-# Mock codex that only reads prompt content from stdin when invoked with trailing '-'
+# 模拟 codex，仅在以尾部 '-' 调用时从 stdin 读取提示内容
 if [[ "${*: -1}" != "-" ]]; then
     echo "mock codex expected trailing '-' to read prompt from stdin" >&2
     exit 9
@@ -91,7 +91,7 @@ EOF
     chmod +x "$bin_dir/codex"
 }
 
-# Helper: create a mock codex binary that records stdin for assertions
+# 辅助函数：创建记录 stdin 用于断言的模拟 codex 二进制文件
 create_recording_mock_codex() {
     local bin_dir="$1"
     local stdin_file="$2"
@@ -117,14 +117,14 @@ EOF
     chmod +x "$bin_dir/codex"
 }
 
-# Helper: create a mock claude binary that outputs valid bitlesson-selector format
+# 辅助函数：创建输出有效 bitlesson-selector 格式的模拟 claude 二进制文件
 create_mock_claude() {
     local bin_dir="$1"
     mkdir -p "$bin_dir"
     cat > "$bin_dir/claude" <<'EOF'
 #!/usr/bin/env bash
-# Mock claude that outputs valid bitlesson-selector format
-# Consume stdin so the pipe does not break
+# 输出有效 bitlesson-selector 格式的模拟 claude
+# 消耗 stdin 以避免管道中断
 cat > /dev/null
 cat <<'OUT'
 LESSON_IDS: NONE
@@ -135,7 +135,7 @@ EOF
 }
 
 # ========================================
-# Test 1: Codex branch chosen for gpt-* model
+# 测试 1：gpt-* 模型选择 Codex 分支
 # ========================================
 echo "--- Test 1: gpt-* model routes to codex ---"
 echo ""
@@ -163,7 +163,7 @@ else
 fi
 
 # ========================================
-# Test 1b: Codex branch passes '-' and consumes stdin prompt
+# 测试 1b：Codex 分支传递 '-' 并消耗 stdin 提示
 # ========================================
 echo ""
 echo "--- Test 1b: gpt-* codex path passes stdin prompt via trailing '-' ---"
@@ -198,7 +198,7 @@ else
 fi
 
 # ========================================
-# Test 2: Claude branch chosen for haiku model
+# 测试 2：haiku 模型选择 Claude 分支
 # ========================================
 echo ""
 echo "--- Test 2: haiku model routes to claude ---"
@@ -227,7 +227,7 @@ else
 fi
 
 # ========================================
-# Test 3: Claude branch chosen for sonnet model
+# 测试 3：sonnet 模型选择 Claude 分支
 # ========================================
 echo ""
 echo "--- Test 3: sonnet model routes to claude ---"
@@ -256,7 +256,7 @@ else
 fi
 
 # ========================================
-# Test 4: Claude branch chosen for opus model (case-insensitive)
+# 测试 4：opus 模型选择 Claude 分支（不区分大小写）
 # ========================================
 echo ""
 echo "--- Test 4: OPUS (uppercase) model routes to claude ---"
@@ -285,7 +285,7 @@ else
 fi
 
 # ========================================
-# Test 5: Unknown model exits non-zero with clear error message
+# 测试 5：未知模型以非零退出并给出清晰的错误消息
 # ========================================
 echo ""
 echo "--- Test 5: Unknown model exits non-zero with error ---"
@@ -311,7 +311,7 @@ else
 fi
 
 # ========================================
-# Test 6: Codex branch missing codex binary exits non-zero
+# 测试 6：Codex 分支缺少 codex 二进制文件以非零退出
 # ========================================
 echo ""
 echo "--- Test 6: gpt-* model with missing codex binary exits non-zero ---"
@@ -321,10 +321,10 @@ setup_test_dir
 create_real_humanize_bitlesson "$TEST_DIR"
 mkdir -p "$TEST_DIR/.humanize"
 printf '{"bitlesson_model": "gpt-4o"}' > "$TEST_DIR/.humanize/config.json"
-# Use a bin dir that contains a stub claude but NOT codex.
+# 使用包含存根 claude 但不包含 codex 的 bin 目录。
 NO_CODEX_BIN="$TEST_DIR/no-codex-bin"
 mkdir -p "$NO_CODEX_BIN"
-# Provide a stub claude so it does not interfere with the codex check
+# 提供存根 claude 以避免干扰 codex 检查
 cat > "$NO_CODEX_BIN/claude" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -347,7 +347,7 @@ else
 fi
 
 # ========================================
-# Test 7: Claude model falls back to codex when claude binary is missing
+# 测试 7：缺少 claude 二进制文件时 Claude 模型回退到 codex
 # ========================================
 echo ""
 echo "--- Test 7: haiku model falls back to codex when claude binary is missing ---"
@@ -357,10 +357,10 @@ setup_test_dir
 create_real_humanize_bitlesson "$TEST_DIR"
 mkdir -p "$TEST_DIR/.humanize"
 printf '{"bitlesson_model": "haiku"}' > "$TEST_DIR/.humanize/config.json"
-# Use a bin dir that contains a stub codex but NOT claude.
+# 使用包含存根 codex 但不包含 claude 的 bin 目录。
 NO_CLAUDE_BIN="$TEST_DIR/no-claude-bin"
 mkdir -p "$NO_CLAUDE_BIN"
-# Provide a stub codex that produces valid bitlesson output (proves fallback worked)
+# 提供产生有效 bitlesson 输出的存根 codex（证明回退工作正常）
 cat > "$NO_CLAUDE_BIN/codex" <<'MOCK_EOF'
 #!/usr/bin/env bash
 echo "LESSON_IDS: NONE"
@@ -384,7 +384,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 摘要
 # ========================================
 
 echo ""

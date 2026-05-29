@@ -1,96 +1,95 @@
 #!/usr/bin/env bash
 #
-# Stop Hook for RLCR loop
+# RLCR 循环的 Stop Hook
 #
-# Intercepts Claude's exit attempts and uses Codex to review work.
-# If Codex doesn't confirm completion, blocks exit and feeds review back.
+# 拦截 Claude 的退出尝试并使用 Codex 审查工作。
+# 如果 Codex 不确认完成，则阻止退出并反馈审查结果。
 #
-# State directory: .humanize/rlcr/<timestamp>/
-# State file: state.md (current_round, max_iterations, codex config)
-# Summary file: round-N-summary.md (Claude's work summary)
-# Review prompt: round-N-review-prompt.md (prompt sent to Codex)
-# Review result: round-N-review-result.md (Codex's review)
+# 状态目录：.humanize/rlcr/<timestamp>/
+# 状态文件：state.md（current_round、max_iterations、codex 配置）
+# 摘要文件：round-N-summary.md（Claude 的工作摘要）
+# 审查提示：round-N-review-prompt.md（发送给 Codex 的提示）
+# 审查结果：round-N-review-result.md（Codex 的审查）
 #
 
 set -euo pipefail
 
 # ========================================
-# Default Configuration
+# 默认配置
 # ========================================
 
-# DEFAULT_CODEX_MODEL and DEFAULT_CODEX_EFFORT are provided by loop-common.sh (sourced below)
+# DEFAULT_CODEX_MODEL 和 DEFAULT_CODEX_EFFORT 由 loop-common.sh（下面源码引入）提供
 DEFAULT_CODEX_TIMEOUT=5400
 
 # ========================================
-# Read Hook Input
+# 读取钩子输入
 # ========================================
 
 HOOK_INPUT=$(cat)
 
-# NOTE: We intentionally do NOT check stop_hook_active here.
-# For iterative loops, stop_hook_active will be true when Claude is continuing
-# from a previous blocked stop. We WANT to run Codex review each iteration.
-# Loop termination is controlled by:
-# - No active loop directory (no state.md) -> exit early below
-# - Codex outputs MARKER_COMPLETE -> allow exit
-# - current_round >= max_iterations -> allow exit
+# 注意：我们故意在这里不检查 stop_hook_active。
+# 对于迭代循环，当 Claude 从先前被阻止的停止继续时，stop_hook_active 将为 true。
+# 我们希望每次迭代都运行 Codex 审查。
+# 循环终止由以下控制：
+# - 没有活跃循环目录（没有 state.md）-> 在下面提前退出
+# - Codex 输出 MARKER_COMPLETE -> 允许退出
+# - current_round >= max_iterations -> 允许退出
 
 # ========================================
-# Find Active Loop
+# 查找活跃循环
 # ========================================
 
-# Source shared loop functions and template loader
+# 源码引入共享循环函数和模板加载器
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 source "$SCRIPT_DIR/lib/loop-common.sh"
 
 PROJECT_ROOT="$(resolve_project_root)" || exit 0
 LOOP_BASE_DIR="$PROJECT_ROOT/.humanize/rlcr"
 
-# Source portable timeout wrapper for git operations
+# 源码引入可移植的 git 操作超时包装器
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$PLUGIN_ROOT/scripts/portable-timeout.sh"
 
-# Source methodology analysis library
+# 源码引入方法论分析库
 source "$SCRIPT_DIR/lib/methodology-analysis.sh"
 
-# Default timeout for git operations (30 seconds)
+# git 操作的默认超时（30 秒）
 GIT_TIMEOUT=30
 
-# Template directory is set by loop-common.sh via template-loader.sh
+# 模板目录由 loop-common.sh 通过 template-loader.sh 设置
 
-# Extract session_id from hook input for session-aware loop filtering
+# 从钩子输入中提取 session_id 用于会话感知的循环过滤
 HOOK_SESSION_ID=$(extract_session_id "$HOOK_INPUT")
 
 LOOP_DIR=$(find_active_loop "$LOOP_BASE_DIR" "$HOOK_SESSION_ID" true)
 
-# If no active loop (or session_id mismatch), allow exit
+# 如果没有活跃循环（或 session_id 不匹配），允许退出
 if [[ -z "$LOOP_DIR" ]]; then
     exit 0
 fi
 
 # ========================================
-# Background-Task Guards
+# 后台任务守卫
 # ========================================
-# Delegates to handle_bg_task_short_circuit (hooks/lib/loop-bg-tasks.sh),
-# which runs four cohesive guards in order:
-#   1. Ambiguous-caller marker guard (no session_id + marker present)
-#   2. Cross-session parked-loop guard (foreign session walking in)
-#   3. Pending-bg short-circuit (this session has async work in flight)
-#   4. Same-session stale-marker cleanup (bg work just finished)
-# When any guard short-circuits, it emits the appropriate JSON on stdout
-# and `exit 0`s directly; we never return from that call. When no guard
-# fires we continue into the normal gate logic below.
+# 委托给 handle_bg_task_short_circuit（hooks/lib/loop-bg-tasks.sh），
+# 它按顺序运行四个内聚的守卫：
+#   1. 调用者歧义标记守卫（没有 session_id + 标记存在）
+#   2. 跨会话驻留循环守卫（外部会话进入）
+#   3. 待处理后台任务短路（此会话有异步工作正在进行）
+#   4. 同会话过期标记清理（后台工作刚完成）
+# 当任何守卫短路时，它在 stdout 上发出适当的 JSON 并直接 `exit 0`；
+# 我们永远不会从该调用返回。当没有守卫触发时，我们继续下面的正常门控逻辑。
 handle_bg_task_short_circuit "$LOOP_DIR" "$HOOK_INPUT" "$HOOK_SESSION_ID"
 
 # ========================================
-# Detect Loop Phase: Normal or Finalize
+# 检测循环阶段：正常或 Finalize
 # ========================================
-# Normal loop: state.md exists
-# Finalize Phase: finalize-state.md exists (after Codex COMPLETE, before final completion)
+# 正常循环：state.md 存在
+# Finalize 阶段：finalize-state.md 存在（Codex COMPLETE 之后，最终完成之前）
 
 STATE_FILE=$(resolve_active_state_file "$LOOP_DIR")
 if [[ -z "$STATE_FILE" ]]; then
-    # No state file found, allow exit
+    # 未找到状态文件，允许退出
     exit 0
 fi
 
@@ -101,14 +100,14 @@ IS_METHODOLOGY_ANALYSIS_PHASE=false
 [[ "$STATE_FILE" == *"/methodology-analysis-state.md" ]] && IS_METHODOLOGY_ANALYSIS_PHASE=true
 
 # ========================================
-# Parse State File (using shared function)
+# 解析状态文件（使用共享函数）
 # ========================================
 
-# First extract raw frontmatter to check which fields are actually present
-# This prevents silently using defaults for missing critical fields
+# 首先提取原始前置元数据以检查实际存在哪些字段
+# 这防止了对缺失关键字段静默使用默认值
 RAW_FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" 2>/dev/null || echo "")
 
-# Check if critical fields are present before parsing (which applies defaults)
+# 在解析之前检查关键字段是否存在（解析会应用默认值）
 RAW_CURRENT_ROUND=$(echo "$RAW_FRONTMATTER" | grep "^current_round:" || true)
 RAW_MAX_ITERATIONS=$(echo "$RAW_FRONTMATTER" | grep "^max_iterations:" || true)
 RAW_FULL_REVIEW_ROUND=$(echo "$RAW_FRONTMATTER" | grep "^full_review_round:" || true)
@@ -116,13 +115,13 @@ RAW_BITLESSON_REQUIRED=$(echo "$RAW_FRONTMATTER" | grep "^bitlesson_required:" |
 RAW_BITLESSON_FILE=$(echo "$RAW_FRONTMATTER" | grep "^bitlesson_file:" || true)
 RAW_BITLESSON_ALLOW_EMPTY_NONE=$(echo "$RAW_FRONTMATTER" | grep "^bitlesson_allow_empty_none:" || true)
 
-# Use tolerant parsing to extract values
-# Note: parse_state_file applies defaults for missing current_round/max_iterations
+# 使用容错解析提取值
+# 注意：parse_state_file 对缺失的 current_round/max_iterations 应用默认值
 if ! parse_state_file "$STATE_FILE" 2>/dev/null; then
     echo "Warning: parse_state_file returned non-zero, proceeding to schema validation" >&2
 fi
 
-# Map STATE_* variables to local names for backward compatibility
+# 将 STATE_* 变量映射到本地名称以保持向后兼容性
 PLAN_TRACKED="$STATE_PLAN_TRACKED"
 START_BRANCH="$STATE_START_BRANCH"
 BASE_BRANCH="${STATE_BASE_BRANCH:-}"
@@ -170,8 +169,8 @@ fi
 MAINLINE_STALL_COUNT="${STATE_MAINLINE_STALL_COUNT:-0}"
 LAST_MAINLINE_VERDICT="${STATE_LAST_MAINLINE_VERDICT:-$MAINLINE_VERDICT_UNKNOWN}"
 DRIFT_STATUS="${STATE_DRIFT_STATUS:-$DRIFT_STATUS_NORMAL}"
-# Re-validate Codex Model and Effort for YAML safety (in case state.md was manually edited)
-# Use same validation patterns as setup-rlcr-loop.sh
+# 重新验证 Codex Model 和 Effort 的 YAML 安全性（以防 state.md 被手动编辑）
+# 使用与 setup-rlcr-loop.sh 相同的验证模式
 if [[ ! "$CODEX_EXEC_MODEL" =~ ^[a-zA-Z0-9._-]+$ ]]; then
     echo "Error: Invalid codex_model in state file: $CODEX_EXEC_MODEL" >&2
     end_loop "$LOOP_DIR" "$STATE_FILE" "$EXIT_UNEXPECTED"
@@ -184,8 +183,8 @@ if [[ ! "$CODEX_EXEC_EFFORT" =~ ^(xhigh|high|medium|low)$ ]]; then
     exit 0
 fi
 
-# Validate critical fields were actually present (not just defaulted)
-# This prevents silently treating a truncated state file as round 0
+# 验证关键字段是否实际存在（不仅仅是默认值）
+# 这防止了将截断的状态文件静默视为第 0 轮
 if [[ -z "$RAW_CURRENT_ROUND" ]]; then
     echo "Error: State file missing required field: current_round" >&2
     echo "  State file may be truncated or corrupted" >&2
@@ -199,7 +198,7 @@ if [[ -z "$RAW_MAX_ITERATIONS" ]]; then
     exit 0
 fi
 
-# Validate numeric fields
+# 验证数字字段
 if [[ ! "$CURRENT_ROUND" =~ ^[0-9]+$ ]]; then
     echo "Warning: State file corrupted (current_round not numeric), stopping loop" >&2
     end_loop "$LOOP_DIR" "$STATE_FILE" "$EXIT_UNEXPECTED"
@@ -223,9 +222,9 @@ if [[ "$STRICT_SUCCESS" != "true" && "$STRICT_SUCCESS" != "false" ]]; then
 fi
 
 # ========================================
-# Quick-check 0: Schema Validation (v1.1.2+ fields)
+# 快速检查 0：模式验证（v1.1.2+ 字段）
 # ========================================
-# If schema is outdated, terminate loop as unexpected
+# 如果模式过时，以意外方式终止循环
 
 if [[ -z "$PLAN_TRACKED" || -z "$START_BRANCH" ]]; then
     REASON="RLCR loop state file is missing required fields (plan_tracked or start_branch).
@@ -242,9 +241,9 @@ This indicates the loop was started with an older version of humanize.
 fi
 
 # ========================================
-# Quick-check 0.1: Schema Validation (v1.5.0+ fields)
+# 快速检查 0.1：模式验证（v1.5.0+ 字段）
 # ========================================
-# Validate review_started and base_branch fields for v1.5.0+ state files
+# 验证 v1.5.0+ 状态文件的 review_started 和 base_branch 字段
 
 if [[ -z "$REVIEW_STARTED" || ( "$REVIEW_STARTED" != "true" && "$REVIEW_STARTED" != "false" ) ]]; then
     REASON="RLCR loop state file is missing or has invalid review_started field.
@@ -275,10 +274,10 @@ This indicates the loop was started with an older version of humanize (pre-1.5.0
 fi
 
 # ========================================
-# Quick-check 0.2: Schema Warning (v1.5.2+ fields)
+# 快速检查 0.2：模式警告（v1.5.2+ 字段）
 # ========================================
-# Warn about missing full_review_round field (introduced in v1.5.2)
-# This is a non-blocking warning - we continue with default value (5)
+# 警告缺失的 full_review_round 字段（在 v1.5.2 中引入）
+# 这是一个非阻塞警告 - 我们使用默认值（5）继续
 
 if [[ -z "$RAW_FULL_REVIEW_ROUND" ]]; then
     echo "Note: State file missing full_review_round field (introduced in v1.5.2)." >&2
@@ -288,10 +287,10 @@ if [[ -z "$RAW_FULL_REVIEW_ROUND" ]]; then
 fi
 
 # ========================================
-# Quick-check 0.5: Branch Consistency
+# 快速检查 0.5：分支一致性
 # ========================================
 
-# Use || GIT_EXIT_CODE=$? to prevent set -e from aborting on non-zero exit
+# 使用 || GIT_EXIT_CODE=$? 防止 set -e 在非零退出时中止
 CURRENT_BRANCH=$(run_with_timeout "$GIT_TIMEOUT" git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null) || GIT_EXIT_CODE=$?
 GIT_EXIT_CODE=${GIT_EXIT_CODE:-0}
 if [[ $GIT_EXIT_CODE -ne 0 || -z "$CURRENT_BRANCH" ]]; then
@@ -321,20 +320,20 @@ Branch switching is not allowed. Switch back to $START_BRANCH or cancel the loop
 fi
 
 # ========================================
-# Quick-check 0.6: Plan File Integrity
+# 快速检查 0.6：计划文件完整性
 # ========================================
-# Skip this check in Review Phase (review_started=true)
-# In review phase, the plan file is no longer needed - only code review matters.
-# This is especially important for skip-impl mode where no real plan file exists.
+# 在审查阶段（review_started=true）跳过此检查
+# 在审查阶段，计划文件不再需要 - 只有代码审查重要。
+# 这对于没有真实计划文件的 skip-impl 模式尤其重要。
 
 if [[ "$REVIEW_STARTED" == "true" ]]; then
-    echo "Review phase: skipping plan file integrity check (plan no longer needed)" >&2
+    echo "审查阶段：跳过计划文件完整性检查（计划不再需要）" >&2
 else
 
 BACKUP_PLAN="$LOOP_DIR/plan.md"
 FULL_PLAN_PATH="$PROJECT_ROOT/$PLAN_FILE"
 
-# Check backup exists
+# 检查备份是否存在
 if [[ ! -f "$BACKUP_PLAN" ]]; then
     REASON="Plan file backup not found in loop directory.
 
@@ -347,7 +346,7 @@ This backup is required for plan integrity verification."
     exit 0
 fi
 
-# Check original plan file still matches backup
+# 检查原始计划文件是否仍与备份匹配
 if [[ ! -f "$FULL_PLAN_PATH" ]]; then
     REASON="Project plan file has been deleted.
 
@@ -360,11 +359,11 @@ You can restore from backup if needed. Plan file modifications are not allowed d
     exit 0
 fi
 
-# Check plan file integrity
-# For tracked files: check both git status (uncommitted) AND content diff (committed changes)
-# For gitignored files: check content diff only
+# 检查计划文件完整性
+# 对于已跟踪的文件：检查 git 状态（未提交）和内容差异（已提交的更改）
+# 对于 gitignore 的文件：仅检查内容差异
 if [[ "$PLAN_TRACKED" == "true" ]]; then
-    # Tracked file: first check git status for uncommitted changes
+    # 已跟踪文件：首先检查 git 状态是否有未提交的更改
     PLAN_GIT_STATUS=$(run_with_timeout "$GIT_TIMEOUT" git -C "$PROJECT_ROOT" status --porcelain "$PLAN_FILE" 2>/dev/null || echo "")
     if [[ -n "$PLAN_GIT_STATUS" ]]; then
         REASON="Plan file has uncommitted modifications.
@@ -379,7 +378,7 @@ This RLCR loop was started with --track-plan-file. Plan file modifications are n
     fi
 fi
 
-# Plan changes are now allowed: plan.md is a symlink to the original, so this diff always passes
+# 现在允许计划更改：plan.md 是原始文件的符号链接，因此此差异总是通过
 if ! diff -q "$FULL_PLAN_PATH" "$BACKUP_PLAN" &>/dev/null; then
     FALLBACK="# Plan File Modified
 
@@ -401,24 +400,24 @@ Backup available at: \`$BACKUP_PLAN\`"
     exit 0
 fi
 
-fi  # End of REVIEW_STARTED != true check for plan file integrity
+fi  # 计划文件完整性的 REVIEW_STARTED != true 检查结束
 
 # ========================================
-# Quick Check: Are All Tasks Completed?
+# 快速检查：所有任务是否已完成？
 # ========================================
-# Before running expensive Codex review, check if Claude still has
-# incomplete tasks. If yes, block immediately and tell Claude to finish.
-# Supports both legacy TodoWrite and new Task system (TaskCreate/TaskUpdate).
+# 在运行昂贵的 Codex 审查之前，检查 Claude 是否仍有未完成的任务。
+# 如果是，立即阻止并告诉 Claude 完成。
+# 支持旧版 TodoWrite 和新版 Task 系统（TaskCreate/TaskUpdate）。
 
 TODO_CHECKER="$SCRIPT_DIR/check-todos-from-transcript.py"
 
 if [[ -f "$TODO_CHECKER" ]]; then
-    # Pass hook input to the task checker
+    # 将钩子输入传递给任务检查器
     TODO_RESULT=$(echo "$HOOK_INPUT" | python3 "$TODO_CHECKER" 2>&1) || TODO_EXIT=$?
     TODO_EXIT=${TODO_EXIT:-0}
 
     if [[ "$TODO_EXIT" -eq 2 ]]; then
-        # Parse error - block and surface the error
+        # 解析错误 - 阻止并显示错误
         REASON="Task checker encountered a parse error.
 
 Error: $TODO_RESULT
@@ -437,8 +436,8 @@ Please try again or cancel the loop if this persists."
     fi
 
     if [[ "$TODO_EXIT" -eq 1 ]]; then
-        # Incomplete tasks found - block immediately without Codex review
-        # Extract the incomplete task list from the result
+        # 发现未完成的任务 - 立即阻止，不进行 Codex 审查
+        # 从结果中提取未完成的任务列表
         INCOMPLETE_LIST=$(echo "$TODO_RESULT" | tail -n +2)
 
         FALLBACK="# Incomplete Tasks
@@ -462,22 +461,21 @@ Complete these tasks before exiting:
 fi
 
 # ========================================
-# Helper: Clean Up Stale index.lock
+# 辅助函数：清理过期的 index.lock
 # ========================================
-# git status (and other git commands) temporarily create .git/index.lock
-# while refreshing the index. If a git process is killed mid-operation
-# (e.g., by a timeout wrapper), the lock file can be left behind,
-# causing subsequent git add/commit to fail with:
+# git status（和其他 git 命令）在刷新索引时临时创建 .git/index.lock。
+# 如果 git 进程在操作中途被杀死（例如被超时包装器杀死），
+# 锁文件可能被遗留，导致后续的 git add/commit 失败：
 #   fatal: Unable to create '.git/index.lock': File exists.
-# This helper removes the stale lock so Claude's commit won't fail.
+# 此辅助函数移除过期的锁，以便 Claude 的提交不会失败。
 cleanup_stale_index_lock() {
-    # Resolve the git dir relative to PROJECT_ROOT, not the hook's cwd, so
-    # that index.lock cleanup targets the correct repo even when the hook
-    # executes from a plugin/cache directory rather than the project root.
+    # 解析相对于 PROJECT_ROOT 的 git 目录，而不是钩子的 cwd，
+    # 这样即使钩子从插件/缓存目录而非项目根目录执行，
+    # index.lock 清理也能定位到正确的仓库。
     local project_root="${1:-$PROJECT_ROOT}"
     local git_dir
     git_dir=$(git -C "$project_root" rev-parse --git-dir 2>/dev/null) || return 0
-    # git rev-parse --git-dir may return a relative path; make it absolute.
+    # git rev-parse --git-dir 可能返回相对路径；将其转换为绝对路径。
     if [[ "$git_dir" != /* ]]; then
         git_dir="$project_root/$git_dir"
     fi
@@ -488,24 +486,24 @@ cleanup_stale_index_lock() {
 }
 
 # ========================================
-# Cache Git Status Output
+# 缓存 Git 状态输出
 # ========================================
-# Cache git status output to avoid calling it multiple times.
-# Used by both large file check and git clean check below.
-# IMPORTANT: Fail-closed on git failures to prevent bypassing checks.
+# 缓存 git 状态输出以避免多次调用。
+# 供下面的大文件检查和 git 清洁检查使用。
+# 重要：在 git 失败时关闭失败以防止绕过检查。
 
 GIT_STATUS_CACHED=""
 GIT_IS_REPO=false
 
 if command -v git &>/dev/null && run_with_timeout "$GIT_TIMEOUT" git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null 2>&1; then
     GIT_IS_REPO=true
-    # Capture exit code to detect timeout/failure - do NOT use || echo "" which would fail-open
+    # 捕获退出码以检测超时/失败 - 不要使用 || echo ""，那会导致失败开放
     GIT_STATUS_EXIT=0
     GIT_STATUS_CACHED=$(run_with_timeout "$GIT_TIMEOUT" git -C "$PROJECT_ROOT" status --porcelain 2>/dev/null) || GIT_STATUS_EXIT=$?
 
     if [[ $GIT_STATUS_EXIT -ne 0 ]]; then
-        # Git status failed or timed out - fail-closed by blocking exit
-        # The timed-out git status may have left a stale index.lock
+        # Git 状态失败或超时 - 通过阻止退出实现关闭失败
+        # 超时的 git 状态可能留下了过期的 index.lock
         cleanup_stale_index_lock
         FALLBACK="# Git Status Failed
 
@@ -521,10 +519,10 @@ Cannot verify repository state. Please check git status manually and try again."
 fi
 
 # ========================================
-# Quick Check: Large File Detection
+# 快速检查：大文件检测
 # ========================================
-# Check if any tracked or new files exceed the line limit.
-# Large files should be split into smaller modules.
+# 检查是否有任何已跟踪或新文件超过行数限制。
+# 大文件应拆分为更小的模块。
 
 MAX_LINES=2000
 
@@ -532,34 +530,33 @@ if [[ "$GIT_IS_REPO" == "true" ]]; then
     LARGE_FILES=""
 
     while IFS= read -r line; do
-        # Skip empty lines
+        # 跳过空行
         if [ -z "$line" ]; then
             continue
         fi
 
-        # Extract filename (skip first 3 chars: "XY ")
+        # 提取文件名（跳过前 3 个字符："XY "）
         filename="${line#???}"
 
-        # Handle renames: "old -> new" format
+        # 处理重命名："old -> new" 格式
         case "$filename" in
             *" -> "*) filename="${filename##* -> }" ;;
         esac
 
-        # Resolve filename relative to PROJECT_ROOT (git status --porcelain
-        # returns project-relative paths, but the hook may run from a
-        # different working directory).
+        # 解析相对于 PROJECT_ROOT 的文件名（git status --porcelain
+        # 返回项目相对路径，但钩子可能从不同的工作目录运行）。
         filename="$PROJECT_ROOT/$filename"
 
-        # Skip deleted files
+        # 跳过已删除的文件
         if [ ! -f "$filename" ]; then
             continue
         fi
 
-        # Get file extension and convert to lowercase
+        # 获取文件扩展名并转换为小写
         ext="${filename##*.}"
         ext_lower=$(to_lower "$ext")
 
-        # Determine file type based on extension
+        # 根据扩展名确定文件类型
         case "$ext_lower" in
             py|js|ts|tsx|jsx|java|c|cpp|cc|cxx|h|hpp|cs|go|rs|rb|php|swift|kt|kts|scala|sh|bash|zsh)
                 file_type="code"
@@ -572,10 +569,10 @@ if [[ "$GIT_IS_REPO" == "true" ]]; then
                 ;;
         esac
 
-        # Count lines and trim whitespace (portable across shells)
+        # 计算行数并修剪空白（跨 shell 可移植）
         line_count=$(wc -l < "$filename" 2>/dev/null | tr -d ' ') || continue
 
-        # Validate line_count is numeric before comparison
+        # 在比较之前验证 line_count 是数字
         [[ "$line_count" =~ ^[0-9]+$ ]] || continue
 
         if [ "$line_count" -gt "$MAX_LINES" ]; then
@@ -609,28 +606,25 @@ Split these into smaller modules before continuing."
 fi
 
 # ========================================
-# Methodology Analysis Phase Completion Handler
+# 方法论分析阶段完成处理器
 # ========================================
-# When in methodology analysis phase, check if the analysis is done.
-# If done, rename state to the original exit reason's terminal state.
-# If not done, block and ask Claude to complete the analysis.
-# All other checks (summary, bitlesson, goal tracker, max iterations) are skipped.
-# IMPORTANT: This MUST run before the git-clean check, because methodology
-# artifacts (.humanize/rlcr/...) may make the working tree appear dirty
-# if .humanize is tracked, which would block exit before reaching this handler.
+# 当处于方法论分析阶段时，检查分析是否完成。
+# 如果完成，将状态重命名为原始退出原因的终端状态。
+# 如果未完成，阻止并要求 Claude 完成分析。
+# 跳过所有其他检查（摘要、bitlesson、目标跟踪器、最大迭代次数）。
+# 重要：这必须在 git 清洁检查之前运行，因为方法论产物
+# （.humanize/rlcr/...）如果 .humanize 被跟踪，可能使工作树看起来脏，
+# 这会在到达此处理器之前阻止退出。
 
 if [[ "$IS_METHODOLOGY_ANALYSIS_PHASE" == "true" ]]; then
     if complete_methodology_analysis; then
-        # Before allowing the terminal state transition, re-verify the
-        # working tree is clean. The main git-clean gate below is skipped
-        # in the methodology branch, so without this check, tracked edits
-        # made during the analysis phase (e.g. post-signoff source
-        # modifications) could slip through unreviewed as soon as the
-        # completion marker appears.
+        # 在允许终端状态转换之前，重新验证工作树是否干净。
+        # 主 git 清洁门控在方法论分支中被跳过，因此如果没有此检查，
+        # 在分析阶段进行的已跟踪编辑（例如签署后的源代码修改）
+        # 可能在完成标记出现时未经审查就溜过去。
         #
-        # Apply the same .humanize/ untracked exclusion the main gate uses
-        # so methodology-artifact writes under .humanize/rlcr/... do not
-        # themselves trip the check.
+        # 应用主门控使用的相同 .humanize/ 未跟踪排除，
+        # 以便 .humanize/rlcr/... 下的方法论产物写入不会触发检查。
         if [[ "$GIT_IS_REPO" == "true" ]]; then
             HUMANIZE_UNTRACKED_PATTERN='^\?\? \.humanize[-/]'
             GIT_STATUS_FOR_BLOCK=$(echo "$GIT_STATUS_CACHED" | grep -vE "$HUMANIZE_UNTRACKED_PATTERN" || true)
@@ -659,8 +653,8 @@ Please commit all changes before allowing the loop to exit.
                 exit 0
             fi
         fi
-        # Analysis complete and tree clean. Now do the terminal rename so the
-        # active state file stays in place until this cleanliness gate passes.
+        # 分析完成且树干净。现在进行终端重命名，
+        # 以便活动状态文件在此清洁门控通过之前保持原位。
         _meth_exit_reason=$(cat "$LOOP_DIR/.methodology-exit-reason" 2>/dev/null | tr -d '[:space:]' || echo "")
         if [[ -n "$_meth_exit_reason" ]]; then
             mv "$LOOP_DIR/methodology-analysis-state.md" "$LOOP_DIR/${_meth_exit_reason}-state.md" 2>/dev/null || true
@@ -669,19 +663,19 @@ Please commit all changes before allowing the loop to exit.
         fi
         exit 0
     else
-        # Analysis not yet complete, block
+        # 分析尚未完成，阻止
         block_methodology_analysis_incomplete
         exit 0
     fi
 fi
 
 # ========================================
-# Quick Check: Git Clean and Pushed?
+# 快速检查：Git 是否干净且已推送？
 # ========================================
-# Before running expensive Codex review, check if all changes have been
-# committed and pushed. This ensures work is properly saved.
+# 在运行昂贵的 Codex 审查之前，检查是否所有更改都已提交并推送。
+# 这确保工作被正确保存。
 
-# Use cached git status from above
+# 使用上面缓存的 git 状态
 if [[ "$GIT_IS_REPO" == "true" ]]; then
     GIT_ISSUES=""
     SPECIAL_NOTES=""
@@ -701,20 +695,19 @@ if [[ "$GIT_IS_REPO" == "true" ]]; then
         exit 0
     fi
 
-    # Check for uncommitted changes (staged or unstaged) using cached status.
-    # Exclude untracked .humanize/ paths and .humanize-* dash-separated legacy
-    # variants from the dirty determination because local plugin state under
-    # .humanize/ (.humanize/bitlesson.md, config.json, rlcr/) is intentionally
-    # untracked.
+    # 使用缓存状态检查未提交的更改（已暂存或未暂存）。
+    # 从脏判定中排除未跟踪的 .humanize/ 路径和 .humanize-* 短横线分隔的旧变体，
+    # 因为 .humanize/ 下的本地插件状态（.humanize/bitlesson.md、config.json、rlcr/）
+    # 是故意不跟踪的。
     HUMANIZE_UNTRACKED_PATTERN='^\?\? \.humanize[-/]'
     GIT_STATUS_FOR_BLOCK=$(echo "$GIT_STATUS_CACHED" | grep -vE "$HUMANIZE_UNTRACKED_PATTERN" || true)
     if [[ -n "$GIT_STATUS_FOR_BLOCK" ]]; then
         GIT_ISSUES="uncommitted changes"
 
-        # Check for special cases in untracked files (use original status for notes)
+        # 检查未跟踪文件中的特殊情况（使用原始状态作为注释）
         UNTRACKED=$(echo "$GIT_STATUS_CACHED" | grep '^??' || true)
 
-        # Check if .humanize/ or .humanize-* dash-separated legacy variants are untracked.
+        # 检查 .humanize/ 或 .humanize-* 短横线分隔的旧变体是否未跟踪。
         if echo "$UNTRACKED" | grep -qE "$HUMANIZE_UNTRACKED_PATTERN"; then
             HUMANIZE_LOCAL_NOTE=$(load_template "$TEMPLATE_DIR" "block/git-not-clean-humanize-local.md" 2>/dev/null)
             if [[ -z "$HUMANIZE_LOCAL_NOTE" ]]; then
@@ -723,7 +716,7 @@ if [[ "$GIT_IS_REPO" == "true" ]]; then
             SPECIAL_NOTES="$SPECIAL_NOTES$HUMANIZE_LOCAL_NOTE"
         fi
 
-        # Check for other untracked files (potential artifacts)
+        # 检查其他未跟踪的文件（潜在的产物）
         OTHER_UNTRACKED=$(echo "$UNTRACKED" | grep -vE "$HUMANIZE_UNTRACKED_PATTERN" || true)
         if [[ -n "$OTHER_UNTRACKED" ]]; then
             UNTRACKED_NOTE=$(load_template "$TEMPLATE_DIR" "block/git-not-clean-untracked.md" 2>/dev/null)
@@ -734,11 +727,11 @@ if [[ "$GIT_IS_REPO" == "true" ]]; then
         fi
     fi
 
-    # Block if there are uncommitted changes
+    # 如果有未提交的更改则阻止
     if [[ -n "$GIT_ISSUES" ]]; then
-        # Clean up stale index.lock before Claude attempts git add/commit
+        # 在 Claude 尝试 git add/commit 之前清理过期的 index.lock
         cleanup_stale_index_lock
-        # Git has uncommitted changes - block and remind Claude to commit
+        # Git 有未提交的更改 - 阻止并提醒 Claude 提交
         FALLBACK="# Git Not Clean
 
 Detected: {{GIT_ISSUES}}
@@ -761,11 +754,11 @@ Please commit all changes before exiting.
     fi
 
     # ========================================
-    # Check Unpushed Commits (only when push_every_round is true)
+    # 检查未推送的提交（仅当 push_every_round 为 true 时）
     # ========================================
 
     if [[ "$PUSH_EVERY_ROUND" == "true" ]]; then
-        # Check if local branch is ahead of remote (unpushed commits)
+        # 检查本地分支是否领先于远程（未推送的提交）
         GIT_AHEAD=$(run_with_timeout "$GIT_TIMEOUT" git -C "$PROJECT_ROOT" status -sb 2>/dev/null | grep -o 'ahead [0-9]*' || true)
         if [[ -n "$GIT_AHEAD" ]]; then
             AHEAD_COUNT=$(echo "$GIT_AHEAD" | grep -o '[0-9]*')
@@ -794,10 +787,10 @@ Please push before exiting."
 fi
 
 # ========================================
-# Check Summary File Exists
+# 检查摘要文件是否存在
 # ========================================
 
-# In Finalize Phase, expect finalize-summary.md instead of round-N-summary.md
+# 在 Finalize 阶段，期望 finalize-summary.md 而不是 round-N-summary.md
 if [[ "$IS_FINALIZE_PHASE" == "true" ]]; then
     SUMMARY_FILE="$LOOP_DIR/finalize-summary.md"
     ROUND_CONTRACT_FILE=""
@@ -807,8 +800,8 @@ else
 fi
 
 if [[ ! -f "$SUMMARY_FILE" ]]; then
-    # Summary file doesn't exist - Claude didn't write it
-    # Block exit and remind Claude to write summary
+    # 摘要文件不存在 - Claude 没有写入它
+    # 阻止退出并提醒 Claude 写入摘要
 
     FALLBACK="# Work Summary Missing
 
@@ -833,11 +826,11 @@ Please write your work summary to: {{SUMMARY_FILE}}"
     exit 0
 fi
 
-# Check Round Contract Exists
+# 检查轮次合同是否存在
 # ========================================
 
-# Only enforce round contract when anti-drift is active (drift_status present in raw state).
-# Legacy loops that pre-date the anti-drift feature will not have this field.
+# 仅在防漂移活跃时（原始状态中存在 drift_status）强制执行轮次合同。
+# 早于防漂移功能的旧循环不会有此字段。
 RAW_DRIFT_STATUS=$(echo "$RAW_FRONTMATTER" | grep "^drift_status:" || true)
 if [[ "$IS_FINALIZE_PHASE" != "true" ]] && [[ -n "$RAW_DRIFT_STATUS" ]]; then
     if [[ ! -f "$ROUND_CONTRACT_FILE" ]]; then
@@ -867,7 +860,7 @@ The round contract must restate:
 fi
 
 # ========================================
-# Check BitLesson Delta Section (all non-finalize rounds)
+# 检查 BitLesson Delta 部分（所有非 Finalize 轮次）
 # ========================================
 
 if [[ "$IS_FINALIZE_PHASE" != "true" ]] && [[ "$BITLESSON_REQUIRED" == "true" ]]; then
@@ -888,48 +881,48 @@ if [[ "$IS_FINALIZE_PHASE" != "true" ]] && [[ "$BITLESSON_REQUIRED" == "true" ]]
 fi
 
 # ========================================
-# Check Goal Tracker Initialization (Round 0 only, skip in Finalize Phase)
+# 检查目标跟踪器初始化（仅第 0 轮，在 Finalize 阶段跳过）
 # ========================================
 
 GOAL_TRACKER_FILE="$LOOP_DIR/goal-tracker.md"
 
-# Skip this check in Finalize Phase, Review Phase, or when review_started is already true (skip-impl mode)
-# - Finalize Phase: goal tracker was already initialized before COMPLETE
-# - Review Phase: later rounds may update only the mutable section, so Round 0 placeholder checks no longer apply
+# 在 Finalize 阶段、审查阶段或 review_started 已为 true（skip-impl 模式）时跳过此检查
+# - Finalize 阶段：目标跟踪器在 COMPLETE 之前已初始化
+# - 审查阶段：后续轮次可能仅更新可变部分，因此第 0 轮占位符检查不再适用
 if [[ "$IS_FINALIZE_PHASE" != "true" ]] && [[ "$REVIEW_STARTED" != "true" ]] && [[ "$CURRENT_ROUND" -eq 0 ]] && [[ -f "$GOAL_TRACKER_FILE" ]]; then
-    # Check if goal-tracker.md still contains placeholder text
-    # Extract each section and check for generic placeholder pattern within that section
-    # This avoids coupling to specific placeholder wording and prevents false positives
-    # from stray mentions of placeholder text elsewhere in the file
+    # 检查 goal-tracker.md 是否仍包含占位符文本
+    # 提取每个部分并检查该部分内的通用占位符模式
+    # 这避免了与特定占位符措辞的耦合，并防止文件中其他地方
+    # 偶然提及占位符文本导致的误报
 
     HAS_GOAL_PLACEHOLDER=false
     HAS_AC_PLACEHOLDER=false
     HAS_TASKS_PLACEHOLDER=false
 
-    # Extract Ultimate Goal section (### Ultimate Goal to next heading)
-    # Use awk to extract lines between start and end patterns, excluding end pattern
+    # 提取 Ultimate Goal 部分（### Ultimate Goal 到下一个标题）
+    # 使用 awk 提取开始和结束模式之间的行，不包括结束模式
     GOAL_SECTION=$(awk '/^### Ultimate Goal/{found=1; next} /^##/{found=0} found' "$GOAL_TRACKER_FILE" 2>/dev/null)
-    # Check for generic placeholder pattern "[To be " within this section
+    # 检查此部分内的通用占位符模式 "[To be "
     if echo "$GOAL_SECTION" | grep -qE '\[To be [a-z]'; then
         HAS_GOAL_PLACEHOLDER=true
     fi
 
-    # Extract Acceptance Criteria section (### Acceptance Criteria to next heading)
+    # 提取 Acceptance Criteria 部分（### Acceptance Criteria 到下一个标题）
     AC_SECTION=$(awk '/^### Acceptance Criteria/{found=1; next} /^##/{found=0} found' "$GOAL_TRACKER_FILE" 2>/dev/null)
-    # Check for generic placeholder pattern "[To be " within this section
+    # 检查此部分内的通用占位符模式 "[To be "
     if echo "$AC_SECTION" | grep -qE '\[To be [a-z]'; then
         HAS_AC_PLACEHOLDER=true
     fi
 
-    # Extract Active Tasks section (#### Active Tasks to next heading or EOF)
-    # Active Tasks is a level-4 heading, so match any ## or higher
+    # 提取 Active Tasks 部分（#### Active Tasks 到下一个标题或 EOF）
+    # Active Tasks 是 4 级标题，因此匹配任何 ## 或更高
     TASKS_SECTION=$(awk '/^#### Active Tasks/{found=1; next} /^##/{found=0} found' "$GOAL_TRACKER_FILE" 2>/dev/null)
-    # Check for generic placeholder pattern "[To be " within this section
+    # 检查此部分内的通用占位符模式 "[To be "
     if echo "$TASKS_SECTION" | grep -qE '\[To be [a-z]'; then
         HAS_TASKS_PLACEHOLDER=true
     fi
 
-    # Build list of missing items
+    # 构建缺失项目列表
     MISSING_ITEMS=""
     if [[ "$HAS_GOAL_PLACEHOLDER" == "true" ]]; then
         MISSING_ITEMS="$MISSING_ITEMS
@@ -966,52 +959,52 @@ Please fill in the Goal Tracker ({{GOAL_TRACKER_FILE}}):
 fi
 
 # ========================================
-# Check Max Iterations (skip in Finalize Phase - already post-COMPLETE)
+# 检查最大迭代次数（在 Finalize 阶段跳过 - 已在 COMPLETE 之后）
 # ========================================
 
 NEXT_ROUND=$((CURRENT_ROUND + 1))
 
-# Skip max iterations check in Finalize Phase or Review Phase
-# - Finalize Phase: already received COMPLETE from codex
-# - Review Phase: must continue until [P?] issues are cleared, regardless of iteration count
+# 在 Finalize 阶段或审查阶段跳过最大迭代次数检查
+# - Finalize 阶段：已从 codex 收到 COMPLETE
+# - 审查阶段：必须继续直到 [P?] 问题被清除，无论迭代次数如何
 if [[ "$IS_FINALIZE_PHASE" != "true" ]] && [[ "$REVIEW_STARTED" != "true" ]] && [[ $NEXT_ROUND -gt $MAX_ITERATIONS ]] && [[ "$STRICT_SUCCESS" != "true" ]]; then
-    echo "RLCR loop did not complete, but reached max iterations ($MAX_ITERATIONS). Exiting." >&2
-    # Try to enter methodology analysis phase before final exit
+    echo "RLCR 循环未完成，但已达到最大迭代次数（$MAX_ITERATIONS）。正在退出。" >&2
+    # 在最终退出之前尝试进入方法论分析阶段
     if enter_methodology_analysis_phase "maxiter" "Reached max iterations ($MAX_ITERATIONS) without completion"; then
         exit 0
     fi
     end_loop "$LOOP_DIR" "$STATE_FILE" "$EXIT_MAXITER"
     exit 0
 elif [[ "$IS_FINALIZE_PHASE" != "true" ]] && [[ "$REVIEW_STARTED" != "true" ]] && [[ $NEXT_ROUND -gt $MAX_ITERATIONS ]]; then
-    echo "Strict success mode: max iterations ($MAX_ITERATIONS) reached, but loop will continue until acceptance criteria are met." >&2
+    echo "严格成功模式：已达到最大迭代次数（$MAX_ITERATIONS），但循环将继续直到满足验收标准。" >&2
 fi
 
 # ========================================
-# Finalize Phase Completion (skip Codex review)
+# Finalize 阶段完成（跳过 Codex 审查）
 # ========================================
-# If we're in Finalize Phase and all checks have passed, complete the loop
-# No Codex review is performed - this is the final step after Codex already confirmed COMPLETE
+# 如果我们处于 Finalize 阶段且所有检查都已通过，则完成循环
+# 不执行 Codex 审查 - 这是 Codex 已确认 COMPLETE 后的最终步骤
 
 if [[ "$IS_FINALIZE_PHASE" == "true" ]]; then
-    echo "Finalize Phase complete. All checks passed." >&2
-    # Try to enter methodology analysis phase before final exit
+    echo "Finalize 阶段完成。所有检查已通过。" >&2
+    # 在最终退出之前尝试进入方法论分析阶段
     if enter_methodology_analysis_phase "complete" "All acceptance criteria met and code review passed"; then
         exit 0
     fi
-    # Methodology analysis skipped or already done - proceed with normal exit
+    # 方法论分析已跳过或已完成 - 继续正常退出
     mv "$STATE_FILE" "$LOOP_DIR/complete-state.md"
     echo "State preserved as: $LOOP_DIR/complete-state.md" >&2
     exit 0
 fi
 
 # ========================================
-# Docs Path (static default)
+# 文档路径（静态默认）
 # ========================================
 
 DOCS_PATH="docs"
 
 # ========================================
-# Build Codex Review Prompt
+# 构建 Codex 审查提示
 # ========================================
 
 PROMPT_FILE="$LOOP_DIR/round-${CURRENT_ROUND}-prompt.md"
@@ -1020,15 +1013,15 @@ REVIEW_RESULT_FILE="$LOOP_DIR/round-${CURRENT_ROUND}-review-result.md"
 
 SUMMARY_CONTENT=$(cat "$SUMMARY_FILE")
 
-# Shared prompt section for Goal Tracker Update Requests (used in both Full Alignment and Regular reviews)
+# 目标跟踪器更新请求的共享提示部分（在完整对齐和常规审查中使用）
 GOAL_TRACKER_SECTION_FALLBACK="## Goal Tracker Updates
 If Claude's summary includes a Goal Tracker Update Request section, apply the requested changes to {{GOAL_TRACKER_FILE}}."
 GOAL_TRACKER_UPDATE_SECTION=$(load_and_render_safe "$TEMPLATE_DIR" "codex/goal-tracker-update-section.md" "$GOAL_TRACKER_SECTION_FALLBACK" \
     "GOAL_TRACKER_FILE=$GOAL_TRACKER_FILE")
 
-# Determine if this is a Full Alignment Check round (every FULL_REVIEW_ROUND rounds)
-# Full Alignment Checks occur at rounds (N-1), (2N-1), (3N-1), etc. where N=FULL_REVIEW_ROUND
-# Validate FULL_REVIEW_ROUND is a positive integer (default to 5 if invalid/corrupted)
+# 确定这是否是完整对齐检查轮次（每 FULL_REVIEW_ROUND 轮一次）
+# 完整对齐检查发生在轮次 (N-1)、(2N-1)、(3N-1) 等，其中 N=FULL_REVIEW_ROUND
+# 验证 FULL_REVIEW_ROUND 是正整数（如果无效/损坏则默认为 5）
 if ! [[ "$FULL_REVIEW_ROUND" =~ ^[0-9]+$ ]] || [[ "$FULL_REVIEW_ROUND" -lt 2 ]]; then
     echo "Warning: Invalid full_review_round value '$FULL_REVIEW_ROUND', defaulting to 5" >&2
     FULL_REVIEW_ROUND=5
@@ -1038,21 +1031,21 @@ if [[ $((CURRENT_ROUND % FULL_REVIEW_ROUND)) -eq $((FULL_REVIEW_ROUND - 1)) ]]; 
     FULL_ALIGNMENT_CHECK=true
 fi
 
-# Calculate derived values for templates
+# 计算模板的派生值
 LOOP_TIMESTAMP=$(basename "$LOOP_DIR")
 COMPLETED_ITERATIONS=$((CURRENT_ROUND + 1))
-# Clamp previous round indices to 0 minimum to avoid negative file references
-# This can happen with --full-review-round 2 where first alignment check is at round 1
+# 将先前轮次索引限制在最小值 0 以避免负文件引用
+# 这可能在 --full-review-round 2 时发生，其中第一次对齐检查在第 1 轮
 PREV_ROUND=$(( CURRENT_ROUND > 0 ? CURRENT_ROUND - 1 : 0 ))
 PREV_PREV_ROUND=$(( CURRENT_ROUND > 1 ? CURRENT_ROUND - 2 : 0 ))
 
-# Integral component: accumulated commit history and recent round references
-# Validate BASE_COMMIT is an ancestor of HEAD (not just a valid object) before using it in git log
+# 积分组件：累积的提交历史和最近的轮次引用
+# 在 git log 中使用 BASE_COMMIT 之前，验证它是 HEAD 的祖先（不仅仅是有效的对象）
 if [[ -n "$BASE_COMMIT" ]] && git -C "$PROJECT_ROOT" merge-base --is-ancestor "$BASE_COMMIT" HEAD 2>/dev/null; then
     COMMIT_HISTORY=$(git -C "$PROJECT_ROOT" log --oneline --no-decorate --reverse "$BASE_COMMIT"..HEAD 2>/dev/null | tail -80)
 else
     COMMIT_HISTORY=$(git -C "$PROJECT_ROOT" log --oneline --no-decorate --reverse -30 2>/dev/null)
-    # Annotate so Codex knows this is not the full loop history
+    # 注释以便 Codex 知道这不是完整的循环历史
     [[ -n "$COMMIT_HISTORY" ]] && COMMIT_HISTORY="(base commit unavailable, showing recent branch commits)
 ${COMMIT_HISTORY}"
 fi
@@ -1077,7 +1070,7 @@ COMMIT_HISTORY_SECTION=$(load_and_render_safe "$TEMPLATE_DIR" "codex/commit-hist
     "COMMIT_HISTORY=$COMMIT_HISTORY" \
     "RECENT_ROUND_FILES=$RECENT_ROUND_FILES")
 
-# Build the review prompt
+# 构建审查提示
 FULL_ALIGNMENT_FALLBACK="# Full Alignment Review (Round {{CURRENT_ROUND}})
 
 Review Claude's work against the plan and goal tracker. Check all goals are being met.
@@ -1105,7 +1098,7 @@ Review Claude's work for this round.
 Write your review to {{REVIEW_RESULT_FILE}}. End with COMPLETE if done, or list issues."
 
 if [[ "$FULL_ALIGNMENT_CHECK" == "true" ]]; then
-    # Full Alignment Check prompt
+    # 完整对齐检查提示
     load_and_render_safe "$TEMPLATE_DIR" "codex/full-alignment-review.md" "$FULL_ALIGNMENT_FALLBACK" \
         "CURRENT_ROUND=$CURRENT_ROUND" \
         "PLAN_FILE=$PLAN_FILE" \
@@ -1121,7 +1114,7 @@ if [[ "$FULL_ALIGNMENT_CHECK" == "true" ]]; then
         "REVIEW_RESULT_FILE=$REVIEW_RESULT_FILE" > "$REVIEW_PROMPT_FILE"
 
 else
-    # Regular review prompt with goal alignment section
+    # 带有目标对齐部分的常规审查提示
     load_and_render_safe "$TEMPLATE_DIR" "codex/regular-review.md" "$REGULAR_REVIEW_FALLBACK" \
         "CURRENT_ROUND=$CURRENT_ROUND" \
         "PLAN_FILE=$PLAN_FILE" \
@@ -1139,12 +1132,12 @@ else
 fi
 
 # ========================================
-# Shared Setup: Cache Directory and Codex Arguments
+# 共享设置：缓存目录和 Codex 参数
 # ========================================
-# Initialize these before the REVIEW_STARTED guard so they are available in both
-# impl phase (codex exec) and review phase (codex review)
+# 在 REVIEW_STARTED 守卫之前初始化这些，以便它们在实现阶段
+# （codex exec）和审查阶段（codex review）都可用
 
-# First, check if Codex CLI exists
+# 首先，检查 Codex CLI 是否存在
 if ! command -v codex >/dev/null 2>&1; then
     REASON="# Codex CLI Not Found
 
@@ -1166,23 +1159,23 @@ EOF
     exit 0
 fi
 
-# Debug log files go to XDG_CACHE_HOME/humanize/<project-path>/<timestamp>/ to avoid polluting project dir
-# Respects XDG_CACHE_HOME for testability in restricted environments (falls back to $HOME/.cache)
-# This prevents Claude and Codex from reading these debug files during their work
-# The project path is sanitized to replace problematic characters with '-'
-# LOOP_TIMESTAMP already set above via basename "$LOOP_DIR"
-# Sanitize project root path: replace / and other problematic chars with -
-# This matches Claude Code's convention (e.g., /home/sihao/github.com/foo -> -home-sihao-github-com-foo)
+# 调试日志文件放在 XDG_CACHE_HOME/humanize/<project-path>/<timestamp>/ 以避免污染项目目录
+# 尊重 XDG_CACHE_HOME 以便在受限环境中进行测试（回退到 $HOME/.cache）
+# 这防止 Claude 和 Codex 在工作期间读取这些调试文件
+# 项目路径被清理以将有问题的字符替换为 '-'
+# LOOP_TIMESTAMP 已在上面通过 basename "$LOOP_DIR" 设置
+# 清理项目根路径：将 / 和其他有问题的字符替换为 -
+# 这匹配 Claude Code 的约定（例如 /home/sihao/github.com/foo -> -home-sihao-github-com-foo）
 SANITIZED_PROJECT_PATH=$(echo "$PROJECT_ROOT" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g')
 CACHE_BASE="${XDG_CACHE_HOME:-$HOME/.cache}"
 CACHE_DIR="$CACHE_BASE/humanize/$SANITIZED_PROJECT_PATH/$LOOP_TIMESTAMP"
 mkdir -p "$CACHE_DIR"
 
-# portable-timeout.sh already sourced above
+# portable-timeout.sh 已在上面源码引入
 
-# Disable native hooks for nested Codex reviewer calls to prevent Stop-hook recursion.
-# Probe whether the installed Codex CLI supports --disable; cache the result per loop
-# so older builds do not fail with an unknown-argument error.
+# 为嵌套的 Codex 审查器调用禁用原生钩子以防止 Stop-hook 递归。
+# 探测已安装的 Codex CLI 是否支持 --disable；缓存每个循环的结果，
+# 以便较旧的构建不会因未知参数错误而失败。
 CODEX_DISABLE_HOOKS_ARGS=()
 _CODEX_FEATURE_CACHE="$CACHE_DIR/.codex-disable-hooks-supported"
 if [[ -f "$_CODEX_FEATURE_CACHE" ]]; then
@@ -1197,7 +1190,7 @@ else
     fi
 fi
 
-# Build command arguments for summary review (codex exec)
+# 构建摘要审查的命令参数（codex exec）
 CODEX_EXEC_ARGS=("-m" "$CODEX_EXEC_MODEL")
 if [[ -n "$CODEX_EXEC_EFFORT" ]]; then
     CODEX_EXEC_ARGS+=("-c" "model_reasoning_effort=${CODEX_EXEC_EFFORT}")
@@ -1209,28 +1202,28 @@ if [[ "${HUMANIZE_CODEX_BYPASS_SANDBOX:-}" == "true" ]] || [[ "${HUMANIZE_CODEX_
 fi
 CODEX_EXEC_ARGS+=("$CODEX_AUTO_FLAG" "-C" "$PROJECT_ROOT")
 
-# Build Codex command arguments for codex review
+# 构建 codex review 的 Codex 命令参数
 CODEX_REVIEW_ARGS=("-c" "model=${CODEX_REVIEW_MODEL}" "-c" "review_model=${CODEX_REVIEW_MODEL}")
 if [[ -n "$CODEX_REVIEW_EFFORT" ]]; then
     CODEX_REVIEW_ARGS+=("-c" "model_reasoning_effort=${CODEX_REVIEW_EFFORT}")
 fi
 
 # ========================================
-# Helper Functions for Code Review Phase
+# 代码审查阶段的辅助函数
 # ========================================
 
-# Run code review and save debug files
-# Arguments: $1=round_number
-# Sets: CODEX_REVIEW_EXIT_CODE, CODEX_REVIEW_LOG_FILE
-# Returns: exit code from the configured review CLI
+# 运行代码审查并保存调试文件
+# 参数：$1=轮次编号
+# 设置：CODEX_REVIEW_EXIT_CODE、CODEX_REVIEW_LOG_FILE
+# 返回：配置的审查 CLI 的退出码
 run_codex_code_review() {
     local round="$1"
     local timestamp
     timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-    # Determine review base: prefer BASE_COMMIT (captured at loop start) over BASE_BRANCH
-    # Using the fixed commit SHA prevents comparing a branch to itself when working on main,
-    # as the branch ref advances with each commit but the captured SHA stays fixed
+    # 确定审查基准：优先使用 BASE_COMMIT（在循环开始时捕获）而不是 BASE_BRANCH
+    # 使用固定的提交 SHA 可防止在 main 上工作时将分支与自身比较，
+    # 因为分支引用随着每次提交而前进，但捕获的 SHA 保持固定
     local review_base="${BASE_COMMIT:-$BASE_BRANCH}"
     local review_base_type="branch"
     if [[ -n "$BASE_COMMIT" ]]; then
@@ -1241,7 +1234,7 @@ run_codex_code_review() {
     CODEX_REVIEW_LOG_FILE="$CACHE_DIR/round-${round}-codex-review.log"
     local prompt_file="$LOOP_DIR/round-${round}-review-prompt.md"
 
-    # Create audit prompt file describing the code review invocation
+    # 创建描述代码审查调用的审计提示文件
     local prompt_fallback="# Code Review Phase - Round ${round}
 
 This file documents the code review invocation for audit purposes.
@@ -1291,52 +1284,52 @@ Provider: codex
     return "$CODEX_REVIEW_EXIT_CODE"
 }
 
-# Note: detect_review_issues() is defined in loop-common.sh and sourced above
+# 注意：detect_review_issues() 定义在 loop-common.sh 中，并在上面源码引入
 
-# Run code review and handle the result
-# Arguments: $1=round_number, $2=success_system_message
-# This function consolidates the common pattern of:
-#   1. Running codex review (no prompt - uses --base only)
-#   2. Checking results and handling outcomes
-# On success (no issues), calls enter_finalize_phase and exits
-# On issues found, calls continue_review_loop_with_issues and exits
-# On failure, calls block_review_failure and exits
+# 运行代码审查并处理结果
+# 参数：$1=轮次编号，$2=成功系统消息
+# 此函数整合了以下常见模式：
+#   1. 运行 codex review（无提示 - 仅使用 --base）
+#   2. 检查结果并处理结果
+# 成功时（无问题），调用 enter_finalize_phase 并退出
+# 发现问题时，调用 continue_review_loop_with_issues 并退出
+# 失败时，调用 block_review_failure 并退出
 #
-# Round numbering: After COMPLETE at round N, all review phase files use round N+1
-# The caller passes CURRENT_ROUND + 1 as the round_number parameter
+# 轮次编号：在第 N 轮 COMPLETE 之后，所有审查阶段文件使用第 N+1 轮
+# 调用者传递 CURRENT_ROUND + 1 作为轮次编号参数
 run_and_handle_code_review() {
     local round="$1"
     local success_msg="$2"
 
     echo "Running codex review against base branch: $BASE_BRANCH..." >&2
 
-    # Run codex review using helper function
-    # IMPORTANT: Review failure is a blocking error - do NOT skip to finalize
+    # 使用辅助函数运行 codex review
+    # 重要：审查失败是阻塞错误 - 不要跳到 finalize
     if ! run_codex_code_review "$round"; then
         block_review_failure "$round" "Codex review command failed" "$CODEX_REVIEW_EXIT_CODE"
     fi
 
-    # Check both stdout and result file for [P0-9] issues (plan requirement)
-    # detect_review_issues returns: 0=issues found, 1=no issues, 2=stdout missing (hard error)
+    # 检查 stdout 和结果文件中的 [P0-9] 问题（计划要求）
+    # detect_review_issues 返回：0=发现问题，1=无问题，2=stdout 缺失（硬错误）
     local merged_content=""
     local detect_exit=0
     merged_content=$(detect_review_issues "$round") || detect_exit=$?
 
     if [[ "$detect_exit" -eq 2 ]]; then
-        # Stdout missing/empty is a hard error - block and require retry
+        # stdout 缺失/为空是硬错误 - 阻止并要求重试
         block_review_failure "$round" "Codex review produced no stdout output" "N/A"
     elif [[ "$detect_exit" -eq 0 ]] && [[ -n "$merged_content" ]]; then
-        # Issues found - continue review loop
+        # 发现问题 - 继续审查循环
         continue_review_loop_with_issues "$round" "$merged_content"
     else
-        # No issues found (exit code 1) - proceed to finalize
-        echo "Code review passed with no issues. Proceeding to finalize phase." >&2
+        # 未发现问题（退出码 1）- 继续到 finalize
+        echo "代码审查通过，没有问题。继续到 finalize 阶段。" >&2
         enter_finalize_phase "" "$success_msg"
     fi
 }
 
-# Enter finalize phase with appropriate prompt
-# Arguments: $1=skip_reason (empty if not skipped), $2=system_message
+# 使用适当的提示进入 finalize 阶段
+# 参数：$1=跳过原因（如果未跳过则为空），$2=系统消息
 enter_finalize_phase() {
     local skip_reason="$1"
     local system_msg="$2"
@@ -1421,8 +1414,8 @@ Focus on the code changes made during this RLCR session. Focus more on changes b
     exit 0
 }
 
-# Append task tag routing reminder to follow-up prompts.
-# Arguments: $1=prompt_file_path
+# 向后续提示追加任务标签路由提醒。
+# 参数：$1=提示文件路径
 append_task_tag_routing_note() {
     local prompt_file="$1"
 
@@ -1437,8 +1430,8 @@ Follow the plan's per-task routing tags strictly:
 ROUTING_EOF
 }
 
-# Stop the loop when mainline progress has stalled for too many consecutive rounds.
-# Arguments: $1=stall_count, $2=last_verdict
+# 当主线进度在太多连续轮次中停滞时停止循环。
+# 参数：$1=停滞计数，$2=上次裁决
 stop_for_mainline_drift() {
     local stall_count="$1"
     local last_verdict="$2"
@@ -1475,8 +1468,8 @@ This loop should not continue automatically. Revisit the original plan, recover 
     exit 0
 }
 
-# Block exit when implementation review output omits the required mainline verdict.
-# Arguments: $1=review_result_file, $2=review_prompt_file
+# 当实现审查输出省略必需的主线裁决时阻止退出。
+# 参数：$1=审查结果文件，$2=审查提示文件
 block_missing_mainline_verdict() {
     local review_result_file="$1"
     local review_prompt_file="$2"
@@ -1510,20 +1503,20 @@ Files:
     exit 0
 }
 
-# Continue review loop when issues are found
-# Arguments: $1=round_number, $2=review_content
+# 发现问题时继续审查循环
+# 参数：$1=轮次编号，$2=审查内容
 continue_review_loop_with_issues() {
     local round="$1"
     local review_content="$2"
 
     echo "Code review found issues. Continuing review loop..." >&2
 
-    # Update round number in state file
+    # 更新状态文件中的轮次编号
     local temp_file="${STATE_FILE}.tmp.$$"
     sed "s/^current_round: .*/current_round: $round/" "$STATE_FILE" > "$temp_file"
     mv "$temp_file" "$STATE_FILE"
 
-    # Build review-fix prompt for Claude
+    # 为 Claude 构建审查修复提示
     local next_prompt_file="$LOOP_DIR/round-${round}-prompt.md"
     local next_summary_file="$LOOP_DIR/round-${round}-summary.md"
     if [[ ! -f "$next_summary_file" ]]; then
@@ -1602,15 +1595,15 @@ EOF
     exit 0
 }
 
-# Block exit when codex review fails or produces no output
-# This is a hard error - the review phase cannot be skipped
-# Arguments: $1=round_number, $2=failure_reason, $3=exit_code (optional)
+# 当 codex review 失败或未产生输出时阻止退出
+# 这是硬错误 - 审查阶段不能被跳过
+# 参数：$1=轮次编号，$2=失败原因，$3=退出码（可选）
 block_review_failure() {
     local round="$1"
     local failure_reason="$2"
     local exit_code="${3:-unknown}"
 
-    echo "ERROR: Codex review failed. Blocking exit and requiring retry." >&2
+    echo "错误：Codex review 失败。阻止退出并要求重试。" >&2
 
     local stderr_content=""
     local stderr_file="$CACHE_DIR/round-${round}-codex-review.log"
@@ -1678,22 +1671,22 @@ Stderr (last 50 lines):
 }
 
 # ========================================
-# Run Codex Review (Implementation Phase Only)
+# 运行 Codex 审查（仅实现阶段）
 # ========================================
-# Skip the summary review when in review phase - review phase uses codex review instead
+# 在审查阶段跳过摘要审查 - 审查阶段使用 codex review 代替
 
 if [[ "$REVIEW_STARTED" == "true" ]]; then
-    echo "In review phase - skipping codex exec summary review, will run codex review instead..." >&2
-    # Jump directly to Review Phase section below (after the COMPLETE/STOP handling)
+    echo "在审查阶段 - 跳过 codex exec 摘要审查，将改为运行 codex review..." >&2
+    # 直接跳转到下面的审查阶段部分（在 COMPLETE/STOP 处理之后）
 else
 
-echo "Running summary review for round $CURRENT_ROUND via codex..." >&2
+echo "正在通过 codex 运行第 $CURRENT_ROUND 轮的摘要审查..." >&2
 
 CODEX_CMD_FILE="$CACHE_DIR/round-${CURRENT_ROUND}-codex-run.cmd"
 CODEX_STDOUT_FILE="$CACHE_DIR/round-${CURRENT_ROUND}-codex-run.out"
 CODEX_STDERR_FILE="$CACHE_DIR/round-${CURRENT_ROUND}-codex-run.log"
 
-# Save the command for debugging
+# 保存命令用于调试
 CODEX_PROMPT_CONTENT=$(cat "$REVIEW_PROMPT_FILE")
 {
     echo "# Codex invocation debug info"
@@ -1719,11 +1712,11 @@ echo "Codex stdout saved to: $CODEX_STDOUT_FILE" >&2
 echo "Codex stderr saved to: $CODEX_STDERR_FILE" >&2
 
 # ========================================
-# Check Codex Execution Result
+# 检查 Codex 执行结果
 # ========================================
 
-# Helper function to print Codex failure and block exit for retry
-# Uses JSON output with exit 0 (per Claude Code hooks spec) instead of exit 2
+# 辅助函数：打印 Codex 失败并阻止退出以重试
+# 使用 JSON 输出和 exit 0（按照 Claude Code 钩子规范）而不是 exit 2
 codex_failure_exit() {
     local error_type="$1"
     local details="$2"
@@ -1750,7 +1743,7 @@ EOF
     exit 0
 }
 
-# Check 1: Codex exit code indicates failure
+# 检查 1：Codex 退出码表示失败
 if [[ "$CODEX_EXIT_CODE" -ne 0 ]]; then
     STDERR_CONTENT=""
     if [[ -f "$CODEX_STDERR_FILE" ]]; then
@@ -1769,12 +1762,12 @@ Stderr output (last 30 lines):
 $STDERR_CONTENT"
 fi
 
-# Check if Codex created the review result file (it should write to workspace)
-# If not, check if it wrote to stdout
+# 检查 Codex 是否创建了审查结果文件（它应该写入工作区）
+# 如果没有，检查它是否写入了 stdout
 if [[ ! -f "$REVIEW_RESULT_FILE" ]]; then
-    # Codex might have written output to stdout instead
+    # Codex 可能将输出写入了 stdout
     if [[ -s "$CODEX_STDOUT_FILE" ]]; then
-        echo "Codex output found in stdout, copying to review result file..." >&2
+        echo "在 stdout 中找到 Codex 输出，正在复制到审查结果文件..." >&2
         if ! cp "$CODEX_STDOUT_FILE" "$REVIEW_RESULT_FILE" 2>/dev/null; then
             codex_failure_exit "Failed to copy stdout to review result file" \
 "Codex wrote output to stdout but copying to review file failed.
@@ -1787,7 +1780,7 @@ Check if the loop directory is writable."
     fi
 fi
 
-# Check 2: Review result file still doesn't exist
+# 检查 2：审查结果文件仍不存在
 if [[ ! -f "$REVIEW_RESULT_FILE" ]]; then
     STDERR_CONTENT=""
     if [[ -f "$CODEX_STDERR_FILE" ]]; then
@@ -1815,7 +1808,7 @@ Stderr (last 30 lines):
 $STDERR_CONTENT"
 fi
 
-# Check 3: Review result file is empty
+# 检查 3：审查结果文件为空
 if [[ ! -s "$REVIEW_RESULT_FILE" ]]; then
     codex_failure_exit "Review result file is empty" \
 "File exists but is empty: $REVIEW_RESULT_FILE
@@ -1824,12 +1817,12 @@ Codex created the file but wrote no content.
 This may indicate Codex encountered an internal error."
 fi
 
-# Read the review result
+# 读取审查结果
 REVIEW_CONTENT=$(cat "$REVIEW_RESULT_FILE")
 
-# Check if the last non-empty line is exactly "COMPLETE" or "STOP"
-# The word must be on its own line to avoid false positives like "CANNOT COMPLETE"
-# Use strict matching: only whitespace before/after the word is allowed
+# 检查最后一个非空行是否正好是 "COMPLETE" 或 "STOP"
+# 该词必须在自己的行上以避免误报，如 "CANNOT COMPLETE"
+# 使用严格匹配：仅允许词前后的空白
 LAST_LINE=$(echo "$REVIEW_CONTENT" | grep -v '^[[:space:]]*$' | tail -1)
 LAST_LINE_TRIMMED=$(echo "$LAST_LINE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
@@ -1880,39 +1873,39 @@ if [[ "$REVIEW_STARTED" != "true" ]]; then
     fi
 fi
 
-# Handle COMPLETE - enter Review Phase or Finalize Phase
+# 处理 COMPLETE - 进入审查阶段或 Finalize 阶段
 if [[ "$LAST_LINE_TRIMMED" == "$MARKER_COMPLETE" ]]; then
-    # In review phase, COMPLETE signal is ignored - only absence of [P0-9] triggers finalize
+    # 在审查阶段，COMPLETE 信号被忽略 - 只有 [P0-9] 的缺失才触发 finalize
     if [[ "$REVIEW_STARTED" == "true" ]]; then
-        echo "COMPLETE signal ignored in review phase. Codex review determines exit." >&2
-        # Fall through to continue with codex review logic below
+        echo "在审查阶段忽略 COMPLETE 信号。Codex review 决定退出。" >&2
+        # 继续到下面的 codex review 逻辑
     else
-        # Implementation phase complete - transition to review phase
-        # Max iterations check
+        # 实现阶段完成 - 过渡到审查阶段
+        # 最大迭代次数检查
         if [[ $CURRENT_ROUND -ge $MAX_ITERATIONS && "$STRICT_SUCCESS" != "true" ]]; then
-            echo "Codex review passed but at max iterations ($MAX_ITERATIONS). Terminating as MAXITER." >&2
+            echo "Codex review 通过但已达到最大迭代次数（$MAX_ITERATIONS）。以 MAXITER 终止。" >&2
             if enter_methodology_analysis_phase "maxiter" "Codex confirmed COMPLETE but at max iterations ($MAX_ITERATIONS)"; then
                 exit 0
             fi
             end_loop "$LOOP_DIR" "$STATE_FILE" "$EXIT_MAXITER"
             exit 0
         elif [[ $CURRENT_ROUND -ge $MAX_ITERATIONS ]]; then
-            echo "Strict success mode: COMPLETE arrived after max iterations; continuing into review/finalize instead of maxiter exit." >&2
+            echo "严格成功模式：COMPLETE 在最大迭代次数之后到达；继续进入审查/finalize 而不是 maxiter 退出。" >&2
         fi
 
-        # Initialize skip tracking variables before any skip paths
+        # 在任何跳过路径之前初始化跳过跟踪变量
         REVIEW_SKIPPED=""
         REVIEW_SKIP_REASON=""
 
-        # Check if base_branch is available for code review
+        # 检查 base_branch 是否可用于代码审查
         if [[ -z "$BASE_BRANCH" ]]; then
-            echo "Warning: No base_branch configured, skipping code review phase." >&2
+            echo "警告：未配置 base_branch，跳过代码审查阶段。" >&2
             REVIEW_SKIPPED="true"
             REVIEW_SKIP_REASON="No base_branch configured for code review"
         else
-            echo "Implementation complete. Entering Review Phase..." >&2
+            echo "实现完成。正在进入审查阶段..." >&2
 
-            # Update state to indicate review phase has started and clear drift counters.
+            # 更新状态以指示审查阶段已开始并清除漂移计数器。
             upsert_state_fields "$STATE_FILE" \
                 "${FIELD_REVIEW_STARTED}=true" \
                 "${FIELD_MAINLINE_STALL_COUNT}=0" \
@@ -1920,29 +1913,29 @@ if [[ "$LAST_LINE_TRIMMED" == "$MARKER_COMPLETE" ]]; then
                 "${FIELD_DRIFT_STATUS}=${DRIFT_STATUS_NORMAL}"
             REVIEW_STARTED="true"
 
-            # Create marker file to validate review phase was properly entered
-            # Also record which round build finished for monitor display
+            # 创建标记文件以验证审查阶段是否正确进入
+            # 同时记录哪一轮构建完成以供监视器显示
             echo "build_finish_round=$CURRENT_ROUND" > "$LOOP_DIR/.review-phase-started"
 
-            # Run code review and handle results (may exit on issues/failure/success)
-            # Pass CURRENT_ROUND + 1 so all review phase files use the next round number
-            echo "Implementation complete. Running initial code review..." >&2
+            # 运行代码审查并处理结果（可能在问题/失败/成功时退出）
+            # 传递 CURRENT_ROUND + 1 以便所有审查阶段文件使用下一轮次编号
+            echo "实现完成。正在运行初始代码审查..." >&2
             run_and_handle_code_review "$((CURRENT_ROUND + 1))" "Loop: Finalize Phase - Simplify and refactor code before completion"
         fi
     fi
 fi
 
-fi  # End of implementation phase codex exec block (skipped when review_started is true)
+fi  # 实现阶段 codex exec 块结束（当 review_started 为 true 时跳过）
 
 # ========================================
-# Review Phase: Run Code Review (when review_started is true)
+# 审查阶段：运行代码审查（当 review_started 为 true 时）
 # ========================================
-# When in review phase, we need to run codex review on every exit attempt
-# The loop continues until no [P0-9] patterns are found in the review output
+# 当处于审查阶段时，我们需要在每次退出尝试时运行 codex review
+# 循环继续直到在审查输出中未找到 [P0-9] 模式
 
 if [[ "$REVIEW_STARTED" == "true" && -n "$BASE_BRANCH" ]]; then
-    # Validate that review phase was properly entered (marker file must exist)
-    # This prevents manual toggle attacks where someone edits state.md directly
+    # 验证审查阶段是否正确进入（标记文件必须存在）
+    # 这防止了有人直接编辑 state.md 的手动切换攻击
     if [[ ! -f "$LOOP_DIR/.review-phase-started" ]]; then
         REASON="Review phase state inconsistency detected.
 
@@ -1958,15 +1951,15 @@ Use \`/humanize:cancel-rlcr-loop\` to end this loop."
         exit 0
     fi
 
-    echo "Review Phase: Running code review..." >&2
+    echo "审查阶段：正在运行代码审查..." >&2
 
-    # Run code review and handle results (may exit on issues/failure/success)
-    # Pass CURRENT_ROUND + 1 so all review phase files use the next round number
+    # 运行代码审查并处理结果（可能在问题/失败/成功时退出）
+    # 传递 CURRENT_ROUND + 1 以便所有审查阶段文件使用下一轮次编号
     run_and_handle_code_review "$((CURRENT_ROUND + 1))" "Loop: Finalize Phase - Code review passed"
 fi
 
 if [[ "$MAINLINE_DRIFT_STOP" == "true" ]] && [[ "$STRICT_SUCCESS" == "true" ]] && [[ "$LAST_LINE_TRIMMED" != "$MARKER_COMPLETE" ]]; then
-    echo "Strict success mode: mainline drift circuit breaker suppressed; forcing recovery/replan round." >&2
+    echo "严格成功模式：主线漂移断路器被抑制；强制恢复/重新计划轮次。" >&2
     MAINLINE_DRIFT_STOP=false
     DRIFT_REPLAN_REQUIRED=true
     NEXT_DRIFT_STATUS="$DRIFT_STATUS_REPLAN_REQUIRED"
@@ -1978,13 +1971,13 @@ The reviewer detected repeated mainline drift. Do not stop the loop. Re-anchor o
 fi
 
 if [[ "$MAINLINE_DRIFT_STOP" == "true" ]] && [[ "$LAST_LINE_TRIMMED" != "$MARKER_STOP" ]] && [[ "$LAST_LINE_TRIMMED" != "$MARKER_COMPLETE" ]]; then
-    echo "Mainline progress stalled for $NEXT_MAINLINE_STALL_COUNT consecutive rounds. Triggering drift circuit breaker." >&2
+    echo "主线进度在连续 $NEXT_MAINLINE_STALL_COUNT 轮中停滞。触发漂移断路器。" >&2
     stop_for_mainline_drift "$NEXT_MAINLINE_STALL_COUNT" "$NEXT_LAST_MAINLINE_VERDICT"
 fi
 
-# Handle STOP - circuit breaker triggered
+# 处理 STOP - 断路器触发
 if [[ "$LAST_LINE_TRIMMED" == "$MARKER_STOP" && "$STRICT_SUCCESS" == "true" ]]; then
-    echo "Strict success mode: STOP marker suppressed; forcing recovery/replan round." >&2
+    echo "严格成功模式：STOP 标记被抑制；强制恢复/重新计划轮次。" >&2
     DRIFT_REPLAN_REQUIRED=true
     NEXT_DRIFT_STATUS="$DRIFT_STATUS_REPLAN_REQUIRED"
     if [[ "$NEXT_MAINLINE_STALL_COUNT" -lt 1 ]]; then
@@ -2000,28 +1993,28 @@ elif [[ "$LAST_LINE_TRIMMED" == "$MARKER_STOP" ]]; then
     echo "" >&2
     echo "========================================" >&2
     if [[ "$FULL_ALIGNMENT_CHECK" == "true" ]]; then
-        echo "CIRCUIT BREAKER TRIGGERED" >&2
+        echo "断路器已触发" >&2
         echo "========================================" >&2
-        echo "Codex detected development stagnation during Full Alignment Check (Round $CURRENT_ROUND)." >&2
-        echo "The loop has been stopped to prevent further unproductive iterations." >&2
+        echo "Codex 在完整对齐检查期间检测到开发停滞（第 $CURRENT_ROUND 轮）。" >&2
+        echo "循环已停止以防止进一步的非生产性迭代。" >&2
         echo "" >&2
-        echo "Review the historical round files in .humanize/rlcr/$(basename "$LOOP_DIR")/ to understand what went wrong." >&2
-        echo "Consider:" >&2
-        echo "  - Revisiting the original plan for clarity" >&2
-        echo "  - Breaking down the task into smaller pieces" >&2
-        echo "  - Manually addressing the blocking issues" >&2
+        echo "查看 .humanize/rlcr/$(basename "$LOOP_DIR")/ 中的历史轮次文件以了解出了什么问题。" >&2
+        echo "考虑：" >&2
+        echo "  - 重新审视原始计划以获得清晰度" >&2
+        echo "  - 将任务分解为更小的部分" >&2
+        echo "  - 手动解决阻塞问题" >&2
     else
-        echo "UNEXPECTED CIRCUIT BREAKER" >&2
+        echo "意外的断路器" >&2
         echo "========================================" >&2
-        echo "Codex output STOP during a non-alignment round (Round $CURRENT_ROUND)." >&2
-        echo "This is unusual - STOP is normally only expected during Full Alignment Checks (every $FULL_REVIEW_ROUND rounds)." >&2
-        echo "Honoring the STOP request and terminating the loop." >&2
+        echo "Codex 在非对齐轮次（第 $CURRENT_ROUND 轮）期间输出了 STOP。" >&2
+        echo "这很不寻常 - STOP 通常只在完整对齐检查期间预期（每 $FULL_REVIEW_ROUND 轮一次）。" >&2
+        echo "接受 STOP 请求并终止循环。" >&2
         echo "" >&2
-        echo "Review the review result to understand why Codex requested an early stop:" >&2
+        echo "查看审查结果以了解 Codex 为何请求提前停止：" >&2
         echo "  $REVIEW_RESULT_FILE" >&2
     fi
     echo "========================================" >&2
-    # Try to enter methodology analysis phase before final exit
+    # 在最终退出之前尝试进入方法论分析阶段
     if enter_methodology_analysis_phase "stop" "Circuit breaker triggered - stagnation detected at round $CURRENT_ROUND"; then
         exit 0
     fi
@@ -2030,17 +2023,17 @@ elif [[ "$LAST_LINE_TRIMMED" == "$MARKER_STOP" ]]; then
 fi
 
 # ========================================
-# Review Found Issues - Continue Loop
+# 审查发现问题 - 继续循环
 # ========================================
 
-# Update state file for next round
+# 为下一轮更新状态文件
 upsert_state_fields "$STATE_FILE" \
     "${FIELD_CURRENT_ROUND}=${NEXT_ROUND}" \
     "${FIELD_MAINLINE_STALL_COUNT}=${NEXT_MAINLINE_STALL_COUNT}" \
     "${FIELD_LAST_MAINLINE_VERDICT}=${NEXT_LAST_MAINLINE_VERDICT}" \
     "${FIELD_DRIFT_STATUS}=${NEXT_DRIFT_STATUS}"
 
-# Create next round prompt
+# 创建下一轮提示
 NEXT_PROMPT_FILE="$LOOP_DIR/round-${NEXT_ROUND}-prompt.md"
 NEXT_SUMMARY_FILE="$LOOP_DIR/round-${NEXT_ROUND}-summary.md"
 if [[ ! -f "$NEXT_SUMMARY_FILE" ]]; then
@@ -2067,7 +2060,7 @@ EOF
 fi
 NEXT_CONTRACT_FILE="$LOOP_DIR/round-${NEXT_ROUND}-contract.md"
 
-# Build the next round prompt from templates
+# 从模板构建下一轮提示
 NEXT_ROUND_FALLBACK="# Next Round Instructions
 
 Review the feedback below and address all issues.
@@ -2159,8 +2152,8 @@ if [[ "$AGENT_TEAMS" == "true" ]]; then
     mv "$TEMP_PROMPT_FILE" "$NEXT_PROMPT_FILE"
 fi
 
-# Check for Open Questions in review content and inject notice if enabled
-# Detection: line containing "Open Question" substring with total length < 40 chars
+# 检查审查内容中的开放问题并在启用时注入通知
+# 检测：包含 "Open Question" 子字符串且总长度 < 40 字符的行
 if [[ "$ASK_CODEX_QUESTION" == "true" ]]; then
     HAS_OPEN_QUESTION=false
     while IFS= read -r line; do
@@ -2171,12 +2164,12 @@ if [[ "$ASK_CODEX_QUESTION" == "true" ]]; then
     done < "$REVIEW_RESULT_FILE"
 
     if [[ "$HAS_OPEN_QUESTION" == "true" ]]; then
-        echo "Detected Open Question(s) in Codex review - injecting AskUserQuestion notice" >&2
+        echo "在 Codex 审查中检测到开放问题 - 注入 AskUserQuestion 通知" >&2
         OPEN_QUESTION_NOTICE=$(load_template "$TEMPLATE_DIR" "claude/open-question-notice.md" 2>/dev/null)
         if [[ -z "$OPEN_QUESTION_NOTICE" ]]; then
             OPEN_QUESTION_NOTICE="**IMPORTANT**: Codex has found Open Question(s). You must use \`AskUserQuestion\` to clarify those questions with user first, before proceeding to resolve any other Codex's findings."
         fi
-        # Insert notice between "<!-- CODEX's REVIEW RESULT  END  -->" line + "---" line and "## Goal Tracker Reference"
+        # 在 "<!-- CODEX's REVIEW RESULT  END  -->" 行 + "---" 行和 "## Goal Tracker Reference" 之间插入通知
         TEMP_PROMPT_FILE="${NEXT_PROMPT_FILE}.tmp.$$"
         awk -v notice="$OPEN_QUESTION_NOTICE" '
             /<!-- CODEX.*REVIEW RESULT.*END.*-->/ {
@@ -2195,7 +2188,7 @@ if [[ "$ASK_CODEX_QUESTION" == "true" ]]; then
     fi
 fi
 
-# Add special instructions for post-Full Alignment Check rounds
+# 为完整对齐检查后的轮次添加特殊指令
 if [[ "$FULL_ALIGNMENT_CHECK" == "true" ]]; then
     POST_ALIGNMENT=$(load_template "$TEMPLATE_DIR" "claude/post-alignment-action-items.md" 2>/dev/null)
     if [[ -n "$POST_ALIGNMENT" ]]; then
@@ -2203,14 +2196,14 @@ if [[ "$FULL_ALIGNMENT_CHECK" == "true" ]]; then
     fi
 fi
 
-# Add footer with commit/summary instructions
+# 添加包含提交/摘要指令的页脚
 FOOTER_FALLBACK="## Before Exiting
 Commit your changes and write summary to {{NEXT_SUMMARY_FILE}}"
 load_and_render_safe "$TEMPLATE_DIR" "claude/next-round-footer.md" "$FOOTER_FALLBACK" \
     "NEXT_SUMMARY_FILE=$NEXT_SUMMARY_FILE" >> "$NEXT_PROMPT_FILE"
 append_task_tag_routing_note "$NEXT_PROMPT_FILE"
 
-# Add push instruction only if push_every_round is true
+# 仅在 push_every_round 为 true 时添加推送指令
 if [[ "$PUSH_EVERY_ROUND" == "true" ]]; then
     PUSH_NOTE=$(load_template "$TEMPLATE_DIR" "claude/push-every-round-note.md" 2>/dev/null)
     if [[ -z "$PUSH_NOTE" ]]; then
@@ -2219,15 +2212,15 @@ if [[ "$PUSH_EVERY_ROUND" == "true" ]]; then
     echo "$PUSH_NOTE" >> "$NEXT_PROMPT_FILE"
 fi
 
-# Add goal tracker update request template
+# 添加目标跟踪器更新请求模板
 GOAL_UPDATE_REQUEST=$(load_template "$TEMPLATE_DIR" "claude/goal-tracker-update-request.md" 2>/dev/null)
 if [[ -z "$GOAL_UPDATE_REQUEST" ]]; then
     GOAL_UPDATE_REQUEST="Include a Goal Tracker Update Request section in your summary if needed."
 fi
 echo "$GOAL_UPDATE_REQUEST" >> "$NEXT_PROMPT_FILE"
 
-# Add agent-teams continuation instructions (only during implementation phase, not review phase)
-# Loads both continuation header and shared core template for full team leader guidance
+# 添加 agent-teams 续接指令（仅在实现阶段，不在审查阶段）
+# 加载续接标题和共享核心模板以获得完整的团队领导指导
 if [[ "$AGENT_TEAMS" == "true" ]] && [[ "$REVIEW_STARTED" != "true" ]]; then
     AGENT_TEAMS_CONTINUE=$(load_template "$TEMPLATE_DIR" "claude/agent-teams-continue.md" 2>/dev/null)
     AGENT_TEAMS_CORE=$(load_template "$TEMPLATE_DIR" "claude/agent-teams-core.md" 2>/dev/null)
@@ -2248,13 +2241,13 @@ AGENT_TEAMS_FALLBACK_EOF
     fi
 fi
 
-# Build system message
+# 构建系统消息
 SYSTEM_MSG="Loop: Round $NEXT_ROUND/$MAX_ITERATIONS - Codex found issues to address"
 if [[ "$DRIFT_REPLAN_REQUIRED" == "true" ]]; then
     SYSTEM_MSG="Loop: Round $NEXT_ROUND/$MAX_ITERATIONS - Mainline drift detected, replan required"
 fi
 
-# Block exit and send review feedback
+# 阻止退出并发送审查反馈
 jq -n \
     --arg reason "$(cat "$NEXT_PROMPT_FILE")" \
     --arg msg "$SYSTEM_MSG" \

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Helper script to set up monitor test environment
-# This script creates the necessary directory structure and state files
-# for testing the monitor command.
+# 辅助脚本：设置监控器测试环境
+# 此脚本创建必要的目录结构和状态文件，
+# 用于测试 monitor 命令。
 #
-# Usage: ./setup-monitor-test-env.sh <test_dir> <test_name>
+# 用法：./setup-monitor-test-env.sh <test_dir> <test_name>
 #
 
 set -euo pipefail

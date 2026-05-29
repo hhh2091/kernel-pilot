@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Helper script to check for incomplete tasks from Claude Code.
+辅助脚本，用于检查 Claude Code 中未完成的任务。
 
-Supports both:
-- Legacy TodoWrite tool (parsed from transcript)
-- New Task system (read directly from ~/.claude/tasks/<session_id>/)
+同时支持：
+- 旧版 TodoWrite 工具（从 transcript 中解析）
+- 新版 Task 系统（直接从 ~/.claude/tasks/<session_id>/ 读取）
 
-Exit codes:
-  0 - All tasks are completed (or no tasks exist)
-  1 - There are incomplete tasks (details on stdout)
-  2 - Parse error reading hook input JSON
+退出码：
+  0 - 所有任务已完成（或不存在任务）
+  1 - 存在未完成的任务（详情输出到 stdout）
+  2 - 解析 hook 输入 JSON 时出错
 
-Usage:
+用法：
     echo '{"session_id": "...", "transcript_path": "/path/to/transcript.jsonl"}' | python3 check-todos-from-transcript.py
 """
 import json
@@ -25,7 +25,7 @@ LANE_PREFIX_PATTERN = re.compile(r"^\s*\[(mainline|blocking|queued)\](?:\s|$)", 
 
 
 def classify_lane(*parts: str) -> str:
-    """Infer the task lane from content, defaulting to blocking for safety."""
+    """从内容推断任务通道，默认为 blocking 以确保安全。"""
     for part in parts:
         if not part:
             continue
@@ -37,13 +37,13 @@ def classify_lane(*parts: str) -> str:
 
 def extract_tool_calls_from_entry(entry: dict) -> List[Tuple[str, dict]]:
     """
-    Extract tool calls from a transcript entry.
-    Returns list of (tool_name, tool_input) tuples.
+    从 transcript 条目中提取工具调用。
+    返回 (tool_name, tool_input) 元组的列表。
     """
     tool_calls = []
     entry_type = entry.get("type", "")
 
-    # Pattern 1 & 2: Extract content list from assistant or message entries
+    # 模式 1 和 2：从 assistant 或 message 条目中提取内容列表
     if entry_type == "assistant":
         content = entry.get("message", {}).get("content", [])
     elif entry_type == "message":
@@ -51,7 +51,7 @@ def extract_tool_calls_from_entry(entry: dict) -> List[Tuple[str, dict]]:
     else:
         content = []
 
-    # Extract tool calls from content list
+    # 从内容列表中提取工具调用
     if isinstance(content, list):
         for block in content:
             if isinstance(block, dict) and block.get("type") == "tool_use":
@@ -60,7 +60,7 @@ def extract_tool_calls_from_entry(entry: dict) -> List[Tuple[str, dict]]:
                 if tool_name:
                     tool_calls.append((tool_name, tool_input))
 
-    # Pattern 3: Direct tool_use entry
+    # 模式 3：直接的 tool_use 条目
     if entry_type == "tool_use":
         tool_name = entry.get("name", "") or entry.get("tool_name", "")
         tool_input = entry.get("input", {}) or entry.get("tool_input", {})
@@ -72,14 +72,14 @@ def extract_tool_calls_from_entry(entry: dict) -> List[Tuple[str, dict]]:
 
 def find_incomplete_todos_from_transcript(transcript_path: Path) -> List[dict]:
     """
-    Parse transcript JSONL and find incomplete legacy todos (TodoWrite only).
+    解析 transcript JSONL 并查找未完成的旧版待办事项（仅 TodoWrite）。
 
-    Returns list of incomplete items with 'status' and 'content' keys.
+    返回包含 'status' 和 'content' 键的未完成项目列表。
     """
     if not transcript_path.exists():
         return []
 
-    # Legacy: track the most recent TodoWrite todos
+    # 旧版：跟踪最近的 TodoWrite 待办事项
     latest_todos = []
 
     with open(transcript_path, 'r', encoding='utf-8') as f:
@@ -93,15 +93,15 @@ def find_incomplete_todos_from_transcript(transcript_path: Path) -> List[dict]:
             except json.JSONDecodeError:
                 continue
 
-            # Extract all tool calls from this entry
+            # 从此条目中提取所有工具调用
             for tool_name, tool_input in extract_tool_calls_from_entry(entry):
-                # Legacy: TodoWrite
+                # 旧版：TodoWrite
                 if tool_name == "TodoWrite":
                     todos = tool_input.get("todos", [])
                     if todos:
                         latest_todos = todos
 
-    # Build list of incomplete items from legacy todos
+    # 从旧版待办事项构建未完成项目列表
     incomplete = []
     for todo in latest_todos:
         status = todo.get("status", "")
@@ -122,16 +122,16 @@ def find_incomplete_todos_from_transcript(transcript_path: Path) -> List[dict]:
 
 def find_incomplete_tasks_from_directory(session_id: str, tasks_base_dir: str = "") -> List[dict]:
     """
-    Read task files directly from ~/.claude/tasks/<session_id>/ directory.
+    直接从 ~/.claude/tasks/<session_id>/ 目录读取任务文件。
 
-    This is the authoritative source for task state, as it reflects
-    the actual in-memory task list that Claude Code maintains.
+    这是任务状态的权威来源，因为它反映了
+    Claude Code 维护的实际内存中的任务列表。
 
     Args:
-        session_id: The Claude Code session ID
-        tasks_base_dir: Optional override for tasks base directory (for testing)
+        session_id: Claude Code 的会话 ID
+        tasks_base_dir: 可选的任务基础目录覆盖（用于测试）
 
-    Returns list of incomplete items with 'status' and 'content' keys.
+    返回包含 'status' 和 'content' 键的未完成项目列表。
     """
     if tasks_base_dir:
         tasks_dir = Path(tasks_base_dir) / session_id
@@ -148,10 +148,10 @@ def find_incomplete_tasks_from_directory(session_id: str, tasks_base_dir: str = 
 
             status = task.get("status", "pending")
             if status not in ("completed", "deleted"):
-                # Task is incomplete
+                # 任务未完成
                 subject = task.get("subject", "")
                 description = task.get("description", "")
-                task_id = task_file.stem  # Filename without .json
+                task_id = task_file.stem  # 文件名去掉 .json 后缀
                 content = subject or description or f"Task {task_id}"
                 lane = classify_lane(subject, description)
                 if lane == "queued":
@@ -164,44 +164,44 @@ def find_incomplete_tasks_from_directory(session_id: str, tasks_base_dir: str = 
                     "lane": lane,
                 })
         except (json.JSONDecodeError, OSError):
-            # Skip malformed or unreadable task files
+            # 跳过格式错误或无法读取的任务文件
             continue
 
     return incomplete
 
 
 def main():
-    # Read hook input from stdin
+    # 从 stdin 读取 hook 输入
     try:
         stdin_content = sys.stdin.read().strip()
         if not stdin_content:
-            # Empty input - no data available, allow proceeding
+            # 空输入 - 没有可用数据，允许继续执行
             sys.exit(0)
         hook_input = json.loads(stdin_content)
     except json.JSONDecodeError as e:
-        # Parse error - exit with code 2
+        # 解析错误 - 以代码 2 退出
         print(f"PARSE_ERROR: {e}", file=sys.stderr)
         sys.exit(2)
 
     incomplete_items = []
 
-    # Check new Task system using external task directory (authoritative source)
+    # 使用外部任务目录检查新版 Task 系统（权威来源）
     session_id = hook_input.get("session_id", "")
-    tasks_base_dir = hook_input.get("tasks_base_dir", "")  # For testing
+    tasks_base_dir = hook_input.get("tasks_base_dir", "")  # 用于测试
     if session_id:
         incomplete_items.extend(find_incomplete_tasks_from_directory(session_id, tasks_base_dir))
 
-    # Check legacy TodoWrite from transcript
+    # 从 transcript 检查旧版 TodoWrite
     transcript_path = hook_input.get("transcript_path", "")
     if transcript_path:
         transcript_path = Path(transcript_path).expanduser()
         incomplete_items.extend(find_incomplete_todos_from_transcript(transcript_path))
 
     if not incomplete_items:
-        # No incomplete items, allow proceeding
+        # 没有未完成的项目，允许继续执行
         sys.exit(0)
 
-    # Format output
+    # 格式化输出
     output_lines = []
     for item in incomplete_items:
         status = item.get("status", "unknown")
@@ -215,7 +215,7 @@ def main():
         else:
             output_lines.append(f"  - [{status}] {lane_marker} {content}")
 
-    # Output marker and incomplete items both to stdout
+    # 将标记和未完成项目都输出到 stdout
     print("INCOMPLETE_TODOS")
     print("\n".join(output_lines))
     sys.exit(1)

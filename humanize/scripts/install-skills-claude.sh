@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Install/upgrade KernelPilot Humanize for Claude Code.
+# 为 Claude Code 安装/升级 KernelPilot Humanize。
 #
-# Claude Code plugin installation copies the plugin into ~/.claude/plugins/cache
-# but does not hydrate SKILL.md placeholders. This wrapper performs the normal
-# marketplace install, exposes KernelWiki and ncu-report-skill as Claude skills,
-# hydrates the installed plugin cache, and verifies the result.
+# Claude Code 插件安装将插件复制到 ~/.claude/plugins/cache，
+# 但不会填充 SKILL.md 占位符。此包装器执行正常的市场安装，
+# 将 KernelWiki 和 ncu-report-skill 暴露为 Claude 技能，
+# 填充已安装的插件缓存，并验证结果。
 #
 
 set -euo pipefail

@@ -1,20 +1,19 @@
-"""Per-session, per-file log streaming logic for the dashboard.
+"""仪表板的每会话、每文件日志流逻辑。
 
-Implements the snapshot+append+resync+eof event sequence frozen in
-``docs/streaming-protocol.md``. The module is pure logic: it does not
-own a poll loop or HTTP transport. Callers drive ``poll()`` and turn
-the returned event dicts into SSE frames or any other transport.
+实现冻结在 ``docs/streaming-protocol.md`` 中的
+snapshot+append+resync+eof 事件序列。该模块是纯逻辑：
+它不拥有轮询循环或 HTTP 传输。调用者驱动 ``poll()`` 并将
+返回的事件字典转换为 SSE 帧或任何其他传输。
 
-Event shape (matches the contract):
+事件形状（匹配契约）：
 
     {"type": "snapshot", "path": <basename>, "offset": <int>, "bytes_b64": <str>, "eof": <bool>}
     {"type": "append",   "path": <basename>, "offset": <int>, "bytes_b64": <str>}
     {"type": "resync",   "path": <basename>, "reason": "truncated|rotated|recreated|missing|overflow"}
     {"type": "eof",      "path": <basename>}
 
-The streamer assigns a strictly increasing ``id`` per stream and
-retains the last 256 events for ``Last-Event-Id`` reconnects (per the
-contract). Larger snapshots are chunked at 64 KiB.
+流式传输器为每个流分配严格递增的 ``id``，并为 ``Last-Event-Id``
+重连保留最后 256 个事件（按契约）。较大的快照按 64 KiB 分块。
 """
 
 from __future__ import annotations
@@ -28,14 +27,12 @@ from typing import Deque, Dict, List, Optional, Tuple
 
 SNAPSHOT_CHUNK_BYTES = 64 * 1024
 EVENT_RETENTION = 256
-# Idle-TTL for ``LogStreamRegistry`` entries that reach refcount=0
-# without having emitted EOF. After this many seconds with no active
-# consumer the stream is evicted even if its session is still live;
-# a later reconnect gets a fresh LogStream (the streaming contract's
-# out-of-window ``resync(overflow)`` path handles that cleanly). Keep
-# long enough to cover page reloads and brief tab switches, short
-# enough that briefly-opened sessions don't hold their retention
-# deque for the whole process lifetime.
+# ``LogStreamRegistry`` 条目的空闲 TTL，这些条目在未发出 EOF 的
+# 情况下达到 refcount=0。在没有活跃消费者的这么多秒后，即使
+# 会话仍然活跃，流也会被驱逐；后续重连会获得一个新的 LogStream
+# （流式契约的窗口外 ``resync(overflow)`` 路径可以干净地处理）。
+# 保持足够长以覆盖页面刷新和短暂的标签切换，足够短以便短暂
+# 打开的会话不会在整个进程生命周期中持有其保留双端队列。
 IDLE_STREAM_TTL_SECONDS = 300.0
 
 EVENT_SNAPSHOT = "snapshot"
@@ -55,7 +52,7 @@ def _b64(data: bytes) -> str:
 
 
 def _stat_id(path: str) -> Optional[Tuple[int, int]]:
-    """Return ``(st_dev, st_ino)`` for ``path`` or ``None`` if absent."""
+    """返回 ``path`` 的 ``(st_dev, st_ino)``，如果不存在则返回 ``None``。"""
     try:
         st = os.stat(path)
     except (OSError, FileNotFoundError):
@@ -71,32 +68,29 @@ def _file_size(path: str) -> Optional[int]:
 
 
 class LogStream:
-    """One streaming channel for one (session, filename) pair.
+    """一个 (session, filename) 对的一个流式通道。
 
-    A stream is created with the basename of the cache log file (e.g.
-    ``round-3-codex-run.log``) and the absolute path to the parent
-    cache directory. The basename is what appears in the ``path``
-    field of every emitted event so clients only see relative names.
+    流使用缓存日志文件的基本名（例如 ``round-3-codex-run.log``）
+    和父缓存目录的绝对路径创建。基本名是每个发出的事件中
+    ``path`` 字段中出现的内容，因此客户端只看到相对名称。
 
-    Lifecycle:
+    生命周期：
 
-    - ``snapshot()`` — issue zero or more ``snapshot`` events covering
-      the bytes already on disk. May be called multiple times during
-      reconnect; the second call resets internal counters before
-      replaying from offset 0.
-    - ``poll()`` — observe the file once; emit ``append`` if new bytes
-      appeared, ``resync`` followed by a fresh snapshot if the file
-      shrank or its inode changed, ``resync`` with reason ``missing``
-      if the file disappeared, or no events when nothing changed.
-    - ``mark_eof()`` — caller signals that the writer has closed (the
-      session reached a terminal state); a single ``eof`` event is
-      emitted and subsequent ``poll()`` calls are no-ops.
+    - ``snapshot()`` — 发出零个或多个覆盖磁盘上已有字节的
+      ``snapshot`` 事件。在重连期间可以多次调用；第二次调用
+      在从偏移 0 重放之前重置内部计数器。
+    - ``poll()`` — 观察文件一次；如果出现新字节则发出
+      ``append``，如果文件缩小或其 inode 更改则发出 ``resync``
+      后跟新鲜快照，如果文件消失则发出原因 ``missing`` 的
+      ``resync``，或者在没有变化时不发出事件。
+    - ``mark_eof()`` — 调用者发出写入器已关闭的信号（会话
+      达到终端状态）；发出单个 ``eof`` 事件，后续的 ``poll()``
+      调用为空操作。
 
-    Events are returned with a monotonic per-stream id. ``replay``
-    serves a ``Last-Event-Id`` reconnect by returning all retained
-    events newer than the supplied id; if the id is out of the
-    retention window it returns a ``resync(overflow)`` plus a fresh
-    snapshot path that the caller should run through ``snapshot()``.
+    事件以单调递增的每流 id 返回。``replay`` 通过返回比提供的
+    id 更新的所有保留事件来服务 ``Last-Event-Id`` 重连；如果 id
+    超出保留窗口，它返回 ``resync(overflow)`` 加上调用者应该
+    通过 ``snapshot()`` 运行的新鲜快照路径。
     """
 
     def __init__(self, cache_dir: str, basename: str):
@@ -109,37 +103,35 @@ class LogStream:
         self._eof_emitted = False
         self._retained: Deque[Dict] = deque(maxlen=EVENT_RETENTION)
         self._missing_emitted = False
-        # Set by any ``resync`` path (truncated/rotated/recreated) when
-        # the follow-up ``_snapshot_locked`` saw a transiently-empty
-        # file — a common race on CI when the file-system watcher
-        # fires between the writer's ``open('wb')`` (which truncates
-        # to 0) and its subsequent ``write``. While this flag is set,
-        # the next poll that observes content treats the bytes as a
-        # fresh snapshot rather than appending them to the pre-resync
-        # stream, so the protocol's resync→snapshot sequencing is
-        # preserved even when the file starts empty post-resync.
+        # 由任何 ``resync`` 路径（truncated/rotated/recreated）在
+        # 后续的 ``_snapshot_locked`` 看到瞬时空文件时设置——
+        # 这是 CI 上的常见竞态，当文件系统监视器在写入器的
+        # ``open('wb')``（截断为 0）和其后续 ``write`` 之间
+        # 触发时。当此标志被设置时，观察到内容的下一次轮询
+        # 将字节视为新鲜快照，而不是将它们追加到预重同步流中，
+        # 因此即使文件在重同步后开始为空，协议的 resync→snapshot
+        # 排序也被保留。
         self._resync_pending = False
-        # All public mutators (snapshot, poll, mark_eof, replay) acquire
-        # this lock so concurrent SSE handlers can share the same
-        # instance without corrupting offset/retained state. RLock so
-        # that internal helpers that call other public methods (e.g.
-        # the replay overflow path that resets ``_offset``) do not
-        # deadlock themselves.
+        # 所有公共变更器（snapshot、poll、mark_eof、replay）
+        # 获取此锁，以便并发 SSE 处理程序可以共享同一实例
+        # 而不会损坏 offset/retained 状态。RLock 使得调用其他
+        # 公共方法的内部辅助程序（例如重置 ``_offset`` 的
+        # replay overflow 路径）不会死锁。
         self.lock = threading.RLock()
 
     def latest_event_id(self) -> int:
-        """Return the highest event id retained, or 0 if none."""
+        """返回保留的最高事件 id，如果没有则返回 0。"""
         with self.lock:
             return self._retained[-1]["id"] if self._retained else 0
 
     @property
     def eof_emitted(self) -> bool:
-        """Public view of the ``_eof_emitted`` flag.
+        """``_eof_emitted`` 标志的公共视图。
 
-        The registry's release path consults this to decide whether a
-        stream with no active clients can be evicted — once EOF has
-        been delivered nobody will receive retained events, so the
-        retention buffer (up to 256 base64 payloads) is safe to free.
+        注册表的释放路径查询此标志以决定没有活跃客户端的流
+        是否可以被驱逐——一旦 EOF 已交付，没有人会收到保留的
+        事件，因此保留缓冲区（最多 256 个 base64 负载）可以
+        安全释放。
         """
         with self.lock:
             return self._eof_emitted
@@ -151,7 +143,7 @@ class LogStream:
         return event_with_id
 
     def snapshot(self) -> List[Dict]:
-        """Emit snapshot events for everything already on disk."""
+        """为磁盘上已有的一切发出快照事件。"""
         with self.lock:
             return self._snapshot_locked()
 
@@ -195,7 +187,7 @@ class LogStream:
         return events
 
     def poll(self) -> List[Dict]:
-        """Observe the file once and emit any events that occurred."""
+        """观察文件一次并发出发生的任何事件。"""
         with self.lock:
             return self._poll_locked()
 
@@ -219,7 +211,7 @@ class LogStream:
             return events
 
         if self._missing_emitted:
-            # File came back; treat as a recreation.
+            # 文件回来了；视为重新创建。
             events.append(self._emit({
                 "type": EVENT_RESYNC,
                 "path": self.basename,
@@ -230,10 +222,9 @@ class LogStream:
             self._stat = stat
             snap = self._snapshot_locked()
             events.extend(snap)
-            # If the file is transiently empty post-resync (watcher
-            # fired mid-write), defer snapshot delivery to the next
-            # poll so the resync is followed by a real snapshot event
-            # rather than an append when content finally lands.
+            # 如果文件在重同步后瞬时为空（监视器在写入中途触发），
+            # 将快照交付推迟到下一次轮询，以便重同步后跟的是真正的
+            # 快照事件，而不是内容最终落地时的追加。
             self._resync_pending = not snap
             return events
 
@@ -265,10 +256,9 @@ class LogStream:
 
         if size > self._offset:
             if self._resync_pending:
-                # Post-resync content that could not be snapshotted on
-                # the prior poll (file was 0 bytes at the time). Emit
-                # it as a snapshot now so clients still observe the
-                # contract's resync→snapshot sequence.
+                # 后重同步内容，无法在之前的轮询上进行快照
+                # （当时文件为 0 字节）。现在将其作为快照发出，
+                # 以便客户端仍然遵守契约的 resync→snapshot 序列。
                 snap = self._snapshot_locked()
                 events.extend(snap)
                 if self._offset >= size:
@@ -282,7 +272,7 @@ class LogStream:
                 return events
             try:
                 f.seek(self._offset)
-                # Chunk appends so any individual event stays bounded.
+                # 分块追加，使任何单个事件保持有界。
                 start = self._offset
                 remaining = new_bytes
                 while remaining > 0:
@@ -305,7 +295,7 @@ class LogStream:
         return events
 
     def mark_eof(self) -> List[Dict]:
-        """Emit a single ``eof`` event; subsequent polls are no-ops."""
+        """发出单个 ``eof`` 事件；后续轮询为空操作。"""
         with self.lock:
             if self._eof_emitted:
                 return []
@@ -313,11 +303,11 @@ class LogStream:
             return [self._emit({"type": EVENT_EOF, "path": self.basename})]
 
     def replay(self, last_event_id: int) -> Tuple[List[Dict], bool]:
-        """Return retained events newer than ``last_event_id``.
+        """返回比 ``last_event_id`` 更新的保留事件。
 
-        Returns ``(events, in_window)``. When ``in_window`` is False the
-        caller MUST call ``snapshot()`` again after consuming any
-        events; the helper has already emitted a ``resync(overflow)``.
+        返回 ``(events, in_window)``。当 ``in_window`` 为 False 时，
+        调用者在消费任何事件后必须再次调用 ``snapshot()``；
+        辅助程序已经发出了 ``resync(overflow)``。
         """
         with self.lock:
             if not self._retained:
@@ -336,50 +326,45 @@ class LogStream:
 
 
 def stream_url_path(session_id: str, basename: str) -> str:
-    """Canonical SSE URL path for one stream."""
+    """一个流的规范 SSE URL 路径。"""
     return f"/api/sessions/{session_id}/logs/{basename}"
 
 
 class LogStreamRegistry:
-    """Process-lifetime registry of LogStream instances.
+    """LogStream 实例的进程生命周期注册表。
 
-    Keyed by ``(session_id, basename)``. Concurrent SSE handlers
-    share the same instance so retained event history survives
-    client reconnects and the contract's ``Last-Event-Id`` semantics
-    are honored. Without this registry, each request would construct
-    a fresh ``LogStream`` with empty retention and a reconnect would
-    emit the file body as ``append`` from offset 0 instead of
-    replaying or emitting ``resync(overflow)`` + ``snapshot``.
+    以 ``(session_id, basename)`` 为键。并发 SSE 处理程序
+    共享同一实例，以便保留的事件历史在客户端重连中存活
+    并且契约的 ``Last-Event-Id`` 语义得到遵守。没有此注册表，
+    每个请求都会构造一个具有空保留的新 ``LogStream``，重连
+    会将文件正文作为从偏移 0 的 ``append`` 发出，而不是
+    重放或发出 ``resync(overflow)`` + ``snapshot``。
     """
 
     def __init__(self, idle_ttl_seconds: float = IDLE_STREAM_TTL_SECONDS):
         self._streams: Dict[Tuple[str, str], LogStream] = {}
-        # Per-key active-consumer refcount. ``acquire`` / ``release``
-        # pair around each SSE generator so the registry can drop a
-        # stream (and its retention buffer) once the final client has
-        # disconnected AND EOF has already been delivered. Live
-        # sessions without a current client keep their stream resident
-        # so reconnects still hit the 256-event replay window that
-        # the streaming contract mandates.
+        # 每键活跃消费者引用计数。每个 SSE 生成器周围的
+        # ``acquire`` / ``release`` 配对，以便在最终客户端
+        # 断开连接且 EOF 已交付后，注册表可以丢弃流（及其
+        # 保留缓冲区）。没有当前客户端的活跃会话保持流驻留，
+        # 以便重连仍然命中流式契约要求的 256 事件重放窗口。
         self._refcounts: Dict[Tuple[str, str], int] = {}
-        # Monotonic timestamp recorded whenever a stream's refcount
-        # reaches zero without EOF (active-session disconnect). The
-        # idle-TTL sweep in ``release`` uses this to evict entries
-        # that would otherwise accumulate when users briefly open
-        # many active sessions and never revisit them; the streaming
-        # contract's ``resync(overflow)`` path handles the late
-        # reconnect case when a client comes back after eviction.
+        # 每当流的引用计数在没有 EOF 的情况下达到零时记录的
+        # 单调时间戳（活跃会话断开连接）。``release`` 中的
+        # 空闲 TTL 扫描使用此来驱逐否则会在用户短暂打开
+        # 多个活跃会话且从不重新访问时累积的条目；流式契约的
+        # ``resync(overflow)`` 路径处理客户端在驱逐后回来时的
+        # 延迟重连情况。
         self._idle_since: Dict[Tuple[str, str], float] = {}
         self._idle_ttl_seconds = idle_ttl_seconds
         self._lock = threading.Lock()
 
     def get_or_create(self, cache_dir: str, session_id: str, basename: str) -> LogStream:
-        """Return the registry-owned stream, creating it if needed.
+        """返回注册表拥有的流，如果需要则创建。
 
-        Does NOT change the refcount. Tests use this to inspect
-        registry sharing semantics; the SSE route uses ``acquire`` /
-        ``release`` instead so the stream is evicted once its last
-        client disconnects.
+        不改变引用计数。测试使用此来检查注册表共享语义；
+        SSE 路由改用 ``acquire`` / ``release``，以便在最后一个
+        客户端断开连接时流被驱逐。
         """
         key = (session_id, basename)
         with self._lock:
@@ -390,49 +375,45 @@ class LogStreamRegistry:
             return stream
 
     def acquire(self, cache_dir: str, session_id: str, basename: str) -> LogStream:
-        """Get-or-create the stream and record one active consumer.
+        """获取或创建流并记录一个活跃消费者。
 
-        Must be paired with :meth:`release` — typically from the
-        ``finally`` block of the SSE generator so normal EOF, client
-        disconnect, and exception paths all balance the refcount.
+        必须与 :meth:`release` 配对——通常来自 SSE 生成器的
+        ``finally`` 块，以便正常 EOF、客户端断开连接和异常
+        路径都平衡引用计数。
         """
         key = (session_id, basename)
         with self._lock:
-            # Every new acquire is also a chance to drop OTHER entries
-            # whose idle TTL has elapsed without a follow-up release.
-            # Without this, a refcount=0 stream that is never released
-            # again (one-off disconnect on a long-lived session) would
-            # stay resident for the process lifetime and leak its
-            # retention deque.
+            # 每次新的获取也是丢弃其他空闲 TTL 已过期但没有
+            # 后续释放的条目的机会。没有这个，永远不会再次
+            # 释放的 refcount=0 流（长期会话上的一次性断开连接）
+            # 会在进程生命周期内保持驻留并泄漏其保留双端队列。
             self._sweep_idle_streams_locked()
             stream = self._streams.get(key)
             if stream is None:
                 stream = LogStream(cache_dir, basename)
                 self._streams[key] = stream
             self._refcounts[key] = self._refcounts.get(key, 0) + 1
-            # Reset idle clock: a new consumer means the earlier
-            # idle-since timestamp no longer applies.
+            # 重置空闲时钟：新消费者意味着之前的空闲时间戳
+            # 不再适用。
             self._idle_since.pop(key, None)
             return stream
 
     def release(self, session_id: str, basename: str) -> None:
-        """Decrement the consumer count and evict idle streams.
+        """减少消费者计数并驱逐空闲流。
 
-        Eviction strategy:
-        - refcount reaches zero AND the stream has emitted ``eof`` →
-          drop immediately; no future client needs the retention deque.
-        - refcount reaches zero without EOF → start an idle timer for
-          this key so the eventual sweep (below) can evict it once
-          ``IDLE_STREAM_TTL_SECONDS`` elapse with no reconnect. The
-          stream stays resident for the TTL window so the common
-          page-reload-then-reconnect flow still hits the 256-event
-          ``Last-Event-Id`` replay window the contract mandates.
-        - every release also sweeps the registry for OTHER entries
-          whose idle timer has expired. Without this sweep, streams
-          whose clients disconnected before the session terminated
-          (and whose sessions later ended silently with no other
-          poll) would live for the entire process lifetime — the
-          very leak Codex flagged in Round 23.
+        驱逐策略：
+        - 引用计数达到零且流已发出 ``eof`` → 立即丢弃；
+          未来的客户端不需要保留双端队列。
+        - 引用计数达到零但没有 EOF → 为此键启动空闲计时器，
+          以便最终扫描（下面）在 ``IDLE_STREAM_TTL_SECONDS``
+          过期且没有重连时驱逐它。流在 TTL 窗口内保持驻留，
+          以便常见的页面刷新然后重连流程仍然命中契约要求的
+          256 事件 ``Last-Event-Id`` 重放窗口。
+        - 每次释放还扫描注册表中其他空闲计时器已过期的条目。
+          没有此扫描，在会话终止前客户端断开连接的流（且其
+          会话后来在没有其他轮询的情况下静默结束）会在整个
+          进程生命周期内存活——这正是 Codex 在第 23 轮标记
+          的泄漏。
         """
         key = (session_id, basename)
         with self._lock:
@@ -446,22 +427,20 @@ class LogStreamRegistry:
                 self._streams.pop(key, None)
                 self._idle_since.pop(key, None)
             else:
-                # No EOF yet: start the idle timer so the sweep below
-                # (and every future release) can eventually evict this
-                # stream if no one reconnects.
+                # 尚未 EOF：启动空闲计时器，以便下面的扫描
+                # （以及每次未来的释放）最终可以在没有人重连时
+                # 驱逐此流。
                 self._idle_since[key] = time.monotonic()
             self._sweep_idle_streams_locked()
 
     def _sweep_idle_streams_locked(self) -> None:
-        """Drop refcount=0 entries whose idle TTL has elapsed.
+        """丢弃空闲 TTL 已过期的 refcount=0 条目。
 
-        Called from within ``release`` while holding ``self._lock``.
-        Every release doubles as an opportunistic sweep so idle
-        retention buffers do not accumulate even when the sessions
-        they belong to never reach a terminal state during the
-        browser's visit. Keeps the operation O(N) in registry size,
-        which in practice stays small (dozens of unique session logs
-        per dashboard instance).
+        从 ``release`` 内部调用，同时持有 ``self._lock``。
+        每次释放同时作为机会性扫描，因此即使它们所属的会话
+        在浏览器访问期间从未达到终端状态，空闲保留缓冲区
+        也不会累积。保持操作在注册表大小上为 O(N)，实际中
+        保持较小（每个仪表板实例数十个唯一会话日志）。
         """
         if not self._idle_since:
             return
@@ -480,13 +459,12 @@ class LogStreamRegistry:
             return self._streams.get((session_id, basename))
 
     def streams_in_cache_dir(self, cache_dir: str, basename: str) -> List[LogStream]:
-        """Return all streams that observe a specific cache file."""
+        """返回观察特定缓存文件的所有流。"""
         with self._lock:
-            # Piggyback a sweep: this method is invoked from the cache
-            # watcher callback on every observed write, so leveraging
-            # it keeps idle eviction driven by ongoing activity rather
-            # than only by the next ``release()`` call, which may
-            # never happen on long-lived dashboards with low churn.
+            # 搭载扫描：此方法在每次观察到的写入时从缓存监视器
+            # 回调调用，因此利用它使空闲驱逐由持续活动驱动，
+            # 而不是仅由下一次 ``release()`` 调用驱动，后者在
+            # 低变更率的长期仪表板上可能永远不会发生。
             self._sweep_idle_streams_locked()
             return [
                 s for s in self._streams.values()

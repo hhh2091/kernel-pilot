@@ -1,8 +1,8 @@
-"""Export RLCR session data as Markdown reports."""
+"""将 RLCR 会话数据导出为 Markdown 报告。"""
 
 
 def _resolve_content(value, lang='en'):
-    """Extract string content from a bilingual {zh, en} dict or plain string."""
+    """从双语 {zh, en} 字典或纯字符串中提取字符串内容。"""
     if value is None:
         return None
     if isinstance(value, str):
@@ -13,21 +13,20 @@ def _resolve_content(value, lang='en'):
 
 
 def export_session_markdown(session, lang='en'):
-    """Generate a structured Markdown report for a session."""
+    """为会话生成结构化的 Markdown 报告。"""
     lines = []
     sid = session['id']
     lines.append(f"# RLCR Session Report — {sid}\n")
 
-    # Overview table
+    # 概览表
     lines.append("## Overview\n")
     lines.append("| Metric | Value |")
     lines.append("|--------|-------|")
     lines.append(f"| Status | {session['status'].capitalize()} |")
-    # ``current_round`` is a 0-based index — a session that only
-    # finished round 0 reports ``current_round=0`` with one entry
-    # in ``rounds``. Use the parsed rounds list length so the
-    # exported Markdown reflects the true completed-round count
-    # instead of underreporting every session by one.
+    # ``current_round`` 是从 0 开始的索引——一个只完成了第 0 轮的
+    # 会话报告 ``current_round=0``，同时 ``rounds`` 中有一个条目。
+    # 使用解析后的轮次列表长度，以便导出的 Markdown 反映真实的
+    # 已完成轮次计数，而不是对每个会话少报一轮。
     lines.append(f"| Rounds | {len(session.get('rounds') or [])} |")
     lines.append(f"| Plan | {session.get('plan_file', 'N/A')} |")
     lines.append(f"| Branch | {session.get('start_branch', 'N/A')} |")
@@ -41,7 +40,7 @@ def export_session_markdown(session, lang='en'):
         lines.append(f"| AC Completion | {ac_done}/{ac_total} ({round(ac_done/ac_total*100)}%) |")
     lines.append("")
 
-    # Round history
+    # 轮次历史
     if session.get('rounds'):
         lines.append("## Round History\n")
         for r in session['rounds']:
@@ -67,7 +66,7 @@ def export_session_markdown(session, lang='en'):
                 lines.append(review_text)
                 lines.append("")
 
-    # Goal Tracker
+    # 目标跟踪器
     gt = session.get('goal_tracker')
     if gt:
         lines.append("## Goal Tracker\n")
@@ -80,7 +79,7 @@ def export_session_markdown(session, lang='en'):
                 lines.append(f"- {status_icon} **{ac['id']}**: {ac['description']}")
             lines.append("")
 
-    # Methodology analysis
+    # 方法论分析
     report_text = _resolve_content(session.get('methodology_report'), lang)
     if report_text:
         lines.append("## Methodology Analysis\n")

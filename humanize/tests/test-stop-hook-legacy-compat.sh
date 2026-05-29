@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Tests for legacy compatibility fixes in loop-codex-stop-hook.sh
+# loop-codex-stop-hook.sh 中旧版兼容性修复的测试
 #
-# Covers:
-# - Untracked legacy .humanize-* directories do not trigger git-dirty blocks
-# - Untracked .humanizeconfig still triggers git-dirty blocks as a real file
-# - Legacy loops without bitlesson_required stay disabled even if
-#   .humanize/bitlesson.md exists
+# 覆盖：
+# - 未跟踪的旧版 .humanize-* 目录不会触发 git 脏阻止
+# - 未跟踪的 .humanizeconfig 仍作为真实文件触发 git 脏阻止
+# - 没有 bitlesson_required 的旧版循环即使存在
+#   .humanize/bitlesson.md 也保持禁用
 #
 
 set -euo pipefail
@@ -84,8 +84,8 @@ agent_teams: false
 ---
 EOF
 
-    # Intentionally omit BitLesson Delta in the summary so the legacy
-    # bitlesson_required fallback would block before Codex if it regresses.
+    # 故意在摘要中省略 BitLesson Delta，使旧版 bitlesson_required
+    # 回退在回归时会在 Codex 之前阻止。
     cat > "$loop_dir/round-0-summary.md" << 'EOF'
 # Summary
 
@@ -163,9 +163,9 @@ echo "Test 1b: Untracked .humanizeconfig still blocks dirty checks"
 TEST1B_REPO="$TEST_DIR/test1b"
 create_stop_hook_fixture "$TEST1B_REPO"
 touch "$TEST1B_REPO/.humanizeconfig"
-# Also create a .humanize-old directory to trigger the "Special Case" note.
-# The .humanize/ directory itself may be covered by a global gitignore
-# so it might not appear as untracked; .humanize-old/ is never globally ignored.
+# 同时创建 .humanize-old 目录以触发"特殊情况"说明。
+# .humanize/ 目录本身可能被全局 gitignore 覆盖，因此可能
+# 不会显示为未跟踪；.humanize-old/ 永远不会被全局忽略。
 mkdir -p "$TEST1B_REPO/.humanize-old"
 echo "legacy" > "$TEST1B_REPO/.humanize-old/legacy.txt"
 run_stop_hook "$TEST1B_REPO"

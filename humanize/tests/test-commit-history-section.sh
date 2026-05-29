@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Test script for the Integral (I) component: commit-history-section
+# 积分 (I) 组件的测试脚本：commit-history-section
 #
-# Validates:
-# 1. Round 0: "(no commits yet)" and "(first round, no prior history)"
-# 2. Round 2+: commit log and round file references rendered correctly
-# 3. Corrupted BASE_COMMIT: graceful fallback with annotation
-# 4. Template missing: fallback renders the full section including round files
+# 验证：
+# 1. 第 0 轮："(no commits yet)" 和 "(first round, no prior history)"
+# 2. 第 2+ 轮：提交日志和轮次文件引用正确渲染
+# 3. 损坏的 BASE_COMMIT：带注释的优雅回退
+# 4. 模板缺失：回退渲染完整的部分，包括轮次文件
 #
 
 set -euo pipefail
@@ -24,20 +24,20 @@ echo "========================================"
 echo ""
 
 # ========================================
-# Setup: create a temporary git repo
+# 设置：创建临时 git 仓库
 # ========================================
 setup_test_dir
 init_test_git_repo "$TEST_DIR/repo"
 
 # ========================================
-# Test 1: Round 0 - no commits since base, first round
+# 测试 1：第 0 轮 - 基准后无提交，第一轮
 # ========================================
 echo "Test 1: Round 0 - no commits, first round"
 
 CURRENT_ROUND=0
 BASE_COMMIT=$(git -C "$TEST_DIR/repo" rev-parse HEAD)
 
-# No commits since BASE_COMMIT..HEAD (same commit)
+# BASE_COMMIT..HEAD 之间无提交（同一提交）
 COMMIT_HISTORY=$(git -C "$TEST_DIR/repo" log --oneline --no-decorate --reverse "$BASE_COMMIT"..HEAD 2>/dev/null | tail -80)
 [[ -z "$COMMIT_HISTORY" ]] && COMMIT_HISTORY="(no commits yet)"
 
@@ -61,12 +61,12 @@ else
 fi
 
 # ========================================
-# Test 2: Round 3 - with commits and round history
+# 测试 2：第 3 轮 - 带有提交和轮次历史
 # ========================================
 echo ""
 echo "Test 2: Round 3 - commits and round file references"
 
-# Make some commits
+# 创建一些提交
 cd "$TEST_DIR/repo"
 echo "feat1" > feat1.txt && git add feat1.txt && git commit -q -m "feat: add feature 1"
 echo "feat2" > feat2.txt && git add feat2.txt && git commit -q -m "feat: add feature 2"
@@ -114,14 +114,14 @@ else
 fi
 
 # ========================================
-# Test 3: Corrupted BASE_COMMIT - nonexistent object
+# 测试 3：损坏的 BASE_COMMIT - 不存在的对象
 # ========================================
 echo ""
 echo "Test 3: Corrupted BASE_COMMIT graceful fallback"
 
 BAD_COMMIT="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
-# Simulate the exact logic from the stop hook (merge-base --is-ancestor)
+# 模拟停止钩子中的确切逻辑（merge-base --is-ancestor）
 if [[ -n "$BAD_COMMIT" ]] && git -C "$TEST_DIR/repo" merge-base --is-ancestor "$BAD_COMMIT" HEAD 2>/dev/null; then
     COMMIT_HISTORY=$(git -C "$TEST_DIR/repo" log --oneline --no-decorate --reverse "$BAD_COMMIT"..HEAD 2>/dev/null | tail -80)
 else
@@ -143,16 +143,16 @@ else
     fail "Corrupted BASE_COMMIT recent commits" "recent branch commits" "$COMMIT_HISTORY"
 fi
 
-# Verify no crash (we got here = no set -e crash)
+# 验证没有崩溃（我们到达这里 = 没有 set -e 崩溃）
 pass "Corrupted BASE_COMMIT did not crash (set -e safe)"
 
 # ========================================
-# Test 3b: Valid but unrelated commit (not ancestor of HEAD)
+# 测试 3b：有效但无关的提交（不是 HEAD 的祖先）
 # ========================================
 echo ""
 echo "Test 3b: Valid but unrelated BASE_COMMIT (orphan branch)"
 
-# Create an orphan branch with its own commit, then switch back
+# 创建一个带有自己提交的孤儿分支，然后切换回来
 cd "$TEST_DIR/repo"
 ORIG_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git checkout -q --orphan orphan-test
@@ -161,7 +161,7 @@ ORPHAN_COMMIT=$(git rev-parse HEAD)
 git checkout -q "$ORIG_BRANCH"
 cd - > /dev/null
 
-# ORPHAN_COMMIT exists but is NOT an ancestor of HEAD
+# ORPHAN_COMMIT 存在但不是 HEAD 的祖先
 if [[ -n "$ORPHAN_COMMIT" ]] && git -C "$TEST_DIR/repo" merge-base --is-ancestor "$ORPHAN_COMMIT" HEAD 2>/dev/null; then
     COMMIT_HISTORY="should not reach here"
 else
@@ -178,7 +178,7 @@ else
 fi
 
 # ========================================
-# Test 4: Missing template - fallback renders full section
+# 测试 4：模板缺失 - 回退渲染完整部分
 # ========================================
 echo ""
 echo "Test 4: Missing template fallback renders full section"
@@ -193,7 +193,7 @@ for (( r = CURRENT_ROUND - 1; r >= 0 && r >= CURRENT_ROUND - 3; r-- )); do
 "
 done
 
-# Use the exact fallback format from the stop hook
+# 使用停止钩子中的确切回退格式
 COMMIT_HISTORY_SECTION_FALLBACK="## Development History (Integral Context)
 \`\`\`
 ${COMMIT_HISTORY}
@@ -202,7 +202,7 @@ ${COMMIT_HISTORY}
 Read these files before conducting your review to understand the trajectory of work:
 ${RECENT_ROUND_FILES}"
 
-# Point to a non-existent template to force fallback
+# 指向不存在的模板以强制回退
 RESULT=$(load_and_render_safe "$TEMPLATE_DIR" "codex/non-existent-template.md" "$COMMIT_HISTORY_SECTION_FALLBACK" \
     "COMMIT_HISTORY=$COMMIT_HISTORY" \
     "RECENT_ROUND_FILES=$RECENT_ROUND_FILES")
@@ -222,7 +222,7 @@ else
 fi
 
 # ========================================
-# Test 5: Round 1 - only 1 prior round (boundary)
+# 测试 5：第 1 轮 - 仅 1 个先前轮次（边界）
 # ========================================
 echo ""
 echo "Test 5: Round 1 - only 1 prior round"
@@ -244,7 +244,7 @@ else
 fi
 
 # ========================================
-# Test 6: Empty BASE_COMMIT (legacy loop)
+# 测试 6：空的 BASE_COMMIT（旧版循环）
 # ========================================
 echo ""
 echo "Test 6: Empty BASE_COMMIT fallback"
@@ -266,6 +266,6 @@ else
 fi
 
 # ========================================
-# Summary
+# 摘要
 # ========================================
 print_test_summary "Commit History Section (I Component) Tests"

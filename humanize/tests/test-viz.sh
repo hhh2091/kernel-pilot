@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# Tests for the Humanize Viz dashboard functionality
+# Humanize 可视化仪表板功能的测试
 #
-# Tests cover:
-# - viz-start.sh / viz-stop.sh / viz-status.sh script behavior
-# - Python parser module (syntax + basic functionality)
-# - Python analyzer module
-# - Python exporter module
-# - Sanitized issue generation
-# - Setup script viz marker output
-# - Cancel script viz stop integration
+# 测试覆盖：
+# - viz-start.sh / viz-stop.sh / viz-status.sh 脚本行为
+# - Python 解析器模块（语法 + 基本功能）
+# - Python 分析器模块
+# - Python 导出器模块
+# - 清洗后的问题生成
+# - 设置脚本 viz 标记输出
+# - 取消脚本 viz 停止集成
 #
 
 set -euo pipefail
@@ -25,7 +25,7 @@ echo "========================================"
 echo "Humanize Viz Dashboard Tests"
 echo "========================================"
 
-# ─── Pre-check ───
+# ─── 预检查 ───
 if ! command -v python3 &>/dev/null; then
     echo "SKIP: python3 not available"
     exit 0
@@ -34,7 +34,7 @@ fi
 setup_test_dir
 
 # ========================================
-# Test Group 1: Shell Script Validation
+# 测试组 1：Shell 脚本验证
 # ========================================
 echo ""
 echo "Test Group 1: Shell Script Syntax"
@@ -48,7 +48,7 @@ for script in viz-start.sh viz-stop.sh viz-status.sh; do
 done
 
 # ========================================
-# Test Group 2: Python Module Syntax
+# 测试组 2：Python 模块语法
 # ========================================
 echo ""
 echo "Test Group 2: Python Module Syntax"
@@ -62,17 +62,17 @@ for module in parser.py analyzer.py exporter.py app.py watcher.py; do
 done
 
 # ========================================
-# Test Group 3: Parser Tests
+# 测试组 3：解析器测试
 # ========================================
 echo ""
 echo "Test Group 3: Parser Functionality"
 
-# Create a mock RLCR session
+# 创建模拟 RLCR 会话
 MOCK_PROJECT="$TEST_DIR/project"
 MOCK_SESSION="$MOCK_PROJECT/.humanize/rlcr/2026-01-01_12-00-00"
 mkdir -p "$MOCK_SESSION"
 
-# Create state.md
+# 创建 state.md
 cat > "$MOCK_SESSION/state.md" << 'STATE'
 ---
 current_round: 2
@@ -86,7 +86,7 @@ started_at: 2026-01-01T12:00:00Z
 ---
 STATE
 
-# Create goal-tracker.md
+# 创建 goal-tracker.md
 cat > "$MOCK_SESSION/goal-tracker.md" << 'GT'
 ## IMMUTABLE SECTION
 
@@ -120,7 +120,7 @@ Build a test feature.
 |------|-------------|----------------|---------------|-------------------|
 GT
 
-# Create round summaries
+# 创建轮次摘要
 cat > "$MOCK_SESSION/round-0-summary.md" << 'R0'
 # Round 0 Summary
 ## What Was Implemented
@@ -137,14 +137,14 @@ Implemented main feature.
 Action: add
 R1
 
-# Create review result
+# 创建审查结果
 cat > "$MOCK_SESSION/round-0-review-result.md" << 'RR0'
 # Round 0 Review
 Mainline Progress Verdict: ADVANCED
 The implementation is progressing well.
 RR0
 
-# Test parser
+# 测试解析器
 PARSER_OUTPUT=$(python3 -c "
 import sys
 sys.path.insert(0, '$SERVER_DIR')
@@ -215,7 +215,7 @@ else
     fail "Parser tests" "" "$PARSER_OUTPUT"
 fi
 
-# Test malformed session skip
+# 测试格式错误会话跳过
 MALFORMED_SESSION="$MOCK_PROJECT/.humanize/rlcr/2026-01-01_13-00-00"
 mkdir -p "$MALFORMED_SESSION"
 echo "garbage" > "$MALFORMED_SESSION/readme.txt"
@@ -234,12 +234,12 @@ else
     fail "Parser: malformed session skip" "" "$SKIP_OUTPUT"
 fi
 
-# ─── Regression: session_duration_minutes covers full on-disk round range ───
-# When state.current_round lags behind summaries already present on disk
-# (parser expands rounds up to max_disk_round), duration must span every
-# summary file's mtime, not just range(current_round+1). Fixture: two
-# summary files with mtimes ~120s apart; state.current_round=0; expect
-# duration close to 2.0 minutes rather than None or 0.
+# ─── 回归：session_duration_minutes 覆盖完整磁盘轮次范围 ───
+# 当 state.current_round 落后于磁盘上已存在的摘要时（解析器将轮次
+# 扩展到 max_disk_round），持续时间必须跨越每个摘要文件的 mtime，
+# 而不仅是 range(current_round+1)。夹具：两个摘要文件 mtime 相差
+# ~120 秒；state.current_round=0；期望持续时间接近 2.0 分钟而非
+# None 或 0。
 DURATION_SESSION="$MOCK_PROJECT/.humanize/rlcr/2026-03-01_01-02-03"
 mkdir -p "$DURATION_SESSION"
 cat > "$DURATION_SESSION/state.md" << 'DSTATE'
@@ -255,7 +255,7 @@ DSTATE
 : > "$DURATION_SESSION/round-0-summary.md"
 : > "$DURATION_SESSION/round-1-summary.md"
 : > "$DURATION_SESSION/round-2-summary.md"
-# Stagger mtimes by 120s so duration is ~4.0 minutes total (r0 -> r2).
+# 将 mtime 错开 120 秒，使总持续时间约为 4.0 分钟（r0 -> r2）。
 python3 -c "
 import os
 base = 1_700_000_000
@@ -281,7 +281,7 @@ else
 fi
 
 # ========================================
-# Test Group 4: Analyzer Tests
+# 测试组 4：分析器测试
 # ========================================
 echo ""
 echo "Test Group 4: Analyzer"
@@ -332,7 +332,7 @@ else
 fi
 
 # ========================================
-# Test Group 5: Exporter Tests
+# 测试组 5：导出器测试
 # ========================================
 echo ""
 echo "Test Group 5: Exporter"
@@ -388,22 +388,18 @@ else
 fi
 
 # ========================================
-# Test Group 6: Integration Markers
+# 测试组 6：集成标记
 # ========================================
-# The early viz plan auto-started a tmux-backed viz daemon whenever
-# an RLCR loop ran, threaded through VIZ_AVAILABLE / VIZ_PROJECT
-# env markers and viz-stop.sh cleanup hooks in setup-rlcr-loop.sh /
-# cancel-rlcr-loop.sh / commands/start-rlcr-loop.md. That auto-
-# start path was deprecated in favor of the explicit CLI entry
-# point `humanize monitor web --project <path>` (Round 7), which
-# runs the Flask server in the foreground. The RLCR setup/cancel
-# scripts no longer need to know about the dashboard — it is now a
-# separate terminal the user launches when they want it.
+# 早期 viz 计划在 RLCR 循环运行时自动启动 tmux 支持的 viz 守护进程，
+# 通过 VIZ_AVAILABLE / VIZ_PROJECT 环境标记和 setup-rlcr-loop.sh /
+# cancel-rlcr-loop.sh / commands/start-rlcr-loop.md 中的 viz-stop.sh
+# 清理钩子传递。该自动启动路径已被显式 CLI 入口点
+# `humanize monitor web --project <path>`（第 7 轮）取代，
+# 它在前台运行 Flask 服务器。RLCR 设置/取消脚本不再需要了解仪表板
+# —— 它现在是用户在需要时启动的独立终端。
 #
-# Integration assertions therefore only check that the viz-start
-# and viz-stop helpers still exist as importable scripts for the
-# opt-in `--daemon` path; they no longer require the setup /
-# cancel scripts to reference them.
+# 因此集成断言只检查 viz-start 和 viz-stop 辅助函数仍作为可选
+# `--daemon` 路径的可导入脚本存在；它们不再要求设置/取消脚本引用它们。
 echo ""
 echo "Test Group 6: Integration Markers (opt-in --daemon path)"
 
@@ -416,11 +412,11 @@ for helper in viz-start.sh viz-stop.sh viz-status.sh; do
 done
 
 # ========================================
-# Test Group 7: humanize monitor web migration
+# 测试组 7：humanize monitor web 迁移
 # ========================================
-# The legacy /humanize:viz Claude command and skill have been removed.
-# The web dashboard is now reached via the `humanize monitor web`
-# subcommand in scripts/humanize.sh. Tests assert both states.
+# 旧版 /humanize:viz Claude 命令和技能已被移除。
+# Web 仪表板现在通过 scripts/humanize.sh 中的 `humanize monitor web`
+# 子命令访问。测试断言两种状态。
 echo ""
 echo "Test Group 7: humanize monitor web (replaces /humanize:viz)"
 
@@ -461,9 +457,9 @@ else
     fail "README.md missing humanize monitor web reference"
 fi
 
-# Round 18 P2: foreground port probe must branch on --host (same
-# shape as viz-start.sh find_port) so --host <specific-ip> doesn't
-# pick a port that is in use on the external interface.
+# 第 18 轮 P2：前台端口探针必须在 --host 上分支（与 viz-start.sh
+# find_port 相同的形状），使 --host <specific-ip> 不会选择外部接口上
+# 正在使用的端口。
 humanize_sh="$PLUGIN_ROOT/scripts/humanize.sh"
 if grep -qE 'probe_host=.*"localhost"' "$humanize_sh" && \
    grep -qE 'probe_host="\$host"' "$humanize_sh"; then
@@ -479,7 +475,7 @@ else
 fi
 
 # ========================================
-# Test Group 8: Static Assets
+# 测试组 8：静态资源
 # ========================================
 echo ""
 echo "Test Group 8: Static Assets"
@@ -492,14 +488,14 @@ for file in index.html css/theme.css css/layout.css js/app.js js/pipeline.js js/
     fi
 done
 
-# Verify no hard-coded Chinese in i18n.js (UI should be English-only)
+# 验证 i18n.js 中没有硬编码中文（UI 应仅为英文）
 if ! grep -P '[\x{4e00}-\x{9fff}]' "$VIZ_DIR/static/js/i18n.js" >/dev/null 2>&1; then
     pass "i18n.js contains no Chinese characters (English-only UI)"
 else
     fail "i18n.js should not contain Chinese characters"
 fi
 
-# Requirements file
+# 依赖文件
 if [[ -f "$VIZ_DIR/server/requirements.txt" ]]; then
     pass "Python requirements.txt exists"
     if grep -q "flask" "$VIZ_DIR/server/requirements.txt"; then
@@ -512,7 +508,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 
 print_test_summary "Humanize Viz Tests"

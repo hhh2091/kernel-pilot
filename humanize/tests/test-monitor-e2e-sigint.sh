@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Monitor e2e SIGINT tests (parallel split 2/3)
+# 监控端到端 SIGINT 测试（并行分片 2/3）
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test-monitor-e2e-real.sh"

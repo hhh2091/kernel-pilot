@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Tests for validate-gen-idea-io.sh — companion JSON derivation and collision detection.
+# validate-gen-idea-io.sh 的测试 —— 伴随 JSON 派生和冲突检测。
 #
-# Covers:
-#   - .md suffix enforcement on --output
-#   - DIRECTIONS_JSON_FILE derivation in stdout on success
-#   - Companion collision rejection (exit 8)
-#   - Existing output file rejection still works (exit 4)
-#   - Subdir companion path derivation
+# 覆盖：
+#   - --output 上的 .md 后缀强制
+#   - 成功时 stdout 中的 DIRECTIONS_JSON_FILE 派生
+#   - 伴随冲突拒绝（退出 8）
+#   - 现有输出文件拒绝仍然有效（退出 4）
+#   - 子目录伴随路径派生
 #
 
 set -euo pipefail
@@ -25,23 +25,23 @@ echo ""
 
 setup_test_dir
 
-# Create a mock git repo so the script can call git rev-parse
+# 创建模拟 Git 仓库，使脚本可以调用 git rev-parse
 MOCK_REPO="$TEST_DIR/repo"
 init_test_git_repo "$MOCK_REPO"
 
-# Create a valid template tree so exit code 7 does not fire
+# 创建有效的模板树，使退出码 7 不会触发
 PLUGIN_ROOT="$TEST_DIR/plugin"
 mkdir -p "$PLUGIN_ROOT/prompt-template/idea"
 touch "$PLUGIN_ROOT/prompt-template/idea/gen-idea-template.md"
 export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
 
-# Helper: run the validation script inside the mock repo
+# 辅助函数：在模拟仓库内运行验证脚本
 run_validate() {
     (cd "$MOCK_REPO" && bash "$VALIDATE_SCRIPT" "$@")
 }
 
 # ----------------------------------------
-# PT-1: Success with .md output emits DIRECTIONS_JSON_FILE
+# PT-1：.md 输出成功发出 DIRECTIONS_JSON_FILE
 # ----------------------------------------
 echo "--- Positive Tests ---"
 echo ""
@@ -63,7 +63,7 @@ else
     fail "success: DIRECTIONS_JSON_FILE emitted on valid .md output" "exit 0 + DIRECTIONS_JSON_FILE" "exit=$EXIT_CODE"
 fi
 
-# PT-2: Subdir companion path derived correctly
+# PT-2：子目录伴随路径正确派生
 EXIT_CODE=0
 OUTPUT_DIR="$TEST_DIR/out2"
 mkdir -p "$OUTPUT_DIR/subdir"
@@ -83,7 +83,7 @@ echo ""
 echo "--- Negative Tests ---"
 echo ""
 
-# NT-1: No .md suffix — exit 6
+# NT-1：无 .md 后缀 — 退出 6
 EXIT_CODE=0
 OUTPUT=$(run_validate "test idea text" --output "$TEST_DIR/foo" 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 6 ]] && echo "$OUTPUT" | grep -qi "md"; then
@@ -92,7 +92,7 @@ else
     fail "no .md suffix: exits 6" "exit 6 + md message" "exit=$EXIT_CODE"
 fi
 
-# NT-2: .txt suffix — exit 6
+# NT-2：.txt 后缀 — 退出 6
 EXIT_CODE=0
 OUTPUT=$(run_validate "test idea text" --output "$TEST_DIR/foo.txt" 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 6 ]]; then
@@ -101,7 +101,7 @@ else
     fail ".txt suffix: exits 6" "exit 6" "exit=$EXIT_CODE"
 fi
 
-# NT-3: Companion JSON already exists — exit 8
+# NT-3：伴随 JSON 已存在 — 退出 8
 EXIT_CODE=0
 OUTPUT_DIR="$TEST_DIR/out3"
 mkdir -p "$OUTPUT_DIR"
@@ -113,7 +113,7 @@ else
     fail "companion exists: exits 8" "exit 8 + companion message" "exit=$EXIT_CODE"
 fi
 
-# NT-4: Output draft already exists — exit 4 (existing behavior preserved)
+# NT-4：输出草稿已存在 — 退出 4（保留现有行为）
 EXIT_CODE=0
 OUTPUT_DIR="$TEST_DIR/out4"
 mkdir -p "$OUTPUT_DIR"
@@ -125,7 +125,7 @@ else
     fail "output exists: exits 4" "exit 4" "exit=$EXIT_CODE"
 fi
 
-# NT-5: Missing idea — exit 1
+# NT-5：缺少 idea — 退出 1
 EXIT_CODE=0
 OUTPUT=$(run_validate 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]]; then
@@ -134,9 +134,9 @@ else
     fail "missing idea: exits 1" "exit 1" "exit=$EXIT_CODE"
 fi
 
-# NT-6: Slash-containing idea treated as inline, not a missing file path
-# Regression for: whitespace-free input containing "/" was misclassified as a
-# file path and failed with INPUT_NOT_FOUND (exit 2).
+# NT-6：包含斜杠的 idea 被视为内联文本，而非缺失文件路径
+# 回归：包含 "/" 的无空格输入被错误分类为文件路径，
+# 并以 INPUT_NOT_FOUND（退出 2）失败。
 EXIT_CODE=0
 OUTPUT_DIR="$TEST_DIR/out5"
 mkdir -p "$OUTPUT_DIR"
@@ -147,7 +147,7 @@ else
     fail "slash idea (undo/redo): treated as inline text" "exit 0 + VALIDATION_SUCCESS" "exit=$EXIT_CODE"
 fi
 
-# NT-7: Another slash idea — CI/CD
+# NT-7：另一个斜杠 idea — CI/CD
 EXIT_CODE=0
 OUTPUT_DIR="$TEST_DIR/out6"
 mkdir -p "$OUTPUT_DIR"

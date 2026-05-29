@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Tests for gen-idea dual-write contract (AC-2).
+# gen-idea 双写契约 (AC-2) 的测试。
 #
-# Verifies the structural contract between validate-gen-idea-io.sh and commands/gen-idea.md:
-#   - Validation emits DIRECTIONS_JSON_FILE on success
-#   - Validation prevents write when output already exists (no partial write possible)
-#   - commands/gen-idea.md contains instructions for dual-write and explore-idea hint
+# 验证 validate-gen-idea-io.sh 和 commands/gen-idea.md 之间的结构契约：
+#   - 验证成功时发出 DIRECTIONS_JSON_FILE
+#   - 验证在输出已存在时阻止写入（不可能部分写入）
+#   - commands/gen-idea.md 包含双写和 explore-idea 提示的指令
 #
-# No live Claude invocations — all tests are deterministic shell and file-content checks.
+# 无实际 Claude 调用 — all tests are deterministic shell and file-content checks.
 #
 
 set -euo pipefail
@@ -27,7 +27,7 @@ echo ""
 
 setup_test_dir
 
-# Create mock git repo + plugin root for validate-gen-idea-io.sh
+# 为 validate-gen-idea-io.sh 创建模拟 git 仓库 + 插件根目录
 MOCK_REPO="$TEST_DIR/repo"
 init_test_git_repo "$MOCK_REPO"
 PLUGIN_ROOT="$TEST_DIR/plugin"

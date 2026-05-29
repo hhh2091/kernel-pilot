@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # validate-gen-plan-io.sh
-# Validates input and output paths for the gen-plan command
-# Exit codes:
-#   0 - Success, all validations passed
-#   1 - Input file does not exist
-#   2 - Input file is empty
-#   3 - Output directory does not exist
-#   4 - Output file already exists
-#   5 - No write permission to output directory
-#   6 - Invalid arguments
-#   7 - Plan template file not found (plugin configuration error)
+# 验证 gen-plan 命令的输入和输出路径
+# 退出码:
+#   0 - 成功，所有验证通过
+#   1 - 输入文件不存在
+#   2 - 输入文件为空
+#   3 - 输出目录不存在
+#   4 - 输出文件已存在
+#   5 - 没有输出目录的写入权限
+#   6 - 无效参数
+#   7 - 计划模板文件未找到（插件配置错误）
 
 set -e
 

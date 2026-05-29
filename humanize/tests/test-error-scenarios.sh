@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Test error scenarios for template-loader.sh
+# template-loader.sh 的错误场景测试
 #
-# These tests verify that error conditions are handled gracefully
-# without crashing or producing unexpected behavior.
+# 这些测试验证错误条件被优雅地处理，
+# 不会崩溃或产生意外行为。
 #
 
 set -uo pipefail
@@ -14,7 +14,7 @@ source "$PROJECT_ROOT/hooks/lib/template-loader.sh"
 
 TEMPLATE_DIR=$(get_template_dir "$PROJECT_ROOT/hooks/lib")
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
@@ -40,7 +40,7 @@ echo "========================================"
 echo ""
 
 # ========================================
-# Test 1: Template file not found returns empty
+# 测试 1：模板文件未找到返回空
 # ========================================
 echo "Test 1: Template file not found returns empty"
 CONTENT=$(load_template "$TEMPLATE_DIR" "non-existing-file.md" 2>/dev/null)
@@ -52,7 +52,7 @@ else
 fi
 
 # ========================================
-# Test 2: Template directory not found returns empty
+# 测试 2：模板目录未找到返回空
 # ========================================
 echo ""
 echo "Test 2: Template directory not found returns empty"
@@ -65,7 +65,7 @@ else
 fi
 
 # ========================================
-# Test 3: load_and_render with missing template returns empty
+# 测试 3：缺少模板时 load_and_render 返回空
 # ========================================
 echo ""
 echo "Test 3: load_and_render with missing template returns empty"
@@ -78,7 +78,7 @@ else
 fi
 
 # ========================================
-# Test 4: render_template with empty content returns empty
+# 测试 4：空内容的 render_template 返回空
 # ========================================
 echo ""
 echo "Test 4: render_template with empty content returns empty"
@@ -91,7 +91,7 @@ else
 fi
 
 # ========================================
-# Test 5: Variable with special regex characters renders correctly
+# 测试 5：带有特殊正则表达式字符的变量正确渲染
 # ========================================
 echo ""
 echo "Test 5: Variable with special regex characters"
@@ -106,11 +106,11 @@ else
 fi
 
 # ========================================
-# Test 6: Script continues with set -euo pipefail and missing template
+# 测试 6：脚本在 set -euo pipefail 和缺少模板时继续运行
 # ========================================
 echo ""
 echo "Test 6: Script continues with set -euo pipefail"
-# Run in isolated subshell - use || true to capture output even if subshell fails
+# 在隔离的子 shell 中运行 - 使用 || true 即使子 shell 失败也能捕获输出
 SCRIPT_OUTPUT=$(bash -c '
 set -euo pipefail
 source "'"$PROJECT_ROOT"'/hooks/lib/template-loader.sh"
@@ -131,7 +131,7 @@ else
 fi
 
 # ========================================
-# Test 7: load_and_render_safe with missing template uses fallback
+# 测试 7：缺少模板时 load_and_render_safe 使用回退
 # ========================================
 echo ""
 echo "Test 7: load_and_render_safe uses fallback for missing template"
@@ -144,7 +144,7 @@ else
 fi
 
 # ========================================
-# Test 8: load_and_render_safe with fallback containing variables
+# 测试 8：包含变量的回退的 load_and_render_safe
 # ========================================
 echo ""
 echo "Test 8: load_and_render_safe fallback with variable substitution"
@@ -158,7 +158,7 @@ else
 fi
 
 # ========================================
-# Test 9: validate_template_dir with valid directory returns 0
+# 测试 9：有效目录的 validate_template_dir 返回 0
 # ========================================
 echo ""
 echo "Test 9: validate_template_dir accepts valid directory"
@@ -169,7 +169,7 @@ else
 fi
 
 # ========================================
-# Test 10: validate_template_dir with invalid directory returns 1
+# 测试 10：无效目录的 validate_template_dir 返回 1
 # ========================================
 echo ""
 echo "Test 10: validate_template_dir rejects invalid directory"
@@ -180,7 +180,7 @@ else
 fi
 
 # ========================================
-# Test 11: Empty variable name in template stays as-is
+# 测试 11：模板中的空变量名保持原样
 # ========================================
 echo ""
 echo "Test 11: Empty placeholder {{}} stays as-is"
@@ -193,7 +193,7 @@ else
 fi
 
 # ========================================
-# Test 12: Unclosed placeholder {{ stays as-is
+# 测试 12：未闭合的占位符 {{ 保持原样
 # ========================================
 echo ""
 echo "Test 12: Unclosed placeholder {{ stays as-is"
@@ -206,7 +206,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 摘要
 # ========================================
 echo ""
 echo "========================================"

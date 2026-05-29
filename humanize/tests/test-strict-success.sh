@@ -22,7 +22,7 @@ git -C "$repo" config user.email test@example.com
 git -C "$repo" config user.name Test
 
 cat > "$repo/plan.md" <<'PLAN_EOF'
-# Plan
+# 计划
 
 ## Goal
 Reach the measured target.

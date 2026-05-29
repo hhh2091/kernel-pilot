@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Comprehensive template validation tests for CI/CD
+# CI/CD 的全面模板验证测试
 #
-# This script tests:
-# 1. All templates in prompt-template/ can be loaded
-# 2. Template rendering works with various input types
-# 3. Edge cases (CJK, emoji, special chars, empty lines)
-# 4. Fallback mechanisms work correctly
-# 5. Template syntax is valid ({{VAR}} placeholders)
+# 此脚本测试：
+# 1. prompt-template/ 中的所有模板可以加载
+# 2. 模板渲染适用于各种输入类型
+# 3. 边界情况（CJK、表情符号、特殊字符、空行）
+# 4. 回退机制正常工作
+# 5. 模板语法有效（{{VAR}} 占位符）
 #
 
 set -uo pipefail
@@ -16,18 +16,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$PROJECT_ROOT/hooks/lib/template-loader.sh"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色
 
 TESTS_PASSED=0
 TESTS_FAILED=0
 WARNINGS=0
 
-# Test helper functions
+# 测试辅助函数
 pass() {
     echo -e "  ${GREEN}PASS${NC}: $1"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -59,7 +59,7 @@ section() {
 TEMPLATE_DIR=$(get_template_dir "$PROJECT_ROOT/hooks/lib")
 
 # ========================================
-# Section 1: Validate Template Directory Structure
+# 第 1 部分：验证模板目录结构
 # ========================================
 section "Section 1: Template Directory Structure"
 
@@ -80,7 +80,7 @@ for subdir in block codex claude; do
 done
 
 # ========================================
-# Section 2: Load All Templates
+# 第 2 部分：加载所有模板
 # ========================================
 section "Section 2: Load All Templates"
 
@@ -94,7 +94,7 @@ while IFS= read -r -d '' template_file; do
     content=$(load_template "$TEMPLATE_DIR" "$relative_path" 2>/dev/null)
 
     if [[ -n "$content" ]]; then
-        # Check template is not empty (just whitespace)
+        # 检查模板不是空的（仅空白）
         if [[ -n "$(echo "$content" | tr -d '[:space:]')" ]]; then
             pass "Loaded: $relative_path (${#content} bytes)"
         else
@@ -111,7 +111,7 @@ echo "Templates found: $TEMPLATE_COUNT"
 echo "Load failures: $LOAD_FAILURES"
 
 # ========================================
-# Section 3: Template Syntax Validation
+# 第 3 部分：模板语法验证
 # ========================================
 section "Section 3: Template Syntax Validation"
 
@@ -119,32 +119,32 @@ while IFS= read -r -d '' template_file; do
     relative_path="${template_file#$TEMPLATE_DIR/}"
     content=$(cat "$template_file")
 
-    # Check for valid placeholder syntax {{VAR_NAME}}
-    # Valid: {{VAR}}, {{VAR_NAME}}, {{VAR_NAME_123}}
-    # Invalid: {{ VAR }}, {{var with spaces}}, {VAR}, {{VAR}}}, {{{VAR}}}, {(VAR)}
+    # 检查有效的占位符语法 {{VAR_NAME}}
+    # 有效：{{VAR}}、{{VAR_NAME}}、{{VAR_NAME_123}}
+    # 无效：{{ VAR }}、{{var with spaces}}、{VAR}、{{VAR}}}、{{{VAR}}}、{(VAR)}
 
     syntax_errors=""
 
-    # Check 1: Extra closing braces - {{VAR}}} or {{VAR}}}}
+    # 检查 1：多余的闭合大括号 - {{VAR}}} 或 {{VAR}}}}
     extra_close=$(echo "$content" | grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}\}+' || true)
     if [[ -n "$extra_close" ]]; then
         syntax_errors="${syntax_errors}Extra closing braces: $extra_close\n"
     fi
 
-    # Check 2: Extra opening braces - {{{VAR}}} or {{{{VAR}}
+    # 检查 2：多余的开大括号 - {{{VAR}}} 或 {{{{VAR}}
     extra_open=$(echo "$content" | grep -oE '\{\{\{+[A-Z_][A-Z0-9_]*\}\}' || true)
     if [[ -n "$extra_open" ]]; then
         syntax_errors="${syntax_errors}Extra opening braces: $extra_open\n"
     fi
 
-    # Check 3: Wrong bracket types - {(VAR)}, [(VAR)], {[VAR]}
+    # 检查 3：错误的括号类型 - {(VAR)}、[(VAR)]、{[VAR]}
     wrong_brackets=$(echo "$content" | grep -oE '\{[\(\[].+?[\)\]]\}' || true)
     if [[ -n "$wrong_brackets" ]]; then
         syntax_errors="${syntax_errors}Wrong bracket types: $wrong_brackets\n"
     fi
 
-    # Check 4: Unclosed placeholders - {{VAR without closing
-    # Look for {{ followed by content but not followed by }}
+    # 检查 4：未闭合的占位符 - {{VAR 无闭合
+    # 查找 {{ 后跟内容但不跟 }} 的情况
     unclosed=$(echo "$content" | grep -oE '\{\{[A-Z_][A-Z0-9_]*[^}]' | grep -v '\}\}' || true)
     if [[ -n "$unclosed" ]]; then
         # Double check - might be false positive
@@ -157,18 +157,17 @@ while IFS= read -r -d '' template_file; do
         done
     fi
 
-    # Check 5: Single brace placeholders - {VAR} instead of {{VAR}}
-    # Skip this check - it's too noisy because templates commonly show {VAR} syntax
-    # in their documentation. The double-brace validation is sufficient.
-    # Only check for clearly invalid patterns like ${VAR} (shell syntax) in templates
+    # 检查 5：单大括号占位符 - {VAR} 而非 {{VAR}}
+    # 跳过此检查 - 因为模板通常在文档中显示 {VAR} 语法，噪音太大。
+    # 双大括号验证已足够。仅检查模板中明显无效的模式如 ${VAR}（shell 语法）
 
-    # Check 6: Spaces inside placeholders - {{ VAR }} or {{VAR }}
+    # 检查 6：占位符内的空格 - {{ VAR }} 或 {{VAR }}
     spaced_placeholders=$(echo "$content" | grep -oE '\{\{ +[A-Z_][A-Z0-9_]* *\}\}|\{\{[A-Z_][A-Z0-9_]* +\}\}' || true)
     if [[ -n "$spaced_placeholders" ]]; then
         syntax_errors="${syntax_errors}Spaces in placeholder: $spaced_placeholders\n"
     fi
 
-    # Check 7: Lowercase placeholders - {{var}} or {{varName}}
+    # 检查 7：小写占位符 - {{var}} 或 {{varName}}
     lowercase_placeholders=$(echo "$content" | grep -oE '\{\{[a-z][a-zA-Z0-9_]*\}\}' || true)
     if [[ -n "$lowercase_placeholders" ]]; then
         syntax_errors="${syntax_errors}Lowercase placeholder (should be UPPER_CASE): $lowercase_placeholders\n"
@@ -183,7 +182,7 @@ while IFS= read -r -d '' template_file; do
             fi
         done
     else
-        # Check that placeholders exist if template seems to need them
+        # 如果模板似乎需要占位符，检查占位符是否存在
         placeholder_count=$(echo "$content" | grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}' | wc -l)
         if [[ $placeholder_count -gt 0 ]]; then
             pass "Syntax valid: $relative_path ($placeholder_count placeholders)"
@@ -194,18 +193,18 @@ while IFS= read -r -d '' template_file; do
 done < <(find "$TEMPLATE_DIR" -name "*.md" -type f -print0 | sort -z)
 
 # ========================================
-# Section 3.5: Malformed Placeholder Detection Tests
+# 第 3.5 部分：格式错误占位符检测测试
 # ========================================
 section "Section 3.5: Malformed Placeholder Detection Tests"
 
 echo ""
 echo "Testing detection of malformed placeholders..."
 
-# Create a temporary test file with various malformed patterns
+# 创建包含各种格式错误模式的临时测试文件
 TEMP_TEST_DIR=$(mktemp -d)
 mkdir -p "$TEMP_TEST_DIR/block" "$TEMP_TEST_DIR/codex" "$TEMP_TEST_DIR/claude"
 
-# Test: Extra closing braces
+# 测试：多余闭合大括号
 echo "Testing: {{VAR}}} detection..."
 echo "Test content {{VAR}}} here" > "$TEMP_TEST_DIR/block/test1.md"
 result=$(echo "Test content {{VAR}}} here" | grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}\}+' || true)
@@ -215,7 +214,7 @@ else
     fail "Should detect extra closing braces: {{VAR}}}"
 fi
 
-# Test: Extra opening braces
+# 测试：多余开大括号
 echo "Testing: {{{VAR}}} detection..."
 result=$(echo "Test content {{{VAR}}} here" | grep -oE '\{\{\{+[A-Z_][A-Z0-9_]*\}\}' || true)
 if [[ -n "$result" ]]; then
@@ -224,7 +223,7 @@ else
     fail "Should detect extra opening braces: {{{VAR}}}"
 fi
 
-# Test: Spaces inside placeholder
+# 测试：占位符内空格
 echo "Testing: {{ VAR }} detection..."
 result=$(echo "Test content {{ VAR }} here" | grep -oE '\{\{ +[A-Z_][A-Z0-9_]* *\}\}' || true)
 if [[ -n "$result" ]]; then
@@ -233,7 +232,7 @@ else
     fail "Should detect spaces in placeholder: {{ VAR }}"
 fi
 
-# Test: Lowercase placeholder
+# 测试：小写占位符
 echo "Testing: {{varName}} detection..."
 result=$(echo "Test content {{varName}} here" | grep -oE '\{\{[a-z][a-zA-Z0-9_]*\}\}' || true)
 if [[ -n "$result" ]]; then
@@ -242,7 +241,7 @@ else
     fail "Should detect lowercase placeholder: {{varName}}"
 fi
 
-# Test: Valid placeholder should NOT trigger errors
+# 测试：有效占位符不应触发错误
 echo "Testing: {{VALID_VAR}} should pass..."
 content="Test content {{VALID_VAR}} here"
 extra_close=$(echo "$content" | grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}\}+' || true)
@@ -255,11 +254,11 @@ else
     fail "Valid placeholder should not trigger errors"
 fi
 
-# Clean up
+# 清理
 rm -rf "$TEMP_TEST_DIR"
 
 # ========================================
-# Section 4: Render Template Edge Cases
+# 第 4 部分：渲染模板边界情况
 # ========================================
 section "Section 4: Render Template Edge Cases"
 
@@ -348,7 +347,7 @@ echo ""
 echo "Testing CJK characters..."
 result=$(render_template "Message: {{MSG}}" "MSG=Hello World")
 if [[ "$result" == "Message: Hello World" ]]; then
-    # CJK in variable value
+    # 变量值中的 CJK
     result2=$(render_template "CJK: {{CJK}}" "CJK=Chinese Text Here")
     if grep -q "CJK:" <<<"$result2"; then
         pass "CJK characters handling"
@@ -438,7 +437,7 @@ else
 fi
 
 # ========================================
-# Section 5: Fallback Mechanism Tests
+# 第 5 部分：回退机制测试
 # ========================================
 section "Section 5: Fallback Mechanism Tests"
 
@@ -490,7 +489,7 @@ fi
 rm -rf "$temp_dir"
 
 # ========================================
-# Section 6: Integration Tests with Real Templates
+# 第 6 部分：使用真实模板的集成测试
 # ========================================
 section "Section 6: Integration Tests with Real Templates"
 
@@ -540,7 +539,7 @@ else
 fi
 
 # ========================================
-# Section 7: Stress Tests
+# 第 7 部分：压力测试
 # ========================================
 section "Section 7: Stress Tests"
 
@@ -572,8 +571,8 @@ while IFS= read -r -d '' template_file; do
         continue
     fi
 
-    # Try rendering with dummy values
-    # Extract placeholder names and create dummy assignments
+    # 尝试使用虚拟值渲染
+    # 提取占位符名称并创建虚拟赋值
     placeholders=$(echo "$content" | grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}' | sed 's/{{//g; s/}}//g' | sort -u)
 
     args=()
@@ -606,7 +605,7 @@ if $all_success; then
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 section "Test Summary"
 

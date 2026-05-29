@@ -1,29 +1,27 @@
 #!/usr/bin/env bash
 #
-# DISCLAIMER
+# 免责声明
 # ----------
-# Author: Sihao Liu
+# 作者: Sihao Liu
 #
-# This is a status line script for the CLI tool that happens to include
-# an RLCR status field tied to the Humanize plugin. It is included in
-# this repository solely for community sharing purposes.
+# 这是一个 CLI 工具的状态行脚本，恰好包含了与 Humanize 插件
+# 关联的 RLCR 状态字段。它被包含在此仓库中纯粹是为了社区分享。
 #
-# Provided AS-IS -- it serves as a reference and template only.
-# Only the final field (RLCR) is related to this repository; the rest
-# is generic session information. Future updates to the Humanize plugin
-# will generally not involve changes to this script.
+# 按原样提供 -- 仅作为参考和模板。
+# 只有最后一个字段（RLCR）与此仓库相关；其余是通用的会话信息。
+# Humanize 插件的未来更新通常不会涉及对此脚本的更改。
 #
-# Claude Code Status Line - Display usage information
-# Format: <model> | [context bar] | $X.XX @ Xh:Ym:Zs
+# Claude Code 状态行 - 显示使用信息
+# 格式: <model> | [context bar] | $X.XX @ Xh:Ym:Zs
 
 input=$(cat)
 
-# Extract values using jq
+# 使用 jq 提取值
 get_value() {
     echo "$input" | jq -r "$1 // empty" 2>/dev/null
 }
 
-# Format milliseconds as Xh:Ym:Zs
+# 将毫秒格式化为 Xh:Ym:Zs
 format_duration() {
     local ms=$1
     local total_sec=$((ms / 1000))
@@ -33,7 +31,7 @@ format_duration() {
     printf "%dh:%dm:%ds" "$hours" "$mins" "$secs"
 }
 
-# Determine RLCR display status for a session directory
+# 确定会话目录的 RLCR 显示状态
 _resolve_rlcr_display() {
     local session_dir="$1"
 
@@ -50,7 +48,7 @@ _resolve_rlcr_display() {
             local bname
             bname=$(basename "$terminal_file")
             local reason="${bname%-state.md}"
-            # Capitalize first letter (Bash 3 compatible)
+            # 首字母大写（Bash 3 兼容）
             local first_char
             first_char=$(printf '%s' "$reason" | cut -c1 | tr '[:lower:]' '[:upper:]')
             local rest
@@ -62,8 +60,8 @@ _resolve_rlcr_display() {
     fi
 }
 
-# Get RLCR loop status for the current session
-# Mirrors find_active_loop() logic from humanize hooks/lib/loop-common.sh
+# 获取当前会话的 RLCR 循环状态
+# 镜像了 humanize hooks/lib/loop-common.sh 中的 find_active_loop() 逻辑
 get_rlcr_status() {
     local rlcr_dir="$1"
     local filter_session_id="$2"
@@ -73,7 +71,7 @@ get_rlcr_status() {
         return
     fi
 
-    # Pre-scan: if any state files have a session_id, ignore those without
+    # 预扫描: 如果任何状态文件有 session_id，则忽略没有的
     local has_sid_aware=false
     if grep -rqE '^session_id: *.+' "$rlcr_dir"/*/*.md 2>/dev/null; then
         has_sid_aware=true
@@ -81,7 +79,7 @@ get_rlcr_status() {
 
     if [[ -z "$filter_session_id" ]]; then
         if ! $has_sid_aware; then
-            # No session-aware files: check the newest directory only (zombie-loop protection)
+            # 没有会话感知文件: 仅检查最新的目录（僵尸循环保护）
             local newest_dir
             newest_dir=$(ls -1d "$rlcr_dir"/*/ 2>/dev/null | sort -r | head -1)
             if [[ -z "$newest_dir" ]]; then
@@ -91,7 +89,7 @@ get_rlcr_status() {
             _resolve_rlcr_display "${newest_dir%/}"
             return
         fi
-        # Session-aware files exist: find newest session-aware directory
+        # 存在会话感知文件: 查找最新的会话感知目录
         local dir
         while IFS= read -r dir; do
             [[ -z "$dir" ]] && continue
@@ -118,13 +116,13 @@ get_rlcr_status() {
         return
     fi
 
-    # With session_id: iterate newest-to-oldest, find matching session
+    # 带有 session_id: 从最新到最旧迭代，查找匹配的会话
     local dir
     while IFS= read -r dir; do
         [[ -z "$dir" ]] && continue
         local trimmed="${dir%/}"
 
-        # Find any state file (active or terminal)
+        # 查找任何状态文件（活跃或终端）
         local any_state=""
         if [[ -f "$trimmed/finalize-state.md" ]]; then
             any_state="$trimmed/finalize-state.md"
@@ -135,11 +133,11 @@ get_rlcr_status() {
         fi
         [[ -z "$any_state" ]] && continue
 
-        # Extract stored session_id from YAML frontmatter
+        # 从 YAML frontmatter 中提取存储的 session_id
         local stored_sid
         stored_sid=$(awk '/^---$/{n++; next} n==1 && /^session_id:/{sub(/^session_id: */, ""); gsub(/ /, ""); print; exit}' "$any_state" 2>/dev/null)
 
-        # Skip session-unaware entries when session-aware ones exist
+        # 当存在会话感知条目时跳过会话无感知条目
         if [[ -z "$stored_sid" ]]; then
             $has_sid_aware && continue
             _resolve_rlcr_display "$trimmed"
@@ -154,7 +152,7 @@ get_rlcr_status() {
     echo "Off"
 }
 
-# Get color for RLCR status
+# 获取 RLCR 状态的颜色
 get_rlcr_color() {
     case "$1" in
         Active|Finalizing) echo "\e[32m" ;;
@@ -166,31 +164,31 @@ get_rlcr_color() {
     esac
 }
 
-# Get all raw values
+# 获取所有原始值
 MODEL=$(get_value '.model.display_name')
 CWD=$(get_value '.cwd')
 SESSION_ID=$(get_value '.session_id')
 TRANSCRIPT_PATH=$(get_value '.transcript_path')
 
-# Resolve session display name (customTitle from /rename, or full session_id)
-# Primary source: transcript jsonl (has custom-title events even during active session)
-# Fallback: sessions-index.json (may not have active session yet)
+# 解析会话显示名称（来自 /rename 的 customTitle，或完整的 session_id）
+# 主要来源: transcript jsonl（即使在活跃会话期间也有 custom-title 事件）
+# 回退: sessions-index.json（可能还没有活跃会话）
 get_session_display() {
     local sid="$1"
     local transcript="$2"
     local cwd="$3"
     [[ -z "$sid" ]] && return
 
-    # Resolve project dir name for file lookups
+    # 解析项目目录名称以进行文件查找
     local proj_dir_name
     proj_dir_name=$(echo "$cwd" | sed 's|[/.]|-|g')
 
-    # If transcript_path not provided, construct from project dir and session_id
+    # 如果未提供 transcript_path，则从项目目录和 session_id 构建
     if [[ -z "$transcript" || ! -f "$transcript" ]]; then
         transcript="$HOME/.claude/projects/${proj_dir_name}/${sid}.jsonl"
     fi
 
-    # Try transcript jsonl first (grep is faster than jq for large files)
+    # 首先尝试 transcript jsonl（对于大文件 grep 比 jq 更快）
     if [[ -f "$transcript" ]]; then
         local title
         title=$(grep '"type":"custom-title"' "$transcript" 2>/dev/null | tail -1 | jq -r '.customTitle // empty' 2>/dev/null)
@@ -200,7 +198,7 @@ get_session_display() {
         fi
     fi
 
-    # Fallback: sessions-index.json (for resumed sessions where transcript may differ)
+    # 回退: sessions-index.json（用于恢复的会话，其中 transcript 可能不同）
     local idx_file="$HOME/.claude/projects/${proj_dir_name}/sessions-index.json"
     if [[ -f "$idx_file" ]]; then
         local title
@@ -213,11 +211,11 @@ get_session_display() {
         fi
     fi
 
-    # Fallback: full session_id
+    # 回退: 完整的 session_id
     echo "$sid"
 }
 
-# Get fast mode status from user settings
+# 从用户设置获取快速模式状态
 get_fast_mode() {
     local settings="$HOME/.claude/settings.json"
     if [[ -f "$settings" ]]; then
@@ -234,7 +232,7 @@ get_fast_mode() {
 SESSION_DISPLAY=$(get_session_display "$SESSION_ID" "$TRANSCRIPT_PATH" "$CWD")
 FAST_MODE=$(get_fast_mode)
 
-# Get git branch name for CWD
+# 获取当前工作目录的 git 分支名称
 if [[ -n "$CWD" && -d "$CWD" ]]; then
     BRANCH=$(git -C "$CWD" branch --show-current 2>/dev/null)
 fi
@@ -244,17 +242,17 @@ DURATION=$(get_value '.cost.total_duration_ms')
 LINES_ADDED=$(get_value '.cost.total_lines_added')
 LINES_REMOVED=$(get_value '.cost.total_lines_removed')
 
-# Format cost (2 decimal places)
+# 格式化费用（2 位小数）
 COST_STR=$(printf "%.2f" "${COST:-0}")
 
-# Format duration as h:m:s
+# 将持续时间格式化为 h:m:s
 DURATION_STR=$(format_duration "${DURATION:-0}")
 
-# Default values if null/empty
+# 如果为 null/empty 则使用默认值
 LINES_ADDED=${LINES_ADDED:-0}
 LINES_REMOVED=${LINES_REMOVED:-0}
 
-# Determine RLCR status
+# 确定 RLCR 状态
 if [[ -n "$CWD" && -d "$CWD/.humanize" ]]; then
     RLCR_STATUS=$(get_rlcr_status "$CWD/.humanize/rlcr" "$SESSION_ID")
 else
@@ -262,42 +260,42 @@ else
 fi
 RLCR_COLOR=$(get_rlcr_color "$RLCR_STATUS")
 
-# Get color for fast mode status
+# 获取快速模式状态的颜色
 get_fast_color() {
     case "$1" in
-        On) echo "\e[33m" ;;   # Yellow - attention, it's expensive
-        Off) echo "\e[2m" ;;   # Dim
+        On) echo "\e[33m" ;;   # 黄色 - 注意，这很昂贵
+        Off) echo "\e[2m" ;;   # 暗色
     esac
 }
 
 FAST_COLOR=$(get_fast_color "$FAST_MODE")
 
-# Build context usage progress bar
-# Format: [###60%###|  40%   ]
-# Color: remaining >70% green, 30-70% yellow, <30% red
+# 构建上下文使用进度条
+# 格式: [###60%###|  40%   ]
+# 颜色: 剩余 >70% 绿色, 30-70% 黄色, <30% 红色
 build_context_bar() {
     local used_pct=${1:-0}
     local remaining_pct=$((100 - used_pct))
     local bar_width=20
 
-    # Color for remaining portion based on remaining percentage
+    # 根据剩余百分比为剩余部分着色
     local remain_color
     if [[ $remaining_pct -gt 70 ]]; then
-        remain_color="\e[32m"    # Green
+        remain_color="\e[32m"    # 绿色
     elif [[ $remaining_pct -ge 30 ]]; then
-        remain_color="\e[33m"    # Yellow
+        remain_color="\e[33m"    # 黄色
     else
-        remain_color="\e[31m"    # Red
+        remain_color="\e[31m"    # 红色
     fi
 
-    # Used portion: white background + black foreground
+    # 已使用部分: 白色背景 + 黑色前景
     local used_style="\e[47;30m"
     local reset="\e[0m"
 
     local used_width=$(( (used_pct * bar_width + 50) / 100 ))
     local remain_width=$(( bar_width - used_width ))
 
-    # Build used portion: spaces with white bg, percentage label centered
+    # 构建已使用部分: 带白色背景的空格，百分比标签居中
     local used_label="${used_pct}%"
     local used_str=""
     local i
@@ -309,7 +307,7 @@ build_context_bar() {
         used_str="${used_str:0:offset}${used_label}${used_str:offset+${#used_label}}"
     fi
 
-    # Build remaining portion: spaces, percentage label centered
+    # 构建剩余部分: 空格，百分比标签居中
     local remain_label="${remaining_pct}%"
     local remain_str=""
     for (( i = 0; i < remain_width; i++ )); do
@@ -329,26 +327,26 @@ CONTEXT_USED=${CONTEXT_USED:-0}
 CONTEXT_USED=$(printf "%.0f" "$CONTEXT_USED")
 CONTEXT_BAR=$(build_context_bar "$CONTEXT_USED")
 
-# Define colors
-CORAL="\e[38;5;173m"      # Claude branding - for MODEL
-CYAN="\e[36m"             # Info - for CWD
-YELLOW="\e[33m"           # for BRANCH
-GREEN="\e[32m"            # Positive - for COST and LINES_ADDED
-RED="\e[31m"              # Negative - for LINES_REMOVED
-BLUE="\e[34m"             # Label - for Session
-MAGENTA="\e[35m"          # Label - for RLCR and Fast
+# 定义颜色
+CORAL="\e[38;5;173m"      # Claude 品牌色 - 用于 MODEL
+CYAN="\e[36m"             # 信息 - 用于 CWD
+YELLOW="\e[33m"           # 用于 BRANCH
+GREEN="\e[32m"            # 正向 - 用于 COST 和 LINES_ADDED
+RED="\e[31m"              # 负向 - 用于 LINES_REMOVED
+BLUE="\e[34m"             # 标签 - 用于 Session
+MAGENTA="\e[35m"          # 标签 - 用于 RLCR 和 Fast
 RESET="\e[0m"
 
-# Shorten CWD: replace $HOME with ~
+# 缩短 CWD: 将 $HOME 替换为 ~
 TILDE='~'
 CWD_SHORT="${CWD/#$HOME/$TILDE}"
 
-# Strip ANSI escape sequences to get visible text length
+# 去除 ANSI 转义序列以获取可见文本长度
 strip_ansi() {
     printf '%b' "$1" | sed 's/\x1b\[[0-9;]*m//g'
 }
 
-# Build individual fields: colored (F) and plain-text (P) pairs
+# 构建各个字段: 彩色（F）和纯文本（P）对
 F1=$(printf "%b%s%b" "$CORAL" "${MODEL:-?}" "$RESET")
 P1="${MODEL:-?}"
 
@@ -376,12 +374,12 @@ P8=$(printf "RLCR: %s" "$RLCR_STATUS")
 FIELDS=("$F1" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8")
 PLAINS=("$P1" "$P2" "$P3" "$P4" "$P5" "$P6" "$P7" "$P8")
 
-# Get terminal width via /dev/tty (stdin is piped, so tput/stty need the real TTY)
+# 通过 /dev/tty 获取终端宽度（stdin 是管道的，所以 tput/stty 需要真实的 TTY）
 TERM_WIDTH=$(stty size < /dev/tty 2>/dev/null | awk '{print $2}')
 TERM_WIDTH=${TERM_WIDTH:-$(tput cols 2>/dev/tty || echo 80)}
 MAX_WIDTH=$(( TERM_WIDTH * 75 / 100 ))
 
-# Greedily pack fields into lines, wrapping when adding a field exceeds MAX_WIDTH
+# 贪婪地将字段打包到行中，当添加字段超过 MAX_WIDTH 时换行
 SEPARATOR=" | "
 SEP_WIDTH=${#SEPARATOR}
 cur_line=""

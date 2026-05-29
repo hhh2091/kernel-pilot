@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Test script for command_modifies_file function in loop-common.sh
+# loop-common.sh 中 command_modifies_file 函数的测试脚本
 #
-# Tests the regex patterns used to detect file modification commands
-# to ensure proper blocking of file writes via Bash.
+# 测试用于检测文件修改命令的正则表达式模式，
+# 确保通过 Bash 正确阻止文件写入。
 #
 
 set -euo pipefail
@@ -12,15 +12,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色
 
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# Test helper functions
+# 测试辅助函数
 pass() {
     echo -e "${GREEN}PASS${NC}: $1"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -33,7 +33,7 @@ fail() {
     TESTS_FAILED=$((TESTS_FAILED + 1))
 }
 
-# Assert that a command SHOULD be detected as modifying the target file
+# 断言命令应该被检测为修改目标文件
 assert_modifies() {
     local command="$1"
     local pattern="${2:-goal-tracker\\.md}"
@@ -47,7 +47,7 @@ assert_modifies() {
     fi
 }
 
-# Assert that a command should NOT be detected as modifying the target file
+# 断言命令不应该被检测为修改目标文件
 assert_not_modifies() {
     local command="$1"
     local pattern="${2:-goal-tracker\\.md}"
@@ -67,7 +67,7 @@ echo "========================================"
 echo ""
 
 # ========================================
-# Test Group 1: Redirection operators (> >>)
+# 测试组 1：重定向运算符（> >>）
 # ========================================
 echo "Test Group 1: Redirection operators"
 echo ""
@@ -80,7 +80,7 @@ assert_modifies "echo 'data' > /path/to/goal-tracker.md"
 assert_modifies "ECHO X > GOAL-TRACKER.MD"
 
 # ========================================
-# Test Group 2: tee command
+# 测试组 2：tee 命令
 # ========================================
 echo ""
 echo "Test Group 2: tee command"
@@ -93,7 +93,7 @@ assert_modifies "echo x | tee -a goal-tracker.md"
 assert_modifies "cat file | tee /path/to/goal-tracker.md"
 
 # ========================================
-# Test Group 3: In-place editors (sed, awk, perl)
+# 测试组 3：就地编辑器（sed、awk、perl）
 # ========================================
 echo ""
 echo "Test Group 3: In-place editors"
@@ -107,7 +107,7 @@ assert_modifies "perl -i -pe 's/x/y/' goal-tracker.md"
 assert_modifies "perl -pie 's/x/y/' goal-tracker.md"
 
 # ========================================
-# Test Group 4: File operations (mv, cp, rm)
+# 测试组 4：文件操作（mv、cp、rm）
 # ========================================
 echo ""
 echo "Test Group 4: File operations"
@@ -121,7 +121,7 @@ assert_modifies "rm -rf goal-tracker.md"
 assert_modifies "mv /tmp/new.md /path/to/goal-tracker.md"
 
 # ========================================
-# Test Group 5: Other modifiers (dd, truncate, exec)
+# 测试组 5：其他修改器（dd、truncate、exec）
 # ========================================
 echo ""
 echo "Test Group 5: Other modifiers"
@@ -133,7 +133,7 @@ assert_modifies "exec 3> goal-tracker.md"
 assert_modifies "printf '%s' data > goal-tracker.md"
 
 # ========================================
-# Test Group 6: Commands that should NOT be caught
+# 测试组 6：不应该被捕获的命令
 # ========================================
 echo ""
 echo "Test Group 6: Commands that should NOT be caught (false positives)"
@@ -152,27 +152,27 @@ assert_not_modifies "stat goal-tracker.md"
 assert_not_modifies "diff goal-tracker.md other.md"
 
 # ========================================
-# Test Group 7: Edge cases
+# 测试组 7：边界情况
 # ========================================
 echo ""
 echo "Test Group 7: Edge cases"
 echo ""
 
-# Filename in different positions
+# 不同位置的文件名
 assert_modifies "> goal-tracker.md"
 assert_modifies "echo test >goal-tracker.md"
 
-# Multiple source files to single destination
-# Note: "cp file1.md file2.md goal-tracker.md" (multiple sources) is NOT detected
-# because the pattern expects "cp src dest" format. This is a known limitation.
-# The more common "cp src goal-tracker.md" case IS detected.
+# 多个源文件到单个目标
+# 注意："cp file1.md file2.md goal-tracker.md"（多个源）不会被检测，
+# 因为模式期望 "cp src dest" 格式。这是一个已知的限制。
+# 更常见的 "cp src goal-tracker.md" 情况会被检测到。
 
-# With variables (should still match the literal pattern)
+# 使用变量（应该仍然匹配字面模式）
 assert_not_modifies 'echo x > $FILE'
 assert_not_modifies "cat file.md | grep pattern"
 
 # ========================================
-# Test Group 8: State file patterns
+# 测试组 8：状态文件模式
 # ========================================
 echo ""
 echo "Test Group 8: State file patterns"
@@ -183,7 +183,7 @@ assert_modifies "sed -i 's/round: 0/round: 99/' state.md" "state\\.md"
 assert_not_modifies "cat state.md" "state\\.md"
 
 # ========================================
-# Test Group 9: Summary file patterns
+# 测试组 9：摘要文件模式
 # ========================================
 echo ""
 echo "Test Group 9: Summary file patterns"
@@ -194,7 +194,7 @@ assert_modifies "cat data >> round-10-summary.md" "round-[0-9]+-summary\\.md"
 assert_not_modifies "cat round-5-summary.md" "round-[0-9]+-summary\\.md"
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================"

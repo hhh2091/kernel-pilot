@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# Run RLCR stop-hook logic from non-hook environments (e.g. skill workflows).
+# 从非钩子环境（例如技能工作流）运行 RLCR stop-hook 逻辑。
 #
-# This script wraps hooks/loop-codex-stop-hook.sh so skills can reuse the same
-# enforcement logic and phase transitions that the hook uses.
+# 此脚本包装了 hooks/loop-codex-stop-hook.sh，以便技能可以复用
+# 钩子使用的相同强制执行逻辑和阶段转换。
 #
-# Exit codes:
-#   0   - Gate allowed (no active loop block)
-#   10  - Gate blocked (follow returned reason/instructions and continue loop)
-#   20  - Wrapper/runtime error
+# 退出码:
+#   0   - 门控允许（无活跃循环阻塞）
+#   10  - 门控阻塞（遵循返回的原因/说明并继续循环）
+#   20  - 包装器/运行时错误
 #
-# Usage:
+# 用法:
 #   scripts/rlcr-stop-gate.sh [--session-id ID] [--transcript-path PATH] [--project-root PATH] [--json]
 #
 
@@ -19,9 +19,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 HUMANIZE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Deterministic project-root resolver (CLAUDE_PROJECT_DIR -> git toplevel, no pwd fallback).
-# Overridable via --project-root for non-hook callers; the flag handler below
-# always wins because it runs after this default assignment.
+# 确定性的项目根目录解析器（CLAUDE_PROJECT_DIR -> git 顶层目录，无 pwd 回退）。
+# 非钩子调用者可通过 --project-root 覆盖；下方的标志处理器
+# 始终优先，因为它在此默认赋值之后运行。
 source "$HUMANIZE_ROOT/hooks/lib/project-root.sh"
 PROJECT_ROOT="$(resolve_project_root 2>/dev/null || true)"
 HOOK_SCRIPT="$HUMANIZE_ROOT/hooks/loop-codex-stop-hook.sh"
@@ -79,9 +79,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$PROJECT_ROOT" ]]; then
-    # No humanize project context reachable from here -- nothing to enforce.
-    # Allow the stop to proceed instead of returning a wrapper error so that
-    # invoking the gate outside any project (or any git repo) is benign.
+    # 从此处无法访问 humanize 项目上下文 -- 无需强制执行。
+    # 允许停止继续进行，而不是返回包装器错误，以便
+    # 在任何项目（或任何 git 仓库）之外调用门控是无害的。
     echo "ALLOW: no humanize project root resolved."
     exit 0
 fi
@@ -96,15 +96,14 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 20
 fi
 
-# Build hook input JSON. Include standard Stop hook fields so the underlying
-# hook sees the same schema as a real Claude Code Stop event
-# (hook_event_name, stop_hook_active, cwd).
+# 构建钩子输入 JSON。包含标准 Stop 钩子字段，以便底层
+# 钩子看到与真实 Claude Code Stop 事件相同的架构
+# （hook_event_name、stop_hook_active、cwd）。
 #
-# Empty session_id / transcript_path become explicit null instead of being
-# filtered out; a `select(length > 0)` used as a plain object value collapses
-# the entire enclosing object to empty whenever any selected field is empty,
-# which would hide forwarded fields like transcript_path when only session_id
-# is missing.
+# 空的 session_id / transcript_path 变为显式 null 而不是被过滤掉；
+# 用作普通对象值的 `select(length > 0)` 在任何选定字段为空时
+# 会将整个封闭对象折叠为空，这会在仅 session_id 缺失时
+# 隐藏转发的字段如 transcript_path。
 HOOK_INPUT=$(jq -n \
     --arg session_id "$SESSION_ID" \
     --arg transcript_path "$TRANSCRIPT_PATH" \
@@ -122,8 +121,8 @@ HOOK_INPUT=$(jq -n \
         transcript_path: (if ($transcript_path | length) > 0 then $transcript_path else null end)
     }')
 
-# Capture hook exit code explicitly to map non-zero to exit 20 (wrapper error)
-# instead of letting set -e propagate the raw hook exit code.
+# 显式捕获钩子退出码，将非零映射到退出 20（包装器错误），
+# 而不是让 set -e 传播原始钩子退出码。
 HOOK_EXIT=0
 HOOK_OUTPUT="$(printf '%s' "$HOOK_INPUT" | CLAUDE_PROJECT_DIR="$PROJECT_ROOT" "$HOOK_SCRIPT")" || HOOK_EXIT=$?
 
@@ -133,7 +132,7 @@ if [[ $HOOK_EXIT -ne 0 ]]; then
     exit 20
 fi
 
-# No JSON response means hook allowed exit.
+# 没有 JSON 响应意味着钩子允许退出。
 if [[ -z "$HOOK_OUTPUT" ]]; then
     echo "ALLOW: stop gate passed."
     exit 0
@@ -159,9 +158,9 @@ if [[ "$DECISION" == "block" ]]; then
     exit 10
 fi
 
-# No decision field in the JSON: per Claude Code Stop-hook spec this means
-# allow the stop. Surface any systemMessage so callers see the reason
-# (e.g. "background task(s) still running"), then exit 0.
+# JSON 中没有 decision 字段：根据 Claude Code Stop-hook 规范，这意味着
+# 允许停止。显示任何 systemMessage 以便调用者看到原因
+# （例如 "background task(s) still running"），然后退出 0。
 if [[ -z "$DECISION" ]]; then
     if [[ "$PRINT_JSON" == "true" ]]; then
         printf '%s\n' "$HOOK_OUTPUT"

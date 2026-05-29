@@ -1,39 +1,35 @@
 #!/usr/bin/env bash
 #
-# Live Flask test_client coverage for viz/server/app.py (T13).
+# viz/server/app.py (T13) 的实时 Flask test_client 覆盖。
 #
-# Drives the actual Flask app with route-level requests rather than
-# pattern checks. Bootstraps a Python venv with Flask + flask-sock +
-# watchdog + pyyaml if VIZ_TEST_VENV is unset; uses the supplied venv
-# otherwise.
+# 使用路由级请求驱动实际的 Flask 应用，而非模式检查。
+# 如果未设置 VIZ_TEST_VENV，则引导一个包含 Flask + flask-sock +
+# watchdog + pyyaml 的 Python venv；否则使用提供的 venv。
 #
-# Coverage (every assertion is a real Flask test_client request):
-#   - GET /api/health (open in any mode).
-#   - GET /api/sessions (200 with one CLI-fixed entry; 401 in remote
-#     mode without valid token).
-#   - GET /api/sessions/<id> (200 known / 404 unknown in localhost;
-#     401 without token / 200 with valid bearer in remote mode).
-#   - POST /api/sessions/cancel (400 missing-id route from Round 5).
-#   - POST /api/sessions/<id>/cancel (404 unknown; 401 without token in
-#     remote mode).
-#   - 410 Gone for /api/projects/{switch,add,remove}.
-#   - GET /api/sessions/<id>/logs/<basename> SSE: initial snapshot and
-#     auto-eof when the session has terminal status (so test_client
-#     iter_encoded() returns); basename validation rejects non-matching
-#     names with 400; missing-cache startup yields resync(missing)+eof.
-#   - Auth middleware: every protected endpoint requires a token in
-#     remote mode; missing/invalid token returns 401, valid token
-#     passes.
-#   - Concurrent active sessions enumerated correctly with mixed
-#     lifecycle states.
-#   - Truncation recovery via the SSE route: a writer thread mutates
-#     the cache log mid-stream while the SSE generator is reading,
-#     then transitions the session to a terminal status so the
-#     generator emits eof; the collected event stream contains the
-#     full snapshot -> resync(truncated) -> snapshot -> eof sequence.
+# 覆盖范围（每个断言都是真实的 Flask test_client 请求）：
+#   - GET /api/health（任何模式下开放）。
+#   - GET /api/sessions（200 带一个 CLI 固定条目；远程模式下
+#     无有效 token 时 401）。
+#   - GET /api/sessions/<id>（localhost 中 200 已知 / 404 未知；
+#     远程模式下无 token 401 / 有效 bearer 200）。
+#   - POST /api/sessions/cancel（第 5 轮的 400 缺少 id 路由）。
+#   - POST /api/sessions/<id>/cancel（404 未知；远程模式下
+#     无 token 401）。
+#   - /api/projects/{switch,add,remove} 返回 410 Gone。
+#   - GET /api/sessions/<id>/logs/<basename> SSE：初始快照和
+#     会话处于终态时自动 eof（因此 test_client
+#     iter_encoded() 返回）；basename 验证拒绝不匹配的
+#     名称并返回 400；缺失缓存启动产生 resync(missing)+eof。
+#   - 认证中间件：远程模式下每个受保护端点都需要 token；
+#     缺失/无效 token 返回 401，有效 token 通过。
+#   - 正确枚举具有混合生命周期状态的并发活跃会话。
+#   - 通过 SSE 路由的截断恢复：写入线程在 SSE 生成器读取时
+#     修改缓存日志，然后将会话转换为终态，使
+#     生成器发出 eof；收集的事件流包含完整的
+#     snapshot -> resync(truncated) -> snapshot -> eof 序列。
 #
-# All fixtures live under a per-test mktemp tree; no real ~/.humanize
-# or ~/.cache/humanize is touched.
+# 所有测试夹具位于每个测试的 mktemp 树下；不会触及真实的 ~/.humanize
+# 或 ~/.cache/humanize。
 
 set -euo pipefail
 
@@ -62,7 +58,7 @@ if [[ ! -d "$VENV_DIR/bin" ]]; then
     fi
 fi
 
-# Sanity-check the venv has the imports.
+# 健全性检查 venv 是否有必要的导入。
 if ! "$VENV_DIR/bin/python" -c "import flask, flask_sock, watchdog, yaml" 2>/dev/null; then
     echo "SKIP: venv at $VENV_DIR is missing required packages"
     exit 0
@@ -71,7 +67,7 @@ fi
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Run the Python driver that does the heavy lifting.
+# 运行执行繁重工作的 Python 驱动程序。
 "$VENV_DIR/bin/python" - "$PLUGIN_ROOT" "$TMP_DIR" <<'PYEOF'
 import os
 import sys
@@ -157,7 +153,7 @@ def configured_app(host='127.0.0.1', auth_token='', project_dir=None):
 
 # ─── Tests ──────────────────────────────────────────────────────────
 
-# Group 1: localhost-bound app, no auth required
+# 第 1 组：绑定到 localhost 的应用，不需要认证
 print("\nGroup 1: localhost-bound app, no auth")
 project = make_project('proj_localhost', [
     {'id': '2026-04-17_10-00-00', 'status_files': {
@@ -213,21 +209,21 @@ with configured_app(project_dir=project) as appmod:
     else:
         t_fail(f"projects/remove should return 410, got {r.status_code}")
 
-    # Missing-session-id 400 (the dedicated /api/sessions/cancel route)
+    # 缺少 session-id 的 400（专用的 /api/sessions/cancel 路由）
     r = client.post('/api/sessions/cancel')
     if r.status_code == 400 and 'session_id is required' in (r.get_data(as_text=True) or ''):
         t_pass("POST /api/sessions/cancel 400 with 'session_id is required'")
     else:
         t_fail(f"missing-id 400 route wrong: {r.status_code} {r.get_data(as_text=True)}")
 
-    # Unknown session 404
+    # 未知会话 404
     r = client.post('/api/sessions/9999-99-99/cancel')
     if r.status_code == 404:
         t_pass("POST /api/sessions/<unknown>/cancel returns 404")
     else:
         t_fail(f"unknown-session cancel wrong: {r.status_code}")
 
-    # GET /api/sessions/<known> returns the parsed session dict
+    # GET /api/sessions/<known> 返回解析后的会话字典
     r = client.get('/api/sessions/2026-04-17_10-00-00')
     if r.status_code == 200:
         body = r.get_json() or {}
@@ -238,14 +234,14 @@ with configured_app(project_dir=project) as appmod:
     else:
         t_fail(f"GET /api/sessions/<known> failed: {r.status_code}")
 
-    # GET /api/sessions/<unknown> returns 404
+    # GET /api/sessions/<unknown> 返回 404
     r = client.get('/api/sessions/9999-99-99-no-such')
     if r.status_code == 404:
         t_pass("GET /api/sessions/<unknown> returns 404")
     else:
         t_fail(f"GET /api/sessions/<unknown> should 404, got {r.status_code}")
 
-# Group 2: remote-bound app with token enforcement
+# 第 2 组：带 token 强制的远程绑定应用
 print("\nGroup 2: remote-bound app + token enforcement")
 TOKEN = 'a-very-secret-test-token'
 with configured_app(host='192.0.2.10', auth_token=TOKEN, project_dir=project) as appmod:
@@ -275,7 +271,7 @@ with configured_app(host='192.0.2.10', auth_token=TOKEN, project_dir=project) as
     else:
         t_fail(f"invalid-token sessions should 401, got {r.status_code}")
 
-    # SSE handler is also gated. Use ?token= query param per DEC-4.
+    # SSE 处理器也被门控。根据 DEC-4 使用 ?token= 查询参数。
     seed_cache_log(project, '2026-04-17_10-00-00', 'round-2-codex-run.log', b'hello')
     r = client.get('/api/sessions/2026-04-17_10-00-00/logs/round-2-codex-run.log')
     if r.status_code == 401:
@@ -289,7 +285,7 @@ with configured_app(host='192.0.2.10', auth_token=TOKEN, project_dir=project) as
     else:
         t_fail(f"missing-token cancel should 401, got {r.status_code}")
 
-    # GET /api/sessions/<known> in remote mode: 401 without, 200 with token
+    # 远程模式下的 GET /api/sessions/<known>：无 token 401，有 token 200
     r = client.get('/api/sessions/2026-04-17_10-00-00')
     if r.status_code == 401:
         t_pass("GET /api/sessions/<known> 401 without token in remote mode")
@@ -305,10 +301,10 @@ with configured_app(host='192.0.2.10', auth_token=TOKEN, project_dir=project) as
     else:
         t_fail(f"detail GET with valid token wrong: {r.status_code} {r.get_data(as_text=True)[:200]}")
 
-# Group 3: SSE stream behavior on terminal session (auto-eof)
+# 第 3 组：终态会话上的 SSE 流行为（自动 eof）
 print("\nGroup 3: SSE stream on terminal session (auto-eof)")
 
-# Add a terminal session whose SSE generator self-terminates.
+# 添加一个终态会话，其 SSE 生成器会自行终止。
 project_term = make_project('proj_terminal', [
     {'id': '2026-04-17_11-00-00', 'status_files': {
         'complete-state.md': '---\ncurrent_round: 3\nmax_iterations: 42\n---\n',
@@ -331,7 +327,7 @@ with configured_app(project_dir=project_term) as appmod:
     else:
         t_fail(f"SSE 200 expected, got {r.status_code}")
 
-    # Bad basename rejected
+    # 错误的 basename 被拒绝
     r = client.get('/api/sessions/2026-04-17_11-00-00/logs/not-a-valid-name.txt',
                    buffered=True)
     if r.status_code == 400:
@@ -339,7 +335,7 @@ with configured_app(project_dir=project_term) as appmod:
     else:
         t_fail(f"bad basename should 400, got {r.status_code}")
 
-# Group 4: two concurrent active sessions enumerated
+# 第 4 组：枚举两个并发活跃会话
 print("\nGroup 4: concurrent active sessions")
 proj_concurrent = make_project('proj_concurrent', [
     {'id': '2026-04-17_A', 'status_files': {
@@ -371,7 +367,7 @@ with configured_app(project_dir=proj_concurrent) as appmod:
     else:
         t_fail(f"lifecycle status enumeration wrong: {statuses}")
 
-# Group 5: missing-cache startup race
+# 第 5 组：缺失缓存启动竞争
 print("\nGroup 5: missing-cache startup race")
 proj_race = make_project('proj_race', [
     {'id': '2026-04-17_R', 'status_files': {
@@ -380,14 +376,12 @@ proj_race = make_project('proj_race', [
 ])
 with configured_app(project_dir=proj_race) as appmod:
     client = appmod.app.test_client()
-    # Active session with a state.md but NO terminal status → SSE
-    # generator never auto-eofs. To keep the test deterministic, rename
-    # the session to terminal mid-test by writing a complete-state.md
-    # AFTER the snapshot but BEFORE a long poll. Easier: just check
-    # the route accepts the request even without the cache log; the
-    # missing-cache resync semantics are unit-tested in test-streaming.sh.
-    # Drop the session into terminal state from the start so the
-    # generator self-terminates.
+    # 活跃会话有 state.md 但没有终态 → SSE 生成器永远不会自动 eof。
+    # 为了保持测试的确定性，在测试中将会话重命名为终态，
+    # 在快照之后但在长轮询之前写入 complete-state.md。
+    # 更简单的方法：只检查路由是否接受没有缓存日志的请求；
+    # 缺失缓存的重新同步语义在 test-streaming.sh 中进行单元测试。
+    # 从开始将会话置于终态，使生成器自行终止。
     rlcr_dir = os.path.join(proj_race, '.humanize', 'rlcr', '2026-04-17_R')
     os.rename(os.path.join(rlcr_dir, 'state.md'),
               os.path.join(rlcr_dir, 'complete-state.md'))
@@ -402,14 +396,13 @@ with configured_app(project_dir=proj_race) as appmod:
     else:
         t_fail(f"missing-cache SSE 200 expected, got {r.status_code}")
 
-# Group 6: route-backed truncation recovery via the SSE endpoint.
-# A writer thread mutates the cache log mid-stream while the SSE
-# generator is reading; once the mutation sequence is done the
-# session transitions to a terminal status so the generator emits
-# eof and Flask's iter_encoded() returns. The collected event stream
-# must contain the full snapshot -> resync(truncated) -> snapshot ->
-# eof sequence, proving the real Flask route honors the protocol
-# contract end to end (not just the LogStream class in isolation).
+# 第 6 组：通过 SSE 端点的路由支持截断恢复。
+# 写入线程在 SSE 生成器读取时修改缓存日志；
+# 一旦修改序列完成，会话转换为终态，使生成器发出
+# eof 且 Flask 的 iter_encoded() 返回。收集的事件流
+# 必须包含完整的 snapshot -> resync(truncated) -> snapshot ->
+# eof 序列，证明真实的 Flask 路由端到端遵守协议合同
+# （不仅仅是隔离的 LogStream 类）。
 print("\nGroup 6: route-backed truncation through the SSE endpoint")
 
 import time as _time
@@ -424,20 +417,19 @@ TR_LOG = seed_cache_log(proj_trunc, '2026-04-17_TR',
 TR_RLCR = os.path.join(proj_trunc, '.humanize', 'rlcr', '2026-04-17_TR')
 
 def _writer_then_terminate():
-    # Wait long enough for the SSE handler to emit the initial
-    # snapshot. The handler polls every 0.25 s and exits the snapshot
-    # loop after one read, so 0.6 s is comfortably past the first
-    # poll boundary.
+    # 等待足够长的时间让 SSE 处理器发出初始快照。
+    # 处理器每 0.25 秒轮询一次，并在一次读取后退出快照循环，
+    # 因此 0.6 秒舒适地超过了第一个轮询边界。
     _time.sleep(0.6)
-    # Truncate by overwriting with shorter content.
+    # 用更短的内容覆盖以截断。
     with open(TR_LOG, 'wb') as f:
         f.write(b'short')
-    # Give the poll loop a tick to detect the size shrink and emit
-    # resync(truncated) plus a fresh snapshot.
+    # 给轮询循环一个时间片来检测大小缩减并发出
+    # resync(truncated) 加上新的快照。
     _time.sleep(0.6)
-    # Transition to terminal so the SSE generator emits eof and Flask
-    # closes the response. The handler checks status every poll
-    # iteration via _get_session(force_refresh=True).
+    # 转换为终态，使 SSE 生成器发出 eof 且 Flask
+    # 关闭响应。处理器通过 _get_session(force_refresh=True)
+    # 每次轮询迭代检查状态。
     os.rename(os.path.join(TR_RLCR, 'state.md'),
               os.path.join(TR_RLCR, 'complete-state.md'))
 
@@ -454,7 +446,7 @@ with configured_app(project_dir=proj_trunc) as appmod:
         t_fail(f"route-backed truncation: SSE 200 expected, got {r.status_code}")
     else:
         body = b''.join(r.iter_encoded()).decode('utf-8', errors='replace')
-        # Count occurrences to verify the full sequence.
+        # 计算出现次数以验证完整序列。
         snap_count = body.count('event: snapshot')
         resync_truncated = ('event: resync' in body
                             and '"reason":"truncated"' in body)
@@ -468,18 +460,16 @@ with configured_app(project_dir=proj_trunc) as appmod:
                 f"body[:800]:\n{body[:800]}"
             )
 
-# Group 7: CSRF protection on mutating endpoints (Round 8 P1 fix).
-# A loopback-bound dashboard would otherwise accept cross-origin POSTs
-# from any webpage open in the same browser. The same-origin check
-# layered on top of the auth middleware closes that gap regardless
-# of bind. Read methods (GET) stay open; the test verifies that
-# behaviour is unchanged.
+# 第 7 组：变更端点上的 CSRF 保护（第 8 轮 P1 修复）。
+# 绑定到回环的仪表板会接受来自同一浏览器中打开的任何网页的跨域 POST。
+# 叠加在认证中间件之上的同源检查无论绑定如何都关闭了这个漏洞。
+# 读取方法（GET）保持开放；测试验证该行为不变。
 print("\nGroup 7: CSRF protection on mutating endpoints (P1)")
 
 with configured_app(project_dir=project) as appmod:
     client = appmod.app.test_client()
 
-    # Localhost POST with a cross-origin Origin header → 403.
+    # 带有跨域 Origin 头的 localhost POST → 403。
     r = client.post(
         '/api/sessions/2026-04-17_10-00-00/cancel',
         headers={'Origin': 'http://evil.example.com'},
@@ -489,12 +479,10 @@ with configured_app(project_dir=project) as appmod:
     else:
         t_fail(f"cross-origin POST should 403, got {r.status_code} {r.get_data(as_text=True)[:200]}")
 
-    # Localhost POST with a same-origin Origin → goes through the
-    # normal handler chain (400 here because the session is in a
-    # terminal state, not active/analyzing/finalizing). Flask
-    # test_client's default request Host is `localhost` (no explicit
-    # port, implicit port 80), so the same-origin check uses an
-    # Origin that resolves to the same host:port pair.
+    # 带有同源 Origin 的 localhost POST → 通过正常的处理器链
+    # （这里返回 400，因为会话处于终态，不是 active/analyzing/finalizing）。
+    # Flask test_client 的默认请求 Host 是 `localhost`（无显式端口，
+    # 隐式端口 80），因此同源检查使用解析到相同 host:port 对的 Origin。
     r = client.post(
         '/api/sessions/2026-04-16_09-00-00/cancel',
         headers={'Origin': 'http://localhost'},
@@ -504,7 +492,7 @@ with configured_app(project_dir=project) as appmod:
     else:
         t_fail(f"same-origin POST should NOT 403, got {r.status_code}")
 
-    # Cross-origin Referer (no Origin) also rejected.
+    # 跨域 Referer（无 Origin）也被拒绝。
     r = client.post(
         '/api/sessions/2026-04-17_10-00-00/cancel',
         headers={'Referer': 'http://evil.example.com/foo'},
@@ -514,8 +502,8 @@ with configured_app(project_dir=project) as appmod:
     else:
         t_fail(f"cross-origin Referer POST should 403, got {r.status_code}")
 
-    # GET requests are unaffected by CSRF (Same-Origin Policy already
-    # prevents cross-origin pages from reading our responses).
+    # GET 请求不受 CSRF 影响（同源策略已经
+    # 防止跨域页面读取我们的响应）。
     r = client.get(
         '/api/sessions',
         headers={'Origin': 'http://evil.example.com'},
@@ -525,13 +513,11 @@ with configured_app(project_dir=project) as appmod:
     else:
         t_fail(f"GET should not be gated by CSRF, got {r.status_code}")
 
-# CSRF for the documented `--host 0.0.0.0` remote scenario: the bind
-# is a wildcard, but browsers send the machine's real hostname, so a
-# literal-bind comparison would (incorrectly) reject every cross-host
-# POST as cross-origin. The fix compares Origin against the request's
-# own Host header instead. We simulate that by configuring BIND_HOST
-# to the wildcard and sending a request whose Origin matches the
-# test_client's implicit Host (`localhost`).
+# 文档化的 `--host 0.0.0.0` 远程场景的 CSRF：绑定是通配符，
+# 但浏览器发送机器的真实主机名，因此字面绑定比较会（错误地）
+# 将每个跨主机 POST 拒绝为跨域。修复改为将 Origin 与请求自身的
+# Host 头进行比较。我们通过将 BIND_HOST 配置为通配符并发送
+# Origin 与 test_client 的隐式 Host（`localhost`）匹配的请求来模拟。
 print("\nGroup 7b: CSRF accepts real hostnames for wildcard remote bind")
 TOKEN_REMOTE = 'token-for-wildcard-bind-test'
 with configured_app(host='0.0.0.0', auth_token=TOKEN_REMOTE, project_dir=proj_lifecycle if False else project) as appmod:
@@ -548,7 +534,7 @@ with configured_app(host='0.0.0.0', auth_token=TOKEN_REMOTE, project_dir=proj_li
     else:
         t_fail("wildcard 0.0.0.0 bind: same-origin Origin still rejected as cross-origin")
 
-    # And the cross-origin negative still rejects in wildcard mode.
+    # 跨域负向测试在通配符模式下仍然拒绝。
     r = client.post(
         '/api/sessions/2026-04-16_09-00-00/cancel',
         headers={
@@ -561,16 +547,15 @@ with configured_app(host='0.0.0.0', auth_token=TOKEN_REMOTE, project_dir=proj_li
     else:
         t_fail(f"wildcard 0.0.0.0 bind: cross-origin should 403, got {r.status_code}")
 
-# Group 7c: IPv6 loopback bind (Round 11 P2 fix). request.host carries
-# the bracketed form `[::1]:18000` per RFC 7230, but urlparse on the
-# Origin returns the unbracketed `::1`. Without bracket-stripping the
-# same-origin compare would 403 every mutating request from the
-# documented IPv6 loopback bind.
+# 第 7c 组：IPv6 回环绑定（第 11 轮 P2 修复）。request.host 根据
+# RFC 7230 携带带括号的形式 `[::1]:18000`，但 Origin 上的 urlparse
+# 返回不带括号的 `::1`。如果不剥离括号，同源比较会对来自
+# 文档化的 IPv6 回环绑定的每个变更请求返回 403。
 print("\nGroup 7c: CSRF strips IPv6 brackets before same-origin compare (P2 Round 11)")
 with configured_app(host='::1', auth_token='', project_dir=project) as appmod:
     client = appmod.app.test_client()
-    # Simulate a request whose Host is the bracketed IPv6 form.
-    # Flask test_client honors the Host header explicitly.
+    # 模拟 Host 为带括号 IPv6 形式的请求。
+    # Flask test_client 显式遵循 Host 头。
     r = client.post(
         '/api/sessions/2026-04-16_09-00-00/cancel',
         headers={
@@ -583,7 +568,7 @@ with configured_app(host='::1', auth_token='', project_dir=project) as appmod:
     else:
         t_fail("IPv6 loopback bind: same-origin POST still rejected as cross-origin")
 
-    # Cross-origin still rejected when Host is IPv6.
+    # Host 为 IPv6 时跨域仍然被拒绝。
     r = client.post(
         '/api/sessions/2026-04-16_09-00-00/cancel',
         headers={
@@ -596,12 +581,12 @@ with configured_app(host='::1', auth_token='', project_dir=project) as appmod:
     else:
         t_fail(f"IPv6 loopback bind: cross-origin should 403, got {r.status_code}")
 
-# Group 7d: malformed Origin ports are a controlled 403, not an
-# uncaught ValueError. ``urlparse`` accepts values like
-# ``http://host:bad`` or ``http://host:999999`` without raising, but
-# accessing ``.port`` raises ValueError. Without bracketing that access
-# in try/except, cancel/report/issue POSTs from a client sending such
-# a header would return 500 instead of the intended 403.
+# 第 7d 组：格式错误的 Origin 端口是受控的 403，而非未捕获的
+# ValueError。``urlparse`` 接受 ``http://host:bad`` 或
+# ``http://host:999999`` 等值而不抛出异常，但访问 ``.port``
+# 会抛出 ValueError。如果不在 try/except 中包裹该访问，
+# 发送此类头的客户端的 cancel/report/issue POST 会返回 500
+# 而非预期的 403。
 print("\nGroup 7d: CSRF rejects malformed Origin ports with 403 (no 500)")
 with configured_app(host='127.0.0.1', auth_token='', project_dir=project) as appmod:
     client = appmod.app.test_client()
@@ -620,10 +605,10 @@ with configured_app(host='127.0.0.1', auth_token='', project_dir=project) as app
         else:
             t_fail(f"malformed Origin {bad_origin!r} should 403, got {r.status_code}")
 
-# Group 8: cancel allows analyzing / finalizing phases (Round 8 P2 fix).
-# The dashboard previously rejected anything except status == 'active',
-# which made finalize-stuck loops uncancellable from the UI even
-# though scripts/cancel-rlcr-session.sh supports those phases.
+# 第 8 组：cancel 允许 analyzing / finalizing 阶段（第 8 轮 P2 修复）。
+# 仪表板之前拒绝除 status == 'active' 以外的任何状态，
+# 这使得从 UI 无法取消 finalize 卡住的循环，即使
+# scripts/cancel-rlcr-session.sh 支持这些阶段。
 print("\nGroup 8: cancel route accepts analyzing/finalizing (P2)")
 
 proj_lifecycle = make_project('proj_cancel_lifecycle', [
@@ -638,14 +623,14 @@ proj_lifecycle = make_project('proj_cancel_lifecycle', [
 with configured_app(project_dir=proj_lifecycle) as appmod:
     client = appmod.app.test_client()
 
-    # Cancel on analyzing session: should succeed (no --force needed).
+    # 取消 analyzing 会话：应该成功（不需要 --force）。
     r = client.post('/api/sessions/2026-04-17_AN/cancel')
     if r.status_code == 200 and (r.get_json() or {}).get('status') == 'cancelled':
         t_pass("POST cancel on analyzing session returns 200 cancelled")
     else:
         t_fail(f"analyzing-cancel should 200, got {r.status_code} {r.get_data(as_text=True)[:200]}")
 
-    # Verify the helper actually renamed the active state file.
+    # 验证辅助函数确实重命名了活跃状态文件。
     rlcr_an = os.path.join(proj_lifecycle, '.humanize', 'rlcr', '2026-04-17_AN')
     if (os.path.isfile(os.path.join(rlcr_an, 'cancel-state.md'))
             and not os.path.isfile(os.path.join(rlcr_an, 'methodology-analysis-state.md'))):
@@ -653,9 +638,9 @@ with configured_app(project_dir=proj_lifecycle) as appmod:
     else:
         t_fail("analyzing session: state-file rename did not happen")
 
-    # Cancel on finalizing session: should succeed because the route
-    # forwards --force to the helper. Without --force the helper
-    # returns exit 2.
+    # 取消 finalizing 会话：应该成功，因为路由
+    # 向辅助函数转发 --force。没有 --force 时辅助函数
+    # 返回退出码 2。
     r = client.post('/api/sessions/2026-04-17_FI/cancel')
     if r.status_code == 200 and (r.get_json() or {}).get('status') == 'cancelled':
         t_pass("POST cancel on finalizing session returns 200 (route forwards --force)")
@@ -669,21 +654,20 @@ with configured_app(project_dir=proj_lifecycle) as appmod:
     else:
         t_fail("finalizing session: state-file rename did not happen")
 
-    # Cancel on a terminal session is still rejected (status not in the
-    # cancellable set). Use the freshly-cancelled session for the test.
+    # 取消终态会话仍然被拒绝（状态不在可取消集合中）。
+    # 使用刚刚取消的会话进行测试。
     r = client.post('/api/sessions/2026-04-17_AN/cancel')
     if r.status_code == 400:
         t_pass("POST cancel on terminal (cancelled) session still returns 400")
     else:
         t_fail(f"terminal-cancel should 400, got {r.status_code}")
 
-# Group 8b: --project forwarding regression test (Round 9 P2 fix).
-# When the dashboard process inherits CLAUDE_PROJECT_DIR from another
-# workspace, scripts/cancel-rlcr-session.sh would fall back to that
-# stray env var instead of the dashboard's --project unless the route
-# forwards --project explicitly. Simulate that scenario by setting
-# CLAUDE_PROJECT_DIR to a DIFFERENT empty project and verifying the
-# cancel still affects the dashboard's own project.
+# 第 8b 组：--project 转发回归测试（第 9 轮 P2 修复）。
+# 当仪表板进程从另一个工作区继承 CLAUDE_PROJECT_DIR 时，
+# scripts/cancel-rlcr-session.sh 会回退到那个游离的环境变量，
+# 而非仪表板的 --project，除非路由显式转发 --project。
+# 通过将 CLAUDE_PROJECT_DIR 设置为不同的空项目并验证
+# 取消仍然影响仪表板自己的项目来模拟该场景。
 print("\nGroup 8b: cancel route forwards --project (Round 9 P2 fix)")
 
 other_project = make_project('proj_other_for_env', [
@@ -712,7 +696,7 @@ try:
         else:
             t_fail(f"cancel with stray CLAUDE_PROJECT_DIR should 200, got {r.status_code} {r.get_data(as_text=True)[:200]}")
 
-        # The TARGET project's session should be cancelled.
+        # TARGET 项目的会话应该被取消。
         target_dir = os.path.join(dashboard_project, '.humanize', 'rlcr', '2026-04-17_TARGET')
         if (os.path.isfile(os.path.join(target_dir, 'cancel-state.md'))
                 and not os.path.isfile(os.path.join(target_dir, 'state.md'))):
@@ -720,7 +704,7 @@ try:
         else:
             t_fail("cancel did not rename TARGET state.md to cancel-state.md")
 
-        # The OTHER project's session should be untouched.
+        # OTHER 项目的会话应该不受影响。
         other_dir = os.path.join(other_project, '.humanize', 'rlcr', '2026-04-17_OTHER')
         if os.path.isfile(os.path.join(other_dir, 'state.md')):
             t_pass("cancel did NOT touch the stray CLAUDE_PROJECT_DIR project (OTHER untouched)")
@@ -732,10 +716,10 @@ finally:
     else:
         os.environ.pop('CLAUDE_PROJECT_DIR', None)
 
-# Group 9: parsers recognise both legacy AC-N and post-Round-5 C-N
-# prefixes (Round 10 P2 fix). The --skip-impl template seeds C-N
-# identifiers; if the parsers only matched the legacy prefix, review-
-# only loops would report 0 ACs / 0% completion in the dashboard.
+# 第 9 组：解析器识别旧版 AC-N 和第 5 轮后的 C-N 前缀
+# （第 10 轮 P2 修复）。--skip-impl 模板播种 C-N 标识符；
+# 如果解析器只匹配旧版前缀，仅评审的循环会在仪表板中
+# 报告 0 个 AC / 0% 完成。
 print("\nGroup 9: parsers recognise both AC-N and C-N criterion ids (P2 Round 10)")
 
 def _make_session_with_tracker(name, session_id, tracker_body):
@@ -749,7 +733,7 @@ def _make_session_with_tracker(name, session_id, tracker_body):
         f.write(tracker_body)
     return proj
 
-# Legacy AC-N tracker.
+# 旧版 AC-N 跟踪器。
 legacy_tracker = """\
 ### Acceptance Criteria
 
@@ -772,7 +756,7 @@ with configured_app(project_dir=proj_legacy) as appmod:
     else:
         t_fail(f"legacy AC-N detection wrong: {body.get('ac_total')} (status {r.status_code})")
 
-# Post-Round-5 C-N tracker (matches the --skip-impl template form).
+# 第 5 轮后的 C-N 跟踪器（匹配 --skip-impl 模板形式）。
 new_tracker = """\
 ### Acceptance Criteria
 
@@ -795,8 +779,8 @@ with configured_app(project_dir=proj_new) as appmod:
     else:
         t_fail(f"C-N detection wrong: {body.get('ac_total')} (status {r.status_code})")
 
-# Group 10: finalize-phase classification only applies to the live
-# round, not retroactively to historical rounds (Round 10 P2 fix).
+# 第 10 组：finalize 阶段分类仅适用于实时轮次，
+# 不追溯到历史轮次（第 10 轮 P2 修复）。
 print("\nGroup 10: finalize phase only labels the live round (P2 Round 10)")
 
 proj_final = make_project('proj_finalize_phase', [
@@ -805,8 +789,8 @@ proj_final = make_project('proj_finalize_phase', [
     }},
 ])
 fn_dir = os.path.join(proj_final, '.humanize', 'rlcr', '2026-04-17_FN')
-# Seed several round summaries so parse_session has rounds 0..4 to
-# classify; round 4 is the current round (live finalize step).
+# 播种几个轮次摘要，使 parse_session 有 0..4 轮次需要分类；
+# 第 4 轮是当前轮次（实时 finalize 步骤）。
 for n in range(5):
     with open(os.path.join(fn_dir, f'round-{n}-summary.md'), 'w', encoding='utf-8') as f:
         f.write(f'## Round {n}\n\nSummary content for round {n}.\n')
@@ -817,24 +801,24 @@ with configured_app(project_dir=proj_final) as appmod:
     body = r.get_json() or {}
     rounds = {item['number']: item['phase'] for item in (body.get('rounds') or [])}
 
-    # Historical rounds 0..3 should be 'implementation', not 'finalize'.
+    # 历史轮次 0..3 应该是 'implementation'，不是 'finalize'。
     historical_correct = all(rounds.get(n) == 'implementation' for n in range(4))
     if historical_correct:
         t_pass("historical rounds (0..3) classified as 'implementation', NOT 'finalize'")
     else:
         t_fail(f"historical rounds wrongly relabeled: {rounds}")
 
-    # The current (live finalize) round should be 'finalize'.
+    # 当前（实时 finalize）轮次应该是 'finalize'。
     if rounds.get(4) == 'finalize':
         t_pass("current round (4) classified as 'finalize' (live finalize step)")
     else:
         t_fail(f"current round should be finalize, got {rounds.get(4)}")
 
-# Group 11: parser recognises decimal and dashless criterion ids
-# (Round 13 P2 fix). The plan/goal-tracker format explicitly allows
-# nested ids (AC-1.1, C-2.5) and dashless short forms (C1). A regex
-# that only matched [A]?[C]-\d+ silently dropped those and the
-# dashboard under-reported ac_total/ac_done.
+# 第 11 组：解析器识别小数和无短横线的准则 id
+# （第 13 轮 P2 修复）。计划/目标跟踪器格式显式允许
+# 嵌套 id（AC-1.1、C-2.5）和无短横线的短形式（C1）。
+# 只匹配 [A]?[C]-\d+ 的正则表达式会静默丢弃这些，
+# 仪表板少报了 ac_total/ac_done。
 print("\nGroup 11: parser recognises decimal + dashless criterion ids (P2 Round 13)")
 
 mixed_tracker = """\
@@ -869,12 +853,12 @@ with configured_app(project_dir=proj_mixed) as appmod:
     else:
         t_fail(f"expected {{AC-1.1, C-2.5, C3, AC-4}}, got {ac_ids}")
 
-# Group 12: multi-criterion cells in Completed-Verified mark every
-# listed id as done (Round 13 P2 fix). Before this fix, a row like
-# `| AC-1, AC-2 | ... |` added the composite string as the completed
-# key, so the acceptance_criteria status lookup (which tests a single
-# id) left both criteria pending even though the loop's shell-side
-# accounting treated them as verified.
+# 第 12 组：Completed-Verified 中的多准则单元格将每个
+# 列出的 id 标记为完成（第 13 轮 P2 修复）。在此修复之前，
+# 像 `| AC-1, AC-2 | ... |` 这样的行将复合字符串添加为完成键，
+# 因此 acceptance_criteria 状态查找（测试单个 id）
+# 将两个准则都保留为待定，即使循环的 shell 端
+# 计数将它们视为已验证。
 print("\nGroup 12: multi-id Completed-Verified cells mark every id done (P2 Round 13)")
 
 multi_id_tracker = """\
@@ -911,12 +895,11 @@ with configured_app(project_dir=proj_multi) as appmod:
     else:
         t_fail(f"per-id statuses wrong: {ac_by_id}")
 
-# Group 13: table-form acceptance criteria (Round 14 P2 fix). The
-# loop's shell-side accounting and the refine-plan workflow both
-# allow the "### Acceptance Criteria" section to render as a table
-# instead of a bulleted list. Previously the parser only matched
-# "- id: description" list items, so table-form trackers reported
-# ac_total=0 and skewed analytics.
+# 第 13 组：表格形式的验收标准（第 14 轮 P2 修复）。
+# 循环的 shell 端计数和 refine-plan 工作流都允许
+# "### Acceptance Criteria" 部分渲染为表格而非项目列表。
+# 之前解析器只匹配 "- id: description" 列表项，
+# 因此表格形式的跟踪器报告 ac_total=0 并使分析失真。
 print("\nGroup 13: parser accepts table-form acceptance criteria (P2 Round 14)")
 
 table_ac_tracker = """\
@@ -956,10 +939,10 @@ with configured_app(project_dir=proj_tbl) as appmod:
     else:
         t_fail(f"table-form status propagation wrong: {ac_by_id}")
 
-# Group 13b: /api/sessions must keep cache_logs so home-page live
-# panes can open SSE streams (Round 17 P1 fix). Before this fix the
-# summary route stripped the field, so the multi-session live-pane
-# feature silently never activated on #/.
+# 第 13b 组：/api/sessions 必须保留 cache_logs，以便首页实时
+# 面板可以打开 SSE 流（第 17 轮 P1 修复）。在此修复之前，
+# 摘要路由剥离了该字段，因此多会话实时面板功能
+# 在 #/ 上静默地从未激活。
 print("\nGroup 13b: /api/sessions preserves cache_logs (P1 Round 17)")
 
 proj_cl = make_project('proj_cache_logs', [
@@ -970,9 +953,8 @@ proj_cl = make_project('proj_cache_logs', [
 cl_cache_dir = os.path.join(proj_cl, '.cache', 'humanize',
                             '-' + proj_cl.strip('/').replace('/', '-'),
                             '2026-04-17_CL')
-# Seed a cache log so parse_session can report it. Use the project-
-# local .cache layout honoured by rlcr_sources when the user-level
-# cache is not available in the test environment.
+# 播种缓存日志以便 parse_session 可以报告它。使用
+# rlcr_sources 在用户级缓存不可用时遵循的项目本地 .cache 布局。
 env_override = {'XDG_CACHE_HOME': os.path.join(proj_cl, '.cache')}
 os.makedirs(cl_cache_dir, exist_ok=True)
 with open(os.path.join(cl_cache_dir, 'round-0-codex-run.log'), 'w') as f:
@@ -1003,10 +985,10 @@ finally:
         else:
             os.environ[k] = v
 
-# Group 13c: methodology report prompt uses the LATEST rounds, not
-# the earliest (Round 17 P2 fix). Verified via source-level check
-# because /api/sessions/<id>/generate-report actually invokes the
-# claude CLI which is not available in the test env.
+# 第 13c 组：方法论报告提示使用最新的轮次，而非最早的
+# （第 17 轮 P2 修复）。通过源码级检查验证，因为
+# /api/sessions/<id>/generate-report 实际上调用了
+# 测试环境中不可用的 claude CLI。
 print("\nGroup 13c: methodology report uses latest rounds (P2 Round 17)")
 
 import re as _re_test
@@ -1021,9 +1003,9 @@ if not _re_test.search(r'summaries\[:10\]|reviews\[:10\]', app_src):
 else:
     t_fail("stale [:10] slice still present somewhere in app.py")
 
-# Group 15: session-path validation (Round 19 P1 fix). Non-session
-# paths and traversal attempts must resolve to 404 instead of
-# letting downstream parsers read arbitrary files under .humanize/.
+# 第 15 组：会话路径验证（第 19 轮 P1 修复）。非会话路径和
+# 遍历尝试必须解析为 404，而不是让下游解析器
+# 读取 .humanize/ 下的任意文件。
 print("\nGroup 15: session-path validation rejects traversal + non-session dirs (P1 Round 19)")
 
 proj_trav = make_project('proj_path_validation', [
@@ -1031,24 +1013,24 @@ proj_trav = make_project('proj_path_validation', [
         'state.md': '---\ncurrent_round: 0\nmax_iterations: 42\n---\n',
     }},
 ])
-# Seed a non-session directory under .humanize/rlcr so "stray dir"
-# requests have a real directory to point at (otherwise isdir fails
-# early for a different reason and the test is uninteresting).
+# 在 .humanize/rlcr 下播种一个非会话目录，使"游离目录"
+# 请求有一个真实的目录可以指向（否则 isdir 会因不同原因
+# 提前失败，测试就无意义了）。
 stray_dir = os.path.join(proj_trav, '.humanize', 'rlcr', 'cache')
 os.makedirs(stray_dir, exist_ok=True)
 
 with configured_app(project_dir=proj_trav) as appmod:
     client = appmod.app.test_client()
-    # The valid session still returns 200 (sanity baseline).
+    # 有效会话仍然返回 200（健全性基线）。
     r = client.get('/api/sessions/2026-04-17_PV')
     if r.status_code == 200:
         t_pass("[P1] valid session id still resolves to 200 (regression baseline)")
     else:
         t_fail(f"[P1] regression: valid session id returned {r.status_code}")
 
-    # Traversal attempts must 404, not leak file contents from
-    # sibling .humanize paths. Flask routing normalises `/..`, so
-    # we test the path-segment form that reaches _get_session_dir.
+    # 遍历尝试必须 404，不能泄露同级 .humanize 路径的文件内容。
+    # Flask 路由规范化 `/..`，因此我们测试到达 _get_session_dir
+    # 的路径段形式。
     for bad_id in ('..', '.', '.hidden', 'foo/bar', 'foo\\bar'):
         r = client.get(f'/api/sessions/{bad_id}')
         if r.status_code == 404:
@@ -1059,20 +1041,19 @@ with configured_app(project_dir=proj_trav) as appmod:
     else:
         t_pass("[P1] traversal ids ('..', '.', hidden, slashes, backslashes) all resolve to 404")
 
-    # A real but non-session directory (stray `cache/`) must also
-    # 404 because is_valid_session requires state.md or a terminal
-    # *-state.md file.
+    # 真实但非会话的目录（游离的 `cache/`）也必须 404，
+    # 因为 is_valid_session 需要 state.md 或终态的
+    # *-state.md 文件。
     r = client.get('/api/sessions/cache')
     if r.status_code == 404:
         t_pass("[P1] non-session directory under .humanize/rlcr resolves to 404")
     else:
         t_fail(f"[P1] non-session dir returned {r.status_code} (should be 404)")
 
-# Group 16: COMPLETE verdict requires terminal marker line (Round 19
-# P2 fix). Prose like "CANNOT COMPLETE" must NOT flip verdict to
-# 'complete' -- that would silently break last_verdict, the pipeline
-# UI, and analytics for any review that discusses the COMPLETE
-# contract in free text.
+# 第 16 组：COMPLETE 判定需要终态标记行（第 19 轮 P2 修复）。
+# 像 "CANNOT COMPLETE" 这样的文本不得将判定翻转为
+# 'complete' — 这会静默地破坏 last_verdict、流水线 UI
+# 以及任何在自由文本中讨论 COMPLETE 合同的评审的分析。
 print("\nGroup 16: COMPLETE verdict requires terminal marker line (P2 Round 19)")
 
 from parser import parse_review_result
@@ -1104,10 +1085,10 @@ for label, content, expected in test_cases:
 if all_verdicts_correct:
     t_pass("[P2] COMPLETE verdict parsing handles terminal marker + false-positive prose + fallback verdicts")
 
-# Group 17: /report returns 404 for sessions with no methodology
-# report (Round 19 P3 fix). Without this, clients get 200 plus
-# {'content': {'zh': None, 'en': None}} and cannot distinguish
-# "report missing" from "report loaded successfully but empty".
+# 第 17 组：没有方法论报告的会话的 /report 返回 404
+# （第 19 轮 P3 修复）。没有这个，客户端会得到 200 加
+# {'content': {'zh': None, 'en': None}}，无法区分
+# "报告缺失"和"报告加载成功但为空"。
 print("\nGroup 17: /api/sessions/<id>/report returns 404 when report missing (P3 Round 19)")
 
 proj_rep = make_project('proj_no_report', [
@@ -1118,18 +1099,18 @@ proj_rep = make_project('proj_no_report', [
 
 with configured_app(project_dir=proj_rep) as appmod:
     client = appmod.app.test_client()
-    # No methodology-report.md file seeded -> must 404.
+    # 未播种 methodology-report.md 文件 -> 必须 404。
     r = client.get('/api/sessions/2026-04-17_NR/report')
     if r.status_code == 404:
         t_pass("[P3] /report returns 404 when methodology report file is missing")
     else:
         t_fail(f"[P3] /report returned {r.status_code} for missing report (expected 404)")
 
-    # Seed a real report and confirm the route flips back to 200.
+    # 播种一个真实的报告并确认路由翻转回 200。
     nr_dir = os.path.join(proj_rep, '.humanize', 'rlcr', '2026-04-17_NR')
     with open(os.path.join(nr_dir, 'methodology-analysis-report.md'), 'w') as f:
         f.write('# Methodology Report\n\nContent here.\n')
-    # Drop any cached session to force re-parse.
+    # 丢弃任何缓存的会话以强制重新解析。
     appmod._invalidate_cache()
     r = client.get('/api/sessions/2026-04-17_NR/report')
     if r.status_code == 200:
@@ -1142,23 +1123,23 @@ with configured_app(project_dir=proj_rep) as appmod:
     else:
         t_fail(f"[P3] /report returned {r.status_code} after report was seeded (expected 200)")
 
-# Group 14: skip-impl round 0 is classified as code_review, not
-# implementation (Round 14 P2 fix). setup-rlcr-loop.sh writes the
-# marker file with skip_impl=true so _determine_phase() can
-# distinguish it from a normal-mode session whose first round
-# happened to be the last build round (build_finish_round=0).
+# 第 14 组：skip-impl 第 0 轮被分类为 code_review，而非
+# implementation（第 14 轮 P2 修复）。setup-rlcr-loop.sh 写入
+# 带有 skip_impl=true 的标记文件，使 _determine_phase() 可以
+# 将其与第一轮恰好是最后一轮构建轮次
+# （build_finish_round=0）的正常模式会话区分开。
 print("\nGroup 14: skip-impl round 0 classifies as code_review (P2 Round 14)")
 
-# A. Skip-impl session: every round (including round 0) is review.
+# A. Skip-impl 会话：每轮（包括第 0 轮）都是评审。
 proj_skip = make_project('proj_skip_impl', [
     {'id': '2026-04-17_SK', 'status_files': {
         'state.md': '---\ncurrent_round: 3\nmax_iterations: 42\nreview_started: true\n---\n',
     }},
 ])
 sk_dir = os.path.join(proj_skip, '.humanize', 'rlcr', '2026-04-17_SK')
-# Marker carries both build_finish_round=0 (legacy content) AND the
-# new skip_impl=true discriminator. Seed round-N summaries so
-# parse_session has something to classify.
+# 标记同时携带 build_finish_round=0（旧版内容）和
+# 新的 skip_impl=true 判别器。播种 round-N 摘要，使
+# parse_session 有内容可以分类。
 with open(os.path.join(sk_dir, '.review-phase-started'), 'w') as f:
     f.write('build_finish_round=0\nskip_impl=true\n')
 for n in range(4):
@@ -1179,9 +1160,9 @@ with configured_app(project_dir=proj_skip) as appmod:
     else:
         t_fail(f"skip-impl round phases wrong: {rounds}")
 
-# B. Normal-mode regression: build_finish_round=0 WITHOUT
-# skip_impl=true means round 0 was the last build round and
-# should remain 'implementation' (round 1+ is code_review).
+# B. 正常模式回归：build_finish_round=0 但没有
+# skip_impl=true 意味着第 0 轮是最后一轮构建轮次，
+# 应该保持 'implementation'（第 1+ 轮是 code_review）。
 proj_norm = make_project('proj_norm_build0', [
     {'id': '2026-04-17_NB', 'status_files': {
         'state.md': '---\ncurrent_round: 3\nmax_iterations: 42\nreview_started: true\n---\n',

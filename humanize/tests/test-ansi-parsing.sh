@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# Test ANSI escape code handling in test runner output parsing
+# 测试运行器输出解析中的 ANSI 转义码处理
 #
-# This tests the portable ANSI stripping used in run-all-tests.sh
-# to ensure it works correctly on both GNU (Linux) and BSD (macOS) sed.
+# 测试 run-all-tests.sh 中使用的可移植 ANSI 剥离方法，
+# 确保在 GNU (Linux) 和 BSD (macOS) sed 上都能正确工作。
 #
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
@@ -35,11 +35,11 @@ echo "Testing ANSI Escape Code Parsing"
 echo "========================================"
 echo ""
 
-# Test the portable ANSI stripping approach used in run-all-tests.sh
-# Uses $'\033' (ANSI-C quoting) which works on both GNU and BSD sed
+# 测试 run-all-tests.sh 中使用的可移植 ANSI 剥离方法
+# 使用 $'\033'（ANSI-C 引用），在 GNU 和 BSD sed 上都能工作
 
 # ========================================
-# Test 1: Basic ANSI color stripping
+# 测试 1：基本 ANSI 颜色剥离
 # ========================================
 echo "Test 1: Basic ANSI color stripping"
 input=$'Passed: \033[0;32m43\033[0m'
@@ -53,7 +53,7 @@ else
 fi
 
 # ========================================
-# Test 2: Multiple colors in one line
+# 测试 2：一行中的多个颜色
 # ========================================
 echo ""
 echo "Test 2: Multiple colors in one line"
@@ -67,7 +67,7 @@ else
 fi
 
 # ========================================
-# Test 3: Extract Passed count from colored output
+# 测试 3：从彩色输出中提取 Passed 计数
 # ========================================
 echo ""
 echo "Test 3: Extract Passed count from colored output"
@@ -81,7 +81,7 @@ else
 fi
 
 # ========================================
-# Test 4: Extract Failed count from colored output
+# 测试 4：从彩色输出中提取 Failed 计数
 # ========================================
 echo ""
 echo "Test 4: Extract Failed count from colored output"
@@ -95,7 +95,7 @@ else
 fi
 
 # ========================================
-# Test 5: Zero count extraction
+# 测试 5：零计数提取
 # ========================================
 echo ""
 echo "Test 5: Zero count extraction"
@@ -109,7 +109,7 @@ else
 fi
 
 # ========================================
-# Test 6: Complex multi-line output simulation
+# 测试 6：复杂多行输出模拟
 # ========================================
 echo ""
 echo "Test 6: Complex multi-line output (simulating test suite)"
@@ -130,7 +130,7 @@ else
 fi
 
 # ========================================
-# Test 7: No ANSI codes (plain text)
+# 测试 7：无 ANSI 码（纯文本）
 # ========================================
 echo ""
 echo "Test 7: No ANSI codes (plain text)"
@@ -144,7 +144,7 @@ else
 fi
 
 # ========================================
-# Test 8: Bold and color combined
+# 测试 8：粗体和颜色组合
 # ========================================
 echo ""
 echo "Test 8: Bold and color combined"
@@ -158,7 +158,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 摘要
 # ========================================
 echo ""
 echo "========================================"

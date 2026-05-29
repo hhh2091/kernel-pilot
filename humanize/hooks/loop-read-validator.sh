@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 #
-# PreToolUse Hook: Validate Read access for RLCR loop files
+# PreToolUse 钩子：验证 RLCR 循环文件的读取访问
 #
-# Blocks Claude from reading:
-# - Wrong round's prompt/summary/contract files (outdated information)
-# - Round files from wrong locations (not in .humanize/rlcr/)
-# - Round files from old session directories
-# - Todos files (should use native Task tools instead)
-# - goal-tracker.md from old RLCR sessions
+# 阻止 Claude 读取：
+# - 错误轮次的提示/摘要/合同文件（过时信息）
+# - 错误位置的轮次文件（不在 .humanize/rlcr/ 中）
+# - 旧会话目录的轮次文件
+# - Todos 文件（应使用原生 Task 工具代替）
+# - 旧 RLCR 会话的 goal-tracker.md
 #
 
 set -euo pipefail
 
-# Load shared functions
+# 加载共享函数
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 source "$SCRIPT_DIR/lib/loop-common.sh"
 
 # ========================================
-# Parse Hook Input
+# 解析钩子输入
 # ========================================
 
 HOOK_INPUT=$(cat)
 
-# Validate JSON input structure
+# 验证 JSON 输入结构
 if ! validate_hook_input "$HOOK_INPUT"; then
     exit 1
 fi
 
-# Check for deeply nested JSON (potential DoS)
+# 检查深度嵌套的 JSON（潜在的 DoS 攻击）
 if is_deeply_nested "$HOOK_INPUT" 30; then
     exit 1
 fi
@@ -38,7 +38,7 @@ if [[ "$TOOL_NAME" != "Read" ]]; then
     exit 0
 fi
 
-# Require file_path for Read tool
+# Read 工具需要 file_path 参数
 if ! require_tool_input_field "$HOOK_INPUT" "file_path"; then
     exit 1
 fi
@@ -46,11 +46,11 @@ fi
 FILE_PATH=$(echo "$HOOK_INPUT" | jq -r '.tool_input.file_path // ""')
 FILE_PATH_LOWER=$(to_lower "$FILE_PATH")
 
-# Extract session_id from hook input for session-aware loop filtering
+# 从钩子输入中提取 session_id 用于会话感知的循环过滤
 HOOK_SESSION_ID=$(extract_session_id "$HOOK_INPUT")
 
 # ========================================
-# Block Todos Files
+# 阻止 Todos 文件
 # ========================================
 
 if is_round_file_type "$FILE_PATH_LOWER" "todos"; then
@@ -64,40 +64,38 @@ if is_round_file_type "$FILE_PATH_LOWER" "todos"; then
 fi
 
 # ========================================
-# Methodology Analysis Phase Read Restriction
+# 方法论分析阶段读取限制
 # ========================================
-# During methodology analysis, restrict reads of files within the loop
-# directory to only the artifacts the analysis agent needs. This prevents
-# project-specific information from leaking into the analysis report.
-# Files outside the loop directory are allowed (Claude needs system files).
-# This check MUST come before the summary/prompt early exit below,
-# otherwise non-summary/prompt files in the loop dir escape restriction.
+# 在方法论分析期间，将循环目录内文件的读取限制为
+# 仅分析代理需要的产物。这防止了项目特定信息泄漏到分析报告中。
+# 循环目录外的文件是允许的（Claude 需要系统文件）。
+# 此检查必须在下面的摘要/提示早期退出之前进行，
+# 否则循环目录中的非摘要/提示文件将逃脱限制。
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(resolve_project_root 2>/dev/null || true)}"
 [[ -z "$PROJECT_ROOT" ]] && exit 0
 LOOP_BASE_DIR="${LOOP_BASE_DIR:-$PROJECT_ROOT/.humanize/rlcr}"
-# Use only the session-matched loop. Do NOT fall back to an unfiltered search,
-# as that would incorrectly restrict unrelated sessions opened in the same repo.
-# Limitation: Spawned agents (different session_id) are not restricted by hooks;
-# their sanitization is enforced by the analysis prompt.
+# 仅使用会话匹配的循环。不要回退到未过滤的搜索，
+# 因为这会错误地限制在同一仓库中打开的无关会话。
+# 限制：生成的代理（不同的 session_id）不受钩子限制；
+# 它们的清理由分析提示词强制执行。
 ACTIVE_LOOP_DIR="${LOOP_DIR:-$(find_active_loop "$LOOP_BASE_DIR" "$HOOK_SESSION_ID")}"
 _MA_CHECK_DIR="$ACTIVE_LOOP_DIR"
 
 if [[ -n "$_MA_CHECK_DIR" ]]; then
     _MA_STATE=$(resolve_active_state_file "$_MA_CHECK_DIR")
     if [[ "$_MA_STATE" == *"/methodology-analysis-state.md" ]]; then
-        # Canonicalize to prevent path traversal
-        # If realpath fails (file doesn't exist yet on BSD/macOS), resolve parent dir
+        # 规范化以防止路径遍历
+        # 如果 realpath 失败（文件在 BSD/macOS 上尚不存在），解析父目录
         _ma_real_path=$(realpath "$FILE_PATH" 2>/dev/null || echo "")
         if [[ -z "$_ma_real_path" ]]; then
             _ma_parent=$(realpath "$(dirname "$FILE_PATH")" 2>/dev/null || echo "")
             [[ -n "$_ma_parent" ]] && _ma_real_path="$_ma_parent/$(basename "$FILE_PATH")"
         fi
         _ma_real_loop=$(realpath "$_MA_CHECK_DIR" 2>/dev/null || echo "")
-        # Fallback to raw paths when realpath is unavailable (older macOS/BSD)
-        # Ensure paths are absolute so prefix guards cannot be bypassed.
-        # Reject paths with ".." segments to prevent traversal bypasses
-        # when we cannot canonicalize (fail closed).
+        # 当 realpath 不可用时回退到原始路径（较旧的 macOS/BSD）
+        # 确保路径是绝对路径，以便前缀守卫不能被绕过。
+        # 拒绝包含 ".." 段的路径以防止在无法规范化时的遍历绕过（关闭失败）。
         if [[ -z "$_ma_real_path" ]]; then
             if [[ "$FILE_PATH" == *".."* ]]; then
                 echo "# Read Blocked During Methodology Analysis
@@ -105,9 +103,9 @@ if [[ -n "$_MA_CHECK_DIR" ]]; then
 Path contains traversal segments that cannot be resolved without realpath." >&2
                 exit 2
             fi
-            # Fail closed if the file is a symlink we cannot resolve; the raw
-            # path would skip the project-root prefix guard, allowing a symlink
-            # outside the project to point back at restricted project content.
+            # 如果文件是我们无法解析的符号链接，则关闭失败；
+            # 原始路径会跳过项目根前缀守卫，允许项目外的符号链接
+            # 指回受限的项目内容。
             if [[ -L "$FILE_PATH" ]]; then
                 echo "# Read Blocked During Methodology Analysis
 
@@ -129,13 +127,12 @@ Path is a symlink that cannot be resolved without realpath." >&2
         fi
         if [[ "$_ma_real_path" == "$_ma_real_loop/"* ]]; then
             _ma_basename=$(basename "$_ma_real_path")
-            # Allowlist: only methodology artifacts (not raw development records).
-            # Raw records (round-*-summary.md, round-*-review-result.md) are
-            # intentionally excluded so the originating session cannot read
-            # project-specific content and must rely solely on the sanitized
-            # methodology-analysis-report.md for all user-facing output.
-            # The spawned Opus agent reads raw records directly (not restricted
-            # by hooks due to different session_id -- see limitation comment above).
+            # 允许列表：仅方法论产物（不是原始开发记录）。
+            # 原始记录（round-*-summary.md、round-*-review-result.md）被故意排除，
+            # 以便源会话无法读取项目特定内容，必须仅依赖清理后的
+            # methodology-analysis-report.md 作为所有面向用户的输出。
+            # 生成的 Opus 代理直接读取原始记录（由于不同的 session_id 不受钩子限制
+            # -- 参见上面的限制注释）。
             case "$_ma_basename" in
                 methodology-analysis-report.md|methodology-analysis-done.md|methodology-analysis-state.md)
                     exit 0
@@ -149,8 +146,8 @@ Allowed: methodology-analysis-report.md, methodology-analysis-done.md, methodolo
                     ;;
             esac
         fi
-        # Files within the project root are blocked (project-specific information)
-        # Files outside the project root are allowed (system files, config, etc.)
+        # 项目根目录内的文件被阻止（项目特定信息）
+        # 项目根目录外的文件是允许的（系统文件、配置等）
         _ma_project_real=$(realpath "$PROJECT_ROOT" 2>/dev/null || echo "$PROJECT_ROOT")
         if [[ -n "$_ma_project_real" ]]; then
             _ma_path_check="${_ma_real_path:-$FILE_PATH}"
@@ -169,7 +166,7 @@ Allowed: methodology-analysis-report.md, methodology-analysis-done.md, methodolo
 fi
 
 # ========================================
-# Check for Restricted RLCR Files
+# 检查受限的 RLCR 文件
 # ========================================
 
 IS_GOAL_TRACKER=$(is_goal_tracker_path "$FILE_PATH_LOWER" && echo "true" || echo "false")
@@ -191,24 +188,24 @@ fi
 CLAUDE_FILENAME=$(basename "$FILE_PATH")
 
 # ========================================
-# Find Active Loop and Current Round
+# 查找活跃循环和当前轮次
 # ========================================
 
-# Re-use ACTIVE_LOOP_DIR if already set by methodology analysis check above
+# 如果上面的方法论分析检查已设置，则重用 ACTIVE_LOOP_DIR
 ACTIVE_LOOP_DIR="${ACTIVE_LOOP_DIR:-${LOOP_DIR:-$(find_active_loop "$LOOP_BASE_DIR" "$HOOK_SESSION_ID")}}"
 
 if [[ -z "$ACTIVE_LOOP_DIR" ]]; then
     exit 0
 fi
 
-# Detect loop phase from state file
+# 从状态文件检测循环阶段
 STATE_FILE_TO_PARSE=$(resolve_active_state_file "$ACTIVE_LOOP_DIR")
 IS_FINALIZE_PHASE=false
 if [[ "$STATE_FILE_TO_PARSE" == *"/finalize-state.md" ]]; then
     IS_FINALIZE_PHASE=true
 fi
 
-# Parse state file using strict validation (fail closed on malformed state)
+# 使用严格验证解析状态文件（格式错误时关闭失败）
 if ! parse_state_file_strict "$STATE_FILE_TO_PARSE" 2>/dev/null; then
     echo "Error: Malformed state file, blocking operation for safety" >&2
     exit 1
@@ -221,7 +218,7 @@ if [[ "$IS_FINALIZE_PHASE" == "true" ]] && is_round_file_type "$FILE_PATH_LOWER"
 fi
 
 # ========================================
-# Validate Goal Tracker Path
+# 验证目标跟踪器路径
 # ========================================
 
 if [[ "$IS_GOAL_TRACKER" == "true" ]] && [[ "$IN_HUMANIZE_LOOP_DIR" == "true" ]]; then
@@ -245,7 +242,7 @@ Read the active loop goal tracker instead: {{CORRECT_PATH}}"
 fi
 
 # ========================================
-# Extract Round Number and File Type
+# 提取轮次编号和文件类型
 # ========================================
 
 CLAUDE_ROUND=$(extract_round_number "$CLAUDE_FILENAME")
@@ -253,7 +250,7 @@ if [[ -z "$CLAUDE_ROUND" ]]; then
     exit 0
 fi
 
-# Determine file type from filename
+# 根据文件名确定文件类型
 FILE_TYPE=""
 if is_round_file_type "$FILE_PATH_LOWER" "summary"; then
     FILE_TYPE="summary"
@@ -264,7 +261,7 @@ elif is_round_file_type "$FILE_PATH_LOWER" "contract"; then
 fi
 
 # ========================================
-# Validate File Location
+# 验证文件位置
 # ========================================
 
 if [[ "$IN_HUMANIZE_LOOP_DIR" == "false" ]]; then
@@ -280,7 +277,7 @@ Reading {{FILE_PATH}} is blocked. Read from the active loop: {{ACTIVE_LOOP_DIR}}
 fi
 
 # ========================================
-# Validate Round Number
+# 验证轮次编号
 # ========================================
 
 if [[ "$CLAUDE_ROUND" != "$CURRENT_ROUND" ]] && ! is_allowlisted_file "$FILE_PATH" "$ACTIVE_LOOP_DIR"; then
@@ -299,15 +296,14 @@ Read from: {{ACTIVE_LOOP_DIR}}"
 fi
 
 # ========================================
-# Validate Directory Path
+# 验证目录路径
 # ========================================
 
 CORRECT_PATH="$ACTIVE_LOOP_DIR/$CLAUDE_FILENAME"
 
-# Compare prefix-canonical forms -- see loop-write-validator.sh for the
-# rationale; the same reasoning applies to read paths. A planted symlink
-# at the leaf would otherwise let a Read follow the link outside the loop
-# dir and still pass this validator.
+# 比较前缀规范形式 -- 参见 loop-write-validator.sh 了解原因；
+# 同样的推理适用于读取路径。否则，在叶子处植入的符号链接
+# 会让 Read 跟随链接到循环目录外，仍然通过此验证器。
 _READ_FILE_REAL=$(canonicalize_path_prefix "$FILE_PATH")
 _READ_CORRECT_REAL=$(canonicalize_path_prefix "$CORRECT_PATH")
 if [[ "${_READ_FILE_REAL:-$FILE_PATH}" != "${_READ_CORRECT_REAL:-$CORRECT_PATH}" ]]; then

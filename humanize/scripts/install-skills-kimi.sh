@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Convenience wrapper: install Humanize skills for Kimi target.
+# 便捷包装器：为 Kimi 目标安装 Humanize 技能。
 #
 
 set -euo pipefail

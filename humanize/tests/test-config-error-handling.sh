@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Tests for error handling in scripts/lib/config-loader.sh
+# scripts/lib/config-loader.sh 中错误处理的测试
 #
-# Validates:
-# - Missing default_config.json causes a fatal (non-zero) exit
-# - Malformed JSON in project config emits a warning and falls back to defaults
-# - Malformed JSON in user config emits a warning and falls back to defaults
-# - Empty ({}) project config is valid and uses all defaults
-# - Missing project config file is not fatal; defaults are used
-# - Missing optional user config file is not fatal; defaults are used
+# 验证：
+# - 缺失 default_config.json 导致致命（非零）退出
+# - 项目配置中的格式错误 JSON 发出警告并回退到默认值
+# - 用户配置中的格式错误 JSON 发出警告并回退到默认值
+# - 空的 ({}) 项目配置有效，使用所有默认值
+# - 缺失项目配置文件不致命；使用默认值
+# - 缺失可选用户配置文件不致命；使用默认值
 #
 
 set -euo pipefail
@@ -34,13 +34,13 @@ source "$CONFIG_LOADER"
 
 
 # ========================================
-# Test 1: Missing default_config.json is fatal
+# 测试 1：缺失 default_config.json 是致命的
 # ========================================
 
 setup_test_dir
 FAKE_PLUGIN_ROOT="$TEST_DIR/fake-plugin"
 mkdir -p "$FAKE_PLUGIN_ROOT/config"
-# Intentionally do NOT create default_config.json
+# 故意不创建 default_config.json
 
 PROJECT_DIR="$TEST_DIR/project-fatal"
 mkdir -p "$PROJECT_DIR"
@@ -53,7 +53,7 @@ else
 fi
 
 # ========================================
-# Test 2: Malformed JSON in project config → warning + fall back to defaults
+# 测试 2：项目配置中的格式错误 JSON → 警告 + 回退到默认值
 # ========================================
 
 setup_test_dir
@@ -81,7 +81,7 @@ else
 fi
 
 # ========================================
-# Test 3: Malformed JSON in user config → warning + fall back to defaults
+# 测试 3：用户配置中的格式错误 JSON → 警告 + 回退到默认值
 # ========================================
 
 setup_test_dir
@@ -110,7 +110,7 @@ else
 fi
 
 # ========================================
-# Test 4: Empty project config ({}) is valid → use all defaults
+# 测试 4：空的项目配置 ({}) 有效 → 使用所有默认值
 # ========================================
 
 setup_test_dir
@@ -128,13 +128,13 @@ else
 fi
 
 # ========================================
-# Test 5: Missing project config file is not fatal
+# 测试 5：缺失项目配置文件不致命
 # ========================================
 
 setup_test_dir
 PROJECT_DIR="$TEST_DIR/no-proj-cfg"
 mkdir -p "$PROJECT_DIR"
-# No .humanize/ directory at all
+# 完全没有 .humanize/ 目录
 
 if merged=$(XDG_CONFIG_HOME="$TEST_DIR/no-user3" \
         load_merged_config "$PROJECT_ROOT" "$PROJECT_DIR" 2>/dev/null); then
@@ -150,13 +150,13 @@ else
 fi
 
 # ========================================
-# Test 6: Missing user config directory is not fatal
+# 测试 6：缺失用户配置目录不致命
 # ========================================
 
 setup_test_dir
 PROJECT_DIR="$TEST_DIR/no-user-dir-project"
 mkdir -p "$PROJECT_DIR"
-# Point XDG_CONFIG_HOME to a non-existent directory
+# 将 XDG_CONFIG_HOME 指向不存在的目录
 
 if merged=$(XDG_CONFIG_HOME="$TEST_DIR/does-not-exist" \
         load_merged_config "$PROJECT_ROOT" "$PROJECT_DIR" 2>/dev/null); then

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Round 5 frontend pass tests:
-#   - T10-frontend: project switcher and `+ Add` chrome are removed
-#     from viz/static/js/app.js and viz/static/js/actions.js
-#   - T11-frontend: token propagation is wired in api(), authedFetch,
-#     and the EventSource mounting helper
-#   - T6: home page mounts inline live-log panes via EventSource for
-#     each active session
+# 第 5 轮前端测试：
+#   - T10-frontend：项目切换器和 `+ Add` 界面元素已移除
+#     从 viz/static/js/app.js 和 viz/static/js/actions.js 中
+#   - T11-frontend：token 传播已接入 api()、authedFetch、
+#     以及 EventSource 挂载辅助函数
+#   - T6：主页通过 EventSource 为
+#     每个活跃会话挂载内联实时日志面板
 #
-# These tests are pattern-based (no headless browser required).
+# 这些测试基于模式匹配（不需要无头浏览器）。
 
 set -euo pipefail
 
@@ -135,7 +135,7 @@ fi
 # design kit's .session-grid container (auto-fit grid) tagged with
 # data-home-section for the WS-driven diff updater. The old
 # .active-sessions-list / .active-session-block + inline live-log
-# scheme was removed when the log moved to the session-detail page.
+# 方案在日志移至会话详情页时被移除。
 if grep -q 'session-grid' "$APP_JS" && grep -q 'data-home-section="active"' "$APP_JS"; then
     _pass "renderHome uses the new session-grid layout"
 else
@@ -183,7 +183,7 @@ fi
 # eof closes the SSE cleanly without forcing a page rebuild; the
 # session-detail Active -> Historical transition lands via the next
 # WS round_added / session_finished event (server-side cache-dir
-# watcher broadcasts when the state file is renamed).
+# 监视器在状态文件重命名时广播）。
 if grep -qE "addEventListener\('eof'" "$APP_JS" && \
    grep -qE "_liveLogPanes\.delete" "$APP_JS"; then
     _pass "eof handler closes the pane cleanly without forcing a page rebuild"
@@ -234,7 +234,7 @@ else
 fi
 
 # renderPipeline must NOT call window.addEventListener directly
-# (that was the duplication vector). It must route through the
+# （那是重复的来源）。它必须通过
 # singleton helper.
 render_body=$(awk '/^function renderPipeline/,/^}$/' "$PIPELINE_JS")
 if grep -q 'window.addEventListener' <<<"$render_body"; then
@@ -262,7 +262,7 @@ echo
 echo "Group 7: session-detail targeted refresh + race guard"
 
 # Session-scoped WS events schedule a debounced refresh that
-# re-populates only the pipeline / sidebar / goal-bar subtrees.
+# 仅重新填充 pipeline / sidebar / goal-bar 子树。
 # Polling was removed in favor of this path; a setInterval would
 # reset the user's zoom / pan and restart the EventSource.
 if grep -qE '_scheduleSessionPartialRefresh' "$APP_JS" && \
@@ -284,7 +284,7 @@ else
     _fail "_refreshSessionPartial does not re-check route + skeleton after await"
 fi
 
-# Remote mode cannot reach the localhost-only WS, so a slow
+# 远程模式无法访问仅限 localhost 的 WS，因此一个慢速
 # (~10s) polling fallback re-uses the same targeted-refresh path.
 # It must gate on _isRemoteMode so localhost deployments stay WS-
 # only.
@@ -295,7 +295,7 @@ else
     _fail "remote-mode polling fallback missing"
 fi
 
-# Detail-page live-log pane mounts only on the session-detail
+# 详情页实时日志面板仅在会话详情
 # route and is driven by the per-session SSE stream. The helper
 # must be idempotent so WS-driven refreshes do not tear down the
 # pane on every event.

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Tests for explore-idea command structural requirements.
+# explore-idea 命令结构要求的测试。
 #
-# Verifies the explore-idea command file contains:
-#   - Required allowed tools
-#   - All six workflow phases
-#   - Hard constraints
-#   - Two-tier report structure
-#   - Correct validation script invocation
-#   - Worker dispatch via Agent with isolation: "worktree"
+# 验证 explore-idea 命令文件包含：
+#   - 必需的允许工具
+#   - 所有六个工作流阶段
+#   - 硬约束
+#   - 两层报告结构
+#   - 正确的验证脚本调用
+#   - 通过 Agent 进行 Worker 调度，隔离模式: "worktree"
 #
 
 set -euo pipefail
@@ -46,49 +46,49 @@ echo ""
 echo "--- Allowed Tools ---"
 echo ""
 
-# validate-explore-idea-io.sh in allowed-tools
+# validate-explore-idea-io.sh 在允许工具中
 if grep -q "validate-explore-idea-io.sh" "$EXPLORE_CMD"; then
     pass "validate-explore-idea-io.sh in allowed-tools"
 else
     fail "validate-explore-idea-io.sh in allowed-tools"
 fi
 
-# validate-directions-json.sh in allowed-tools
+# validate-directions-json.sh 在允许工具中
 if grep -q "validate-directions-json.sh" "$EXPLORE_CMD"; then
     pass "validate-directions-json.sh in allowed-tools"
 else
     fail "validate-directions-json.sh in allowed-tools"
 fi
 
-# Agent tool in allowed-tools
+# Agent 工具在允许工具中
 if grep -q '"Agent"' "$EXPLORE_CMD"; then
     pass "Agent tool in allowed-tools"
 else
     fail "Agent tool in allowed-tools"
 fi
 
-# Write tool in allowed-tools (for manifest and report)
+# Write 工具在允许工具中（用于清单和报告）
 if grep -q '"Write"' "$EXPLORE_CMD"; then
     pass "Write tool in allowed-tools"
 else
     fail "Write tool in allowed-tools"
 fi
 
-# Read tool in allowed-tools
+# Read 工具在允许工具中
 if grep -q '"Read"' "$EXPLORE_CMD"; then
     pass "Read tool in allowed-tools"
 else
     fail "Read tool in allowed-tools"
 fi
 
-# jq in allowed-tools (Phase 5 coordinator JSON parsing)
+# jq 在允许工具中（第 5 阶段协调器 JSON 解析）
 if grep -q '"Bash(jq \*)"\|Bash(jq' "$EXPLORE_CMD"; then
     pass "jq in allowed-tools"
 else
     fail "jq in allowed-tools"
 fi
 
-# AskUserQuestion in allowed-tools (Phase 2 confirmation)
+# AskUserQuestion 在允许工具中（第 2 阶段确认）
 if grep -q '"AskUserQuestion"' "$EXPLORE_CMD"; then
     pass "AskUserQuestion in allowed-tools"
 else
@@ -99,7 +99,7 @@ echo ""
 echo "--- Workflow Phases ---"
 echo ""
 
-# All 6 workflow phases present
+# 所有 6 个工作流阶段存在
 PHASES=(
     "Phase 1"
     "Phase 2"
@@ -120,35 +120,35 @@ echo ""
 echo "--- Hard Constraints ---"
 echo ""
 
-# Hard constraints section exists
+# 硬约束部分存在
 if grep -q "Hard Constraints" "$EXPLORE_CMD"; then
     pass "Hard Constraints section present"
 else
     fail "Hard Constraints section present"
 fi
 
-# No remote push constraint
+# 无远程推送约束
 if grep -q "MUST NOT push" "$EXPLORE_CMD" || grep -q "push.*remote" "$EXPLORE_CMD"; then
     pass "constraint: no remote push"
 else
     fail "constraint: no remote push"
 fi
 
-# Manifest written before dispatch
+# 清单在调度前写入
 if grep -q "MUST write.*manifest" "$EXPLORE_CMD" || grep -q "BEFORE.*dispatch\|manifest.*BEFORE" "$EXPLORE_CMD"; then
     pass "constraint: manifest written before dispatch"
 else
     fail "constraint: manifest written before dispatch"
 fi
 
-# No nested skills
+# 无嵌套技能
 if grep -q "nested Skills\|nested.*skill" "$EXPLORE_CMD"; then
     pass "constraint: no nested skills"
 else
     fail "constraint: no nested skills"
 fi
 
-# Worker confirmation required before dispatch
+# 调度前需要 Worker 确认
 if grep -q "explicit.*confirm\|Proceed.*\[y/N\]\|\[y/N\]" "$EXPLORE_CMD"; then
     pass "user confirmation required before dispatch"
 else
@@ -159,21 +159,21 @@ echo ""
 echo "--- Worker Dispatch Pattern ---"
 echo ""
 
-# Worker dispatch uses isolation: "worktree"
+# Worker 调度使用隔离模式: "worktree"
 if grep -q 'isolation.*worktree\|worktree.*isolation' "$EXPLORE_CMD"; then
     pass "worker dispatch uses isolation: worktree"
 else
     fail "worker dispatch uses isolation: worktree"
 fi
 
-# Single Agent-tool message (parallel dispatch)
+# 单个 Agent 工具消息（并行调度）
 if grep -q "single Agent-tool message\|single.*Agent.*message" "$EXPLORE_CMD"; then
     pass "parallel dispatch documented as single Agent-tool message"
 else
     fail "parallel dispatch as single Agent-tool message"
 fi
 
-# Worker branch naming
+# Worker 分支命名
 if grep -q "explore/<RUN_ID>/<dir_slug>" "$EXPLORE_CMD"; then
     pass "worker branch naming format documented"
 else
@@ -184,14 +184,14 @@ echo ""
 echo "--- Result Collection ---"
 echo ""
 
-# Sentinel-based result parsing
+# 基于哨兵的结果解析
 if grep -q "EXPLORE_RESULT_JSON_BEGIN" "$EXPLORE_CMD"; then
     pass "result collection uses EXPLORE_RESULT_JSON_BEGIN sentinel"
 else
     fail "result collection uses sentinel markers"
 fi
 
-# worker-results.jsonl append
+# worker-results.jsonl 追加
 if grep -q "worker-results.jsonl" "$EXPLORE_CMD"; then
     pass "results appended to worker-results.jsonl"
 else
@@ -202,14 +202,14 @@ echo ""
 echo "--- Report Template Structure ---"
 echo ""
 
-# Two-tier report
+# 两层报告
 if grep -q "Tier 1" "$EXPLORE_CMD" && grep -q "Tier 2" "$EXPLORE_CMD"; then
     pass "two-tier report structure documented in command"
 else
     fail "two-tier report structure in command" "Tier 1 + Tier 2" "not found"
 fi
 
-# Report template placeholders
+# 报告模板占位符
 REPORT_PLACEHOLDERS=(
     "<RUN_ID>"
     "<BASE_BRANCH>"
@@ -347,7 +347,7 @@ echo ""
 echo "--- Validate-explore-idea-io.sh Script Structure ---"
 echo ""
 
-# Script has all required exit codes documented
+# 脚本记录了所有必需的退出码
 for code in 1 2 3 4 5 6 7 8 9; do
     if grep -q "exit $code" "$VALIDATE_IO_SCRIPT"; then
         pass "validate-explore-idea-io.sh has exit $code"
@@ -356,7 +356,7 @@ for code in 1 2 3 4 5 6 7 8 9; do
     fi
 done
 
-# VALIDATION_SUCCESS emitted on success
+# 成功时发出 VALIDATION_SUCCESS
 if grep -q "VALIDATION_SUCCESS" "$VALIDATE_IO_SCRIPT"; then
     pass "validate-explore-idea-io.sh emits VALIDATION_SUCCESS on success"
 else

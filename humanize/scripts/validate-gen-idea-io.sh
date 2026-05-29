@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # validate-gen-idea-io.sh
-# Validates input, slug, and output paths for the gen-idea command.
-# Exit codes:
-#   0 - Success
-#   1 - Missing idea input or empty input file
-#   2 - Input looks like a path but is not readable, not .md, or does not exist
-#   3 - Output parent directory does not exist (user-supplied path only)
-#   4 - Output file already exists
-#   5 - No write permission to output directory
-#   6 - Invalid arguments (including --n out of range, missing .md suffix)
-#   7 - Template file not found (plugin configuration error)
-#   8 - Companion directions.json file already exists
+# 验证 gen-idea 命令的输入、slug 和输出路径。
+# 退出码:
+#   0 - 成功
+#   1 - 缺少 idea 输入或输入文件为空
+#   2 - 输入看起来像路径但不可读、不是 .md 或不存在
+#   3 - 输出父目录不存在（仅限用户提供的路径）
+#   4 - 输出文件已存在
+#   5 - 没有输出目录的写入权限
+#   6 - 无效参数（包括 --n 超出范围、缺少 .md 后缀）
+#   7 - 模板文件未找到（插件配置错误）
+#   8 - 伴随的 directions.json 文件已存在
 
 set -e
 

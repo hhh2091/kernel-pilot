@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Common functions for RLCR loop hooks
+# RLCR 循环钩子的通用函数
 #
-# This library provides shared functionality used by:
+# 此库提供被以下脚本使用的共享功能：
 # - loop-read-validator.sh
 # - loop-write-validator.sh
 # - loop-edit-validator.sh
@@ -13,15 +13,15 @@
 # - cancel-rlcr-loop.sh
 #
 
-# Source guard: prevent double-sourcing (readonly vars would fail)
+# 源码守卫：防止重复源码引入（readonly 变量会失败）
 [[ -n "${_LOOP_COMMON_LOADED:-}" ]] && return 0 2>/dev/null || true
 _LOOP_COMMON_LOADED=1
 
 # ========================================
-# Constants
+# 常量
 # ========================================
 
-# State file field names
+# 状态文件字段名
 readonly FIELD_PLAN_TRACKED="plan_tracked"
 readonly FIELD_START_BRANCH="start_branch"
 readonly FIELD_BASE_BRANCH="base_branch"
@@ -52,24 +52,24 @@ readonly MAINLINE_VERDICT_UNKNOWN="unknown"
 readonly DRIFT_STATUS_NORMAL="normal"
 readonly DRIFT_STATUS_REPLAN_REQUIRED="replan_required"
 
-# Default Codex configuration (single source of truth - all scripts reference this)
-# Scripts can pre-set DEFAULT_CODEX_MODEL/DEFAULT_CODEX_EFFORT before sourcing to override.
-# Config-backed defaults are loaded from the merge hierarchy after config-loader.sh is sourced.
-# Precedence: pre-set value > config value > hardcoded fallback (gpt-5.5/high)
+# 默认 Codex 配置（单一事实来源 - 所有脚本引用此配置）
+# 脚本可以在源码引入之前预设 DEFAULT_CODEX_MODEL/DEFAULT_CODEX_EFFORT 以覆盖。
+# 配置支持的默认值在 config-loader.sh 源码引入后从合并层次结构加载。
+# 优先级：预设值 > 配置值 > 硬编码回退（gpt-5.5/high）
 #
-# The actual assignment happens in the "Config-backed defaults" section below,
-# after config-loader.sh has been sourced and merged config is available.
+# 实际赋值发生在下面的"配置支持的默认值"部分，
+# 在 config-loader.sh 源码引入且合并配置可用之后。
 
-# Codex review markers
+# Codex 审查标记
 readonly MARKER_COMPLETE="COMPLETE"
 readonly MARKER_STOP="STOP"
 
-# Exit reasons (used with end_loop function)
-# complete   - Codex confirmed all goals achieved (normal success)
-# cancel     - User cancelled with /cancel-rlcr-loop
-# maxiter    - Reached maximum iterations limit
-# stop       - Codex triggered circuit breaker (stagnation detected)
-# unexpected - System error or invalid state (e.g., corrupted state file)
+# 退出原因（与 end_loop 函数一起使用）
+# complete   - Codex 确认所有目标已实现（正常成功）
+# cancel     - 用户使用 /cancel-rlcr-loop 取消
+# maxiter    - 达到最大迭代次数限制
+# stop       - Codex 触发断路器（检测到停滞）
+# unexpected - 系统错误或无效状态（例如损坏的状态文件）
 readonly EXIT_COMPLETE="complete"
 readonly EXIT_CANCEL="cancel"
 readonly EXIT_MAXITER="maxiter"
@@ -77,31 +77,31 @@ readonly EXIT_STOP="stop"
 readonly EXIT_UNEXPECTED="unexpected"
 
 # ========================================
-# JSON Input Validation
+# JSON 输入验证
 # ========================================
 
-# Validate JSON input and extract tool_name
-# Usage: validate_hook_input "$json_input"
-# Returns: 0 if valid JSON with tool_name, 1 if invalid
-# Sets: VALIDATED_TOOL_NAME, VALIDATED_TOOL_INPUT
+# 验证 JSON 输入并提取 tool_name
+# 用法：validate_hook_input "$json_input"
+# 返回：0 如果是带 tool_name 的有效 JSON，1 如果无效
+# 设置：VALIDATED_TOOL_NAME、VALIDATED_TOOL_INPUT
 #
-# Non-UTF8 handling behavior:
-# - Null bytes (0x00): Rejected with exit 1
-# - Invalid UTF-8 sequences (0x80-0xFF outside valid UTF-8): Rejected by jq as invalid JSON
-# - Valid UTF-8 non-ASCII characters: Accepted (jq handles Unicode correctly)
+# 非 UTF-8 处理行为：
+# - 空字节（0x00）：以退出 1 拒绝
+# - 无效 UTF-8 序列（0x80-0xFF 在有效 UTF-8 之外）：被 jq 作为无效 JSON 拒绝
+# - 有效的 UTF-8 非 ASCII 字符：接受（jq 正确处理 Unicode）
 validate_hook_input() {
     local input="$1"
 
-    # Reject null bytes (security) - portable check without grep -P (BSD incompatible)
-    # tr -cd '\0' keeps only null bytes, wc -c counts them
+    # 拒绝空字节（安全性）- 不使用 grep -P 的可移植检查（BSD 不兼容）
+    # tr -cd '\0' 仅保留空字节，wc -c 计数它们
     if [[ $(printf '%s' "$input" | tr -cd '\0' | wc -c) -gt 0 ]]; then
         echo "Error: Input contains null bytes" >&2
         return 1
     fi
 
-    # Reject non-UTF8 bytes (security/consistency)
-    # Check for bytes in 0x80-0xFF that are NOT part of valid UTF-8 sequences
-    # Skip if iconv is not available (common in minimal containers like Alpine)
+    # 拒绝非 UTF-8 字节（安全性/一致性）
+    # 检查 0x80-0xFF 中不属于有效 UTF-8 序列的字节
+    # 如果 iconv 不可用则跳过（在 Alpine 等最小容器中常见）
     if command -v iconv >/dev/null 2>&1; then
         if ! printf '%s' "$input" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1; then
             echo "Error: Input contains invalid UTF-8 sequences" >&2
@@ -109,28 +109,28 @@ validate_hook_input() {
         fi
     fi
 
-    # Validate JSON syntax with jq
+    # 使用 jq 验证 JSON 语法
     if ! printf '%s' "$input" | jq -e '.' >/dev/null 2>&1; then
         echo "Error: Invalid JSON syntax" >&2
         return 1
     fi
 
-    # Extract tool_name (required)
+    # 提取 tool_name（必需）
     VALIDATED_TOOL_NAME=$(printf '%s' "$input" | jq -r '.tool_name // empty')
     if [[ -z "$VALIDATED_TOOL_NAME" ]]; then
         echo "Error: Missing required field: tool_name" >&2
         return 1
     fi
 
-    # Extract tool_input (required for Read/Write/Bash)
+    # 提取 tool_input（Read/Write/Bash 需要）
     VALIDATED_TOOL_INPUT=$(printf '%s' "$input" | jq -r '.tool_input // empty')
 
     return 0
 }
 
-# Validate that a specific field exists in tool_input
-# Usage: require_tool_input_field "$json_input" "field_name"
-# Returns: 0 if field exists and is non-empty, 1 otherwise
+# 验证 tool_input 中存在特定字段
+# 用法：require_tool_input_field "$json_input" "field_name"
+# 返回：0 如果字段存在且非空，否则返回 1
 require_tool_input_field() {
     local input="$1"
     local field="$2"
@@ -146,14 +146,14 @@ require_tool_input_field() {
     return 0
 }
 
-# Check if JSON is deeply nested (potential DoS)
-# Usage: is_deeply_nested "$json_input" [max_depth]
-# Returns: 0 if too deeply nested, 1 otherwise
+# 检查 JSON 是否深度嵌套（潜在的 DoS 攻击）
+# 用法：is_deeply_nested "$json_input" [max_depth]
+# 返回：0 如果太深嵌套，否则返回 1
 is_deeply_nested() {
     local input="$1"
     local max_depth="${2:-30}"
 
-    # Use jq to check depth - getpath on recursive descent gives us depth
+    # 使用 jq 检查深度 - 递归下降上的 getpath 给我们深度
     local actual_depth
     actual_depth=$(printf '%s' "$input" | jq '[paths | length] | max // 0' 2>/dev/null || echo "0")
 
@@ -166,16 +166,16 @@ is_deeply_nested() {
 }
 
 # ========================================
-# Library Setup
+# 库设置
 # ========================================
 
-# Source template loader
+# 源码引入模板加载器
 LOOP_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 LOOP_COMMON_PLUGIN_ROOT="$(cd "$LOOP_COMMON_DIR/../.." && pwd)"
 export PLUGIN_ROOT="${PLUGIN_ROOT:-$LOOP_COMMON_PLUGIN_ROOT}"
 
-# Shared project-root resolver (CLAUDE_PROJECT_DIR -> git toplevel,
-# realpath-canonicalized). Must load before any caller needs PROJECT_ROOT.
+# 共享的项目根解析器（CLAUDE_PROJECT_DIR -> git toplevel，realpath 规范化）。
+# 必须在任何调用者需要 PROJECT_ROOT 之前加载。
 source "$LOOP_COMMON_DIR/project-root.sh"
 
 _lc_errexit=false; [[ -o errexit ]] && _lc_errexit=true
@@ -188,27 +188,26 @@ $_lc_pipefail && set -o pipefail || set +o pipefail
 unset _lc_errexit _lc_nounset _lc_pipefail
 
 _LOOP_COMMON_PROJECT_ROOT="$(resolve_project_root 2>/dev/null || true)"
-# Config loading is best-effort: use || true so a config-load failure does not
-# abort sourcing before callers' dependency checks (jq, codex) are reached.
-# Stderr is NOT suppressed so malformed config warnings remain visible.
+# 配置加载是尽力而为的：使用 || true 以便配置加载失败不会在调用者的
+# 依赖检查（jq、codex）到达之前中止源码引入。
+# Stderr 不被抑制，以便格式错误的配置警告保持可见。
 #
-# Skip config loading when no project root is available (e.g. humanize.sh is
-# sourced from .bashrc/.zshrc in a non-repo directory like $HOME). Passing an
-# empty project_root to load_merged_config would surface a usage error on
-# stderr every time the shell starts.
+# 当没有项目根可用时跳过配置加载（例如 humanize.sh 从 .bashrc/.zshrc
+# 在非仓库目录如 $HOME 中源码引入）。将空的 project_root 传递给
+# load_merged_config 会在每次 shell 启动时在 stderr 上显示使用错误。
 if [[ -n "$_LOOP_COMMON_PROJECT_ROOT" ]]; then
     _LOOP_COMMON_CONFIG="$(load_merged_config "$LOOP_COMMON_PLUGIN_ROOT" "$_LOOP_COMMON_PROJECT_ROOT")" || true
 else
     _LOOP_COMMON_CONFIG=""
 fi
 
-# Load bitlesson model from merged config (controls which CLI bitlesson-select.sh uses)
+# 从合并配置加载 bitlesson 模型（控制 bitlesson-select.sh 使用的 CLI）
 DEFAULT_BITLESSON_MODEL="$(get_config_value "$_LOOP_COMMON_CONFIG" "bitlesson_model" 2>/dev/null || true)"
 DEFAULT_BITLESSON_MODEL="${DEFAULT_BITLESSON_MODEL:-haiku}"
 
-# Load codex model/effort from merged config so .humanize/config.json can set persistent
-# defaults for all Codex-using features (RLCR, ask-codex).
-# Precedence: pre-set by caller > config value > hardcoded fallback (gpt-5.5/high)
+# 从合并配置加载 codex model/effort，以便 .humanize/config.json 可以为所有
+# 使用 Codex 的功能（RLCR、ask-codex）设置持久默认值。
+# 优先级：调用者预设 > 配置值 > 硬编码回退（gpt-5.5/high）
 _cfg_codex_model="$(get_config_value "$_LOOP_COMMON_CONFIG" "codex_model" 2>/dev/null || true)"
 if [[ -n "$_cfg_codex_model" && ! "$_cfg_codex_model" =~ ^[a-zA-Z0-9._-]+$ ]]; then
     echo "Warning: Invalid codex_model in merged config: $_cfg_codex_model" >&2
@@ -230,8 +229,8 @@ if [[ -n "$_cfg_codex_effort" && ! "$_cfg_codex_effort" =~ ^(xhigh|high|medium|l
 fi
 DEFAULT_CODEX_EFFORT="${DEFAULT_CODEX_EFFORT:-${_cfg_codex_effort:-high}}"
 
-# Load agent_teams from merged config (controls whether RLCR uses agent teams by default)
-# Precedence: pre-set by caller (e.g. --agent-teams flag) > config value > hardcoded fallback (false)
+# 从合并配置加载 agent_teams（控制 RLCR 是否默认使用代理团队）
+# 优先级：调用者预设（例如 --agent-teams 标志）> 配置值 > 硬编码回退（false）
 _cfg_agent_teams="$(get_config_value "$_LOOP_COMMON_CONFIG" "agent_teams" 2>/dev/null || true)"
 DEFAULT_AGENT_TEAMS="${DEFAULT_AGENT_TEAMS:-${_cfg_agent_teams:-false}}"
 unset _cfg_codex_model _cfg_codex_effort _cfg_agent_teams
@@ -240,32 +239,32 @@ unset _LOOP_COMMON_PROJECT_ROOT _LOOP_COMMON_CONFIG
 
 source "$LOOP_COMMON_DIR/template-loader.sh"
 
-# Initialize template directory (can be overridden by sourcing script)
+# 初始化模板目录（可被源码引入脚本覆盖）
 TEMPLATE_DIR="${TEMPLATE_DIR:-$(get_template_dir "$LOOP_COMMON_DIR")}"
 
-# Validate template directory exists (warn but don't fail - allows graceful degradation)
+# 验证模板目录存在（警告但不失败 - 允许优雅降级）
 if ! validate_template_dir "$TEMPLATE_DIR" 2>/dev/null; then
     echo "Warning: Template directory validation failed. Using inline fallbacks." >&2
 fi
 
-# Extract session_id from hook JSON input
-# Usage: extract_session_id "$json_input"
-# Outputs the session_id to stdout, or empty string if not available
+# 从钩子 JSON 输入中提取 session_id
+# 用法：extract_session_id "$json_input"
+# 将 session_id 输出到 stdout，如果不可用则输出空字符串
 extract_session_id() {
     local input="$1"
     printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null || echo ""
 }
 
-# Background-task helpers (expand_leading_tilde, extract_transcript_path,
-# derive_loop_start_iso_ts, list/has/count_pending_background_task[_ids],
-# handle_bg_task_short_circuit) live in loop-bg-tasks.sh and are sourced
-# at the bottom of this file so every existing consumer of loop-common.sh
-# continues to get them transparently.
+# 后台任务辅助函数（expand_leading_tilde、extract_transcript_path、
+# derive_loop_start_iso_ts、list/has/count_pending_background_task[_ids]、
+# handle_bg_task_short_circuit）位于 loop-bg-tasks.sh 中，
+# 在此文件底部源码引入，以便 loop-common.sh 的每个现有消费者
+# 继续透明地获取它们。
 
-# Resolve the active state file for a loop directory
-# Checks for finalize-state.md first, then state.md
-# Usage: resolve_active_state_file "$loop_dir"
-# Outputs the state file path to stdout, or empty string if none found
+# 解析循环目录的活跃状态文件
+# 首先检查 finalize-state.md，然后检查 state.md
+# 用法：resolve_active_state_file "$loop_dir"
+# 将状态文件路径输出到 stdout，如果未找到则输出空字符串
 resolve_active_state_file() {
     local loop_dir="$1"
 
@@ -280,15 +279,15 @@ resolve_active_state_file() {
     fi
 }
 
-# Resolve any state file in a loop directory (active or terminal)
-# Checks active states first (state.md, finalize-state.md), then falls back
-# to any terminal state file (*-state.md such as complete-state.md, cancel-state.md).
-# Usage: resolve_any_state_file "$loop_dir"
-# Outputs the state file path to stdout, or empty string if none found
+# 解析循环目录中的任何状态文件（活跃或终端）
+# 首先检查活跃状态（state.md、finalize-state.md），然后回退到任何终端状态文件
+# （*-state.md，如 complete-state.md、cancel-state.md）。
+# 用法：resolve_any_state_file "$loop_dir"
+# 将状态文件路径输出到 stdout，如果未找到则输出空字符串
 resolve_any_state_file() {
     local loop_dir="$1"
 
-    # Prefer active states
+    # 优先选择活跃状态
     if [[ -f "$loop_dir/methodology-analysis-state.md" ]]; then
         echo "$loop_dir/methodology-analysis-state.md"
         return
@@ -300,36 +299,33 @@ resolve_any_state_file() {
         return
     fi
 
-    # Fall back to any terminal state file
+    # 回退到任何终端状态文件
     local terminal_state
     terminal_state=$(ls -1 "$loop_dir"/*-state.md 2>/dev/null | head -1)
     echo "${terminal_state:-}"
 }
 
-# Find the most recent active loop directory matching optional session_id filter
+# 查找匹配可选 session_id 过滤器的最近活跃循环目录
 #
-# Without session_id filter: only checks the single newest directory.
-#   If it has state.md or finalize-state.md, returns it; otherwise returns empty.
-#   This preserves zombie-loop protection: older directories are never examined,
-#   so a stale state.md in an older directory cannot be accidentally revived.
+# 没有 session_id 过滤器：仅检查单个最新目录。
+#   如果它有 state.md 或 finalize-state.md，则返回它；否则返回空。
+#   这保留了僵尸循环保护：较旧的目录永远不会被检查，
+#   因此较旧目录中的过期 state.md 不会被意外复活。
 #
-# With session_id filter: finds the newest directory belonging to that session
-#   (matching ANY *state.md file including terminal states), then checks whether
-#   it is still active. If the session's newest directory is in terminal state
-#   (complete-state.md, cancel-state.md, etc.), returns empty immediately --
-#   preventing stale older loops from being revived. This enables multiple
-#   concurrent RLCR loops with different session IDs in the same project.
+# 有 session_id 过滤器：查找属于该会话的最新目录
+#   （匹配任何 *state.md 文件，包括终端状态），然后检查它是否仍活跃。
+#   如果会话的最新目录处于终端状态（complete-state.md、cancel-state.md 等），
+#   立即返回空 -- 防止过期的较旧循环被复活。这启用了同一项目中
+#   不同 session ID 的多个并发 RLCR 循环。
 #
-# Empty stored session_id matches any filter (backward compat for pre-session
-# state files).
+# 空的存储 session_id 匹配任何过滤器（预会话状态文件的向后兼容）。
 #
-# Third parameter `allow_bg_marker_fallback` (default "false"): when "true",
-# the session-filter branch also considers a mismatched-session dir that holds
-# a `bg-pending.marker` file AND an active state file. Only the RLCR stop
-# hook opts in to this; every other caller (read/write/bash/plan-file
-# validators, ...) keeps strict session isolation.
+# 第三个参数 `allow_bg_marker_fallback`（默认 "false"）：当为 "true" 时，
+# session-filter 分支还考虑持有 `bg-pending.marker` 文件和活跃状态文件的
+# 不匹配会话目录。只有 RLCR stop hook 选择加入此功能；
+# 所有其他调用者（read/write/bash/plan-file 验证器等）保持严格的会话隔离。
 #
-# Outputs the directory path to stdout, or empty string if none found
+# 将目录路径输出到 stdout，如果未找到则输出空字符串
 find_active_loop() {
     local loop_base_dir="$1"
     local filter_session_id="${2:-}"
@@ -341,7 +337,7 @@ find_active_loop() {
     fi
 
     if [[ -z "$filter_session_id" ]]; then
-        # No filter: only check the single newest directory (zombie-loop protection)
+        # 无过滤器：仅检查单个最新目录（僵尸循环保护）
         local newest_dir
         newest_dir=$(ls -1d "$loop_base_dir"/*/ 2>/dev/null | sort -r | head -1)
 
@@ -357,16 +353,13 @@ find_active_loop() {
         return
     fi
 
-    # Session filter: iterate newest-to-oldest.
+    # session 过滤器：从最新到最旧迭代。
     #
-    # The caller's own (exact stored session_id) match takes precedence over
-    # any marker-based adoption: with multiple active RLCR loops in the same
-    # repo, a newer dir parked by a different session must not be returned
-    # before an older dir that actually belongs to the caller. Marker
-    # candidates are recorded during the scan and only used as a fallback
-    # when no exact match is found anywhere. Zombie-loop protection
-    # (terminal newest for this session returns empty) still wins over
-    # marker fallback.
+    # 调用者自己的（精确存储的 session_id）匹配优先于任何基于标记的采用：
+    # 在同一仓库中有多个活跃 RLCR 循环时，不同会话驻留的较新目录
+    # 不能在实际属于调用者的较旧目录之前返回。标记候选在扫描期间被记录，
+    # 仅在没有找到精确匹配时用作回退。僵尸循环保护
+    # （此会话的终端最新返回空）仍然优先于标记回退。
     local dir
     local marker_candidate=""
     while IFS= read -r dir; do
@@ -382,25 +375,22 @@ find_active_loop() {
         local stored_session_id
         stored_session_id=$(awk -v key="${FIELD_SESSION_ID}" 'BEGIN{f=0} /^---$/{f++; next} f==1 && $0 ~ "^"key":"{sub("^"key":[[:space:]]*",""); print; exit}' "$any_state" 2>/dev/null | tr -d ' ')
 
-        # Empty stored session_id matches any session (backward compat).
+        # 空的存储 session_id 匹配任何会话（向后兼容）。
         if [[ -z "$stored_session_id" ]] || [[ "$stored_session_id" == "$filter_session_id" ]]; then
-            # Newest dir for this session -- only return if active.
+            # 此会话的最新目录 -- 仅在活跃时返回。
             local active_state
             active_state=$(resolve_active_state_file "$trimmed_dir")
             if [[ -n "$active_state" ]]; then
                 echo "$trimmed_dir"
                 return
             fi
-            # Session's newest loop is in terminal state; do not fall through
-            # to marker-based adoption either.
+            # 会话的最新循环处于终端状态；也不要落入基于标记的采用。
             echo ""
             return
         fi
 
-        # Session mismatch. Only the stop hook opts in to marker-based
-        # adoption; validators and other callers keep strict isolation, so
-        # the candidate is only recorded when the caller explicitly allows
-        # it.
+        # 会话不匹配。只有 stop hook 选择加入基于标记的采用；
+        # 验证器和其他调用者保持严格隔离，因此仅在调用者明确允许时才记录候选。
         if [[ "$allow_bg_marker_fallback" == "true" ]] \
            && [[ -z "$marker_candidate" ]] \
            && [[ -f "$trimmed_dir/bg-pending.marker" ]]; then
@@ -409,14 +399,13 @@ find_active_loop() {
             if [[ -n "$candidate_state" ]]; then
                 marker_candidate="$trimmed_dir"
             fi
-            # Marker on a terminal loop is stale; leave it alone.
+            # 终端循环上的标记是过期的；不要动它。
         fi
     done < <(ls -1d "$loop_base_dir"/*/ 2>/dev/null | sort -r)
 
-    # No exact session match. Fall back to marker-based adoption only when
-    # the caller explicitly opted in -- the stop hook uses this to surface
-    # a "parked by another session" notice or to resume its own parked
-    # loop after a previous session died before the bg completion arrived.
+    # 没有精确的会话匹配。仅在调用者明确选择加入时回退到基于标记的采用
+    # -- stop hook 使用此功能来显示"被另一个会话驻留"通知，
+    # 或在先前会话在后台完成到达之前死亡后恢复其自己的驻留循环。
     if [[ "$allow_bg_marker_fallback" == "true" ]] && [[ -n "$marker_candidate" ]]; then
         echo "$marker_candidate"
         return
@@ -425,9 +414,9 @@ find_active_loop() {
     echo ""
 }
 
-# Extract current round number from state.md
-# Outputs the round number to stdout, defaults to 0
-# Note: For full state parsing, use parse_state_file() instead
+# 从 state.md 提取当前轮次编号
+# 将轮次编号输出到 stdout，默认为 0
+# 注意：对于完整状态解析，请使用 parse_state_file()
 get_current_round() {
     local state_file="$1"
 
@@ -440,13 +429,13 @@ get_current_round() {
     echo "${current_round:-0}"
 }
 
-# Extract state fields from frontmatter content (internal helper)
-# Usage: _parse_state_fields
-# Requires STATE_FRONTMATTER to be set before calling
-# Sets all STATE_* field variables without applying defaults
+# 从前置元数据内容中提取状态字段（内部辅助函数）
+# 用法：_parse_state_fields
+# 要求在调用之前设置 STATE_FRONTMATTER
+# 设置所有 STATE_* 字段变量，不应用默认值
 _parse_state_fields() {
-    # Parse fields with consistent quote handling
-    # Legacy quote-stripping kept for backward compatibility with older state files
+    # 使用一致的引号处理解析字段
+    # 保留旧版引号剥离以与较旧的状态文件向后兼容
     STATE_PLAN_TRACKED=$(echo "$STATE_FRONTMATTER" | grep "^${FIELD_PLAN_TRACKED}:" | sed "s/${FIELD_PLAN_TRACKED}: *//" | tr -d ' ' || true)
     STATE_START_BRANCH=$(echo "$STATE_FRONTMATTER" | grep "^${FIELD_START_BRANCH}:" | sed "s/${FIELD_START_BRANCH}: *//; s/^\"//; s/\"\$//" || true)
     STATE_BASE_BRANCH=$(echo "$STATE_FRONTMATTER" | grep "^${FIELD_BASE_BRANCH}:" | sed "s/${FIELD_BASE_BRANCH}: *//; s/^\"//; s/\"\$//" || true)
@@ -470,30 +459,30 @@ _parse_state_fields() {
     STATE_DRIFT_STATUS=$(echo "$STATE_FRONTMATTER" | grep "^${FIELD_DRIFT_STATUS}:" | sed "s/${FIELD_DRIFT_STATUS}: *//" | tr -d ' ' || true)
 }
 
-# Parse state file frontmatter and set variables (tolerant mode with defaults)
-# Usage: parse_state_file "$STATE_FILE"
-# Sets the following variables (caller must declare them):
-#   STATE_FRONTMATTER - raw frontmatter content
-#   STATE_PLAN_TRACKED - "true" or "false"
-#   STATE_START_BRANCH - branch name
-#   STATE_BASE_BRANCH - base branch for code review
-#   STATE_PLAN_FILE - plan file path
-#   STATE_CURRENT_ROUND - current round number
-#   STATE_MAX_ITERATIONS - max iterations
-#   STATE_PUSH_EVERY_ROUND - "true" or "false"
-#   STATE_CODEX_MODEL - codex model name
-#   STATE_CODEX_EFFORT - codex effort level
-#   STATE_CODEX_TIMEOUT - codex timeout in seconds
-#   STATE_REVIEW_STARTED - "true" or "false"
-#   STATE_FULL_REVIEW_ROUND - interval for Full Alignment Check (default: 5)
-#   STATE_ASK_CODEX_QUESTION - "true" or "false" (v1.6.5+)
-#   STATE_AGENT_TEAMS - "true" or "false"
-#   STATE_STRICT_SUCCESS - "true" or "false"
-#   STATE_MAINLINE_STALL_COUNT - consecutive stalled/regressed implementation rounds
+# 解析状态文件前置元数据并设置变量（带默认值的容错模式）
+# 用法：parse_state_file "$STATE_FILE"
+# 设置以下变量（调用者必须声明它们）：
+#   STATE_FRONTMATTER - 原始前置元数据内容
+#   STATE_PLAN_TRACKED - "true" 或 "false"
+#   STATE_START_BRANCH - 分支名称
+#   STATE_BASE_BRANCH - 代码审查的基础分支
+#   STATE_PLAN_FILE - 计划文件路径
+#   STATE_CURRENT_ROUND - 当前轮次编号
+#   STATE_MAX_ITERATIONS - 最大迭代次数
+#   STATE_PUSH_EVERY_ROUND - "true" 或 "false"
+#   STATE_CODEX_MODEL - codex 模型名称
+#   STATE_CODEX_EFFORT - codex effort 级别
+#   STATE_CODEX_TIMEOUT - codex 超时（秒）
+#   STATE_REVIEW_STARTED - "true" 或 "false"
+#   STATE_FULL_REVIEW_ROUND - 完整对齐检查的间隔（默认：5）
+#   STATE_ASK_CODEX_QUESTION - "true" 或 "false"（v1.6.5+）
+#   STATE_AGENT_TEAMS - "true" 或 "false"
+#   STATE_STRICT_SUCCESS - "true" 或 "false"
+#   STATE_MAINLINE_STALL_COUNT - 连续停滞/退化的实现轮次
 #   STATE_LAST_MAINLINE_VERDICT - advanced/stalled/regressed/unknown
 #   STATE_DRIFT_STATUS - normal/replan_required
-# Returns: 0 on success, 1 if file not found
-# Note: For strict validation, use parse_state_file_strict() instead
+# 返回：成功时为 0，文件未找到时为 1
+# 注意：对于严格验证，请使用 parse_state_file_strict()
 parse_state_file() {
     local state_file="$1"
 
@@ -505,35 +494,35 @@ parse_state_file() {
 
     _parse_state_fields
 
-    # Apply defaults for non-schema-critical fields only
-    # Note: review_started is NOT defaulted here so we can detect missing schema fields
-    # and block with a proper message in the stop hook
+    # 仅对非模式关键字段应用默认值
+    # 注意：review_started 在这里不设置默认值，以便我们可以检测缺失的模式字段
+    # 并在 stop hook 中用适当的消息阻止
     STATE_CURRENT_ROUND="${STATE_CURRENT_ROUND:-0}"
     STATE_MAX_ITERATIONS="${STATE_MAX_ITERATIONS:-10}"
     STATE_PUSH_EVERY_ROUND="${STATE_PUSH_EVERY_ROUND:-false}"
     STATE_FULL_REVIEW_ROUND="${STATE_FULL_REVIEW_ROUND:-5}"
     STATE_ASK_CODEX_QUESTION="${STATE_ASK_CODEX_QUESTION:-true}"
     STATE_AGENT_TEAMS="${STATE_AGENT_TEAMS:-false}"
-    # Default privacy_mode to "true" for legacy loops that pre-date this field
+    # 对于早于此字段的旧循环，将 privacy_mode 默认为 "true"
     STATE_PRIVACY_MODE="${STATE_PRIVACY_MODE:-true}"
     STATE_STRICT_SUCCESS="${STATE_STRICT_SUCCESS:-false}"
     STATE_MAINLINE_STALL_COUNT="${STATE_MAINLINE_STALL_COUNT:-0}"
     STATE_LAST_MAINLINE_VERDICT="${STATE_LAST_MAINLINE_VERDICT:-$MAINLINE_VERDICT_UNKNOWN}"
     STATE_DRIFT_STATUS="${STATE_DRIFT_STATUS:-$DRIFT_STATUS_NORMAL}"
-    # STATE_REVIEW_STARTED left as-is (empty if missing, to allow schema validation)
+    # STATE_REVIEW_STARTED 保持原样（如果缺失则为空，以允许模式验证）
 
     return 0
 }
 
-# Strict state file parser that rejects malformed files
-# Usage: parse_state_file_strict "$STATE_FILE"
-# Sets the same variables as parse_state_file()
-# Returns: 0 on success, non-zero on validation failure
-#   1 - file not found
-#   2 - missing YAML frontmatter separators
-#   3 - missing required field (current_round or max_iterations)
-#   4 - non-numeric current_round value
-#   5 - non-numeric max_iterations value
+# 拒绝格式错误文件的严格状态文件解析器
+# 用法：parse_state_file_strict "$STATE_FILE"
+# 设置与 parse_state_file() 相同的变量
+# 返回：成功时为 0，验证失败时为非零
+#   1 - 文件未找到
+#   2 - 缺少 YAML 前置元数据分隔符
+#   3 - 缺少必需字段（current_round 或 max_iterations）
+#   4 - 非数字的 current_round 值
+#   5 - 非数字的 max_iterations 值
 parse_state_file_strict() {
     local state_file="$1"
 
@@ -542,7 +531,7 @@ parse_state_file_strict() {
         return 1
     fi
 
-    # Check for YAML frontmatter separators (must have at least two --- lines)
+    # 检查 YAML 前置元数据分隔符（必须至少有两个 --- 行）
     local separator_count
     separator_count=$(grep -c '^---$' "$state_file" 2>/dev/null || echo "0")
     if [[ "$separator_count" -lt 2 ]]; then
@@ -550,11 +539,11 @@ parse_state_file_strict() {
         return 2
     fi
 
-    # Extract frontmatter and parse all fields (reuse shared helper, no defaults applied)
+    # 提取前置元数据并解析所有字段（重用共享辅助函数，不应用默认值）
     STATE_FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$state_file" 2>/dev/null || echo "")
     _parse_state_fields
 
-    # Validate required fields exist
+    # 验证必需字段存在
     if [[ -z "$STATE_CURRENT_ROUND" ]]; then
         echo "Error: Missing required field: current_round" >&2
         return 3
@@ -572,25 +561,25 @@ parse_state_file_strict() {
         return 3
     fi
 
-    # Validate current_round is numeric (including 0 and negative)
+    # 验证 current_round 是数字（包括 0 和负数）
     if ! [[ "$STATE_CURRENT_ROUND" =~ ^-?[0-9]+$ ]]; then
         echo "Error: Non-numeric current_round value: $STATE_CURRENT_ROUND" >&2
         return 4
     fi
 
-    # Validate max_iterations is numeric
+    # 验证 max_iterations 是数字
     if ! [[ "$STATE_MAX_ITERATIONS" =~ ^-?[0-9]+$ ]]; then
         echo "Error: Non-numeric max_iterations value: $STATE_MAX_ITERATIONS" >&2
         return 5
     fi
 
-    # Validate review_started is boolean
+    # 验证 review_started 是布尔值
     if [[ "$STATE_REVIEW_STARTED" != "true" && "$STATE_REVIEW_STARTED" != "false" ]]; then
         echo "Error: Invalid review_started value (must be true or false): $STATE_REVIEW_STARTED" >&2
         return 6
     fi
 
-    # Apply defaults for optional fields only
+    # 仅对可选字段应用默认值
     STATE_PUSH_EVERY_ROUND="${STATE_PUSH_EVERY_ROUND:-false}"
     STATE_FULL_REVIEW_ROUND="${STATE_FULL_REVIEW_ROUND:-5}"
     STATE_ASK_CODEX_QUESTION="${STATE_ASK_CODEX_QUESTION:-true}"
@@ -604,8 +593,8 @@ parse_state_file_strict() {
     return 0
 }
 
-# Normalize mainline progress verdict to a safe enum.
-# Usage: normalize_mainline_progress_verdict "ADVANCED"
+# 将主线进度裁决规范化为安全枚举。
+# 用法：normalize_mainline_progress_verdict "ADVANCED"
 normalize_mainline_progress_verdict() {
     local verdict_lower
     verdict_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
@@ -620,8 +609,8 @@ normalize_mainline_progress_verdict() {
     esac
 }
 
-# Normalize drift status to a safe enum.
-# Usage: normalize_drift_status "replan_required"
+# 将漂移状态规范化为安全枚举。
+# 用法：normalize_drift_status "replan_required"
 normalize_drift_status() {
     local status_lower
     status_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
@@ -636,9 +625,9 @@ normalize_drift_status() {
     esac
 }
 
-# Extract "Mainline Progress Verdict" from Codex review content.
-# Outputs one of: advanced, stalled, regressed, unknown
-# Usage: extract_mainline_progress_verdict "$review_content"
+# 从 Codex 审查内容中提取"主线进度裁决"。
+# 输出以下之一：advanced、stalled、regressed、unknown
+# 用法：extract_mainline_progress_verdict "$review_content"
 extract_mainline_progress_verdict() {
     local review_content="$1"
     local verdict_line
@@ -650,10 +639,10 @@ extract_mainline_progress_verdict() {
         return
     fi
 
-    # Extract the verdict word using grep -oEi (portable) instead of sed /I (GNU-only).
-    # The preceding grep -Ei already ensures the line contains one of the three verdicts.
-    # Reject lines with multiple verdict keywords (e.g. placeholder template formats)
-    # to avoid silently accepting an ambiguous verdict.
+    # 使用 grep -oEi（可移植）而不是 sed /I（仅 GNU）提取裁决词。
+    # 前面的 grep -Ei 已经确保行包含三个裁决之一。
+    # 拒绝包含多个裁决关键字的行（例如占位符模板格式），
+    # 以避免静默接受模糊的裁决。
     local _verdict_matches
     _verdict_matches=$(printf '%s\n' "$verdict_line" | grep -oEi 'ADVANCED|STALLED|REGRESSED')
     local _match_count
@@ -666,9 +655,9 @@ extract_mainline_progress_verdict() {
     normalize_mainline_progress_verdict "$verdict_value"
 }
 
-# Upsert simple YAML frontmatter fields in a state file.
-# Values must not contain newlines.
-# Usage: upsert_state_fields "/path/to/state.md" "field=value" "other=value"
+# 在状态文件中更新插入简单的 YAML 前置元数据字段。
+# 值不得包含换行符。
+# 用法：upsert_state_fields "/path/to/state.md" "field=value" "other=value"
 upsert_state_fields() {
     local state_file="$1"
     shift
@@ -721,33 +710,31 @@ upsert_state_fields() {
     ' "$state_file" > "$temp_file" && mv "$temp_file" "$state_file"
 }
 
-# Detect review issues from codex review log file
-# Returns:
-#   0 - issues found (caller should continue review loop)
-#   1 - no issues found (caller can proceed to finalize)
-#   2 - log file missing/empty (hard error - caller must block and require retry)
-# Outputs: extracted review content to stdout if issues found
-# Arguments: $1=round_number
-# Required globals: LOOP_DIR, CACHE_DIR
+# 从 codex review 日志文件中检测审查问题
+# 返回：
+#   0 - 发现问题（调用者应继续审查循环）
+#   1 - 未发现问题（调用者可以继续到 finalize）
+#   2 - 日志文件缺失/为空（硬错误 - 调用者必须阻止并要求重试）
+# 输出：如果发现问题，将提取的审查内容输出到 stdout
+# 参数：$1=轮次编号
+# 必需的全局变量：LOOP_DIR、CACHE_DIR
 #
-# Algorithm:
-# 1. Scan the last 50 lines of the log file for [P?] markers in the first 10
-#    characters of each line. Real review issues only appear near the end of the
-#    log; scanning the full file risks false positives from earlier debug output
-#    and can hit argument-list-too-long limits on very large logs.
-# 2. Find the first such line where [P?] (? is a digit) appears in the first 10
-#    characters.
-# 3. If found: extract from that line to the end and output it.
-# 4. If not found: no issues, return 1.
+# 算法：
+# 1. 扫描日志文件的最后 50 行，查找每行前 10 个字符中的 [P?] 标记。
+#    真正的审查问题只出现在日志末尾附近；扫描整个文件可能会因
+#    早期调试输出产生误报，并且在非常大的日志上可能遇到参数列表过长限制。
+# 2. 找到第一个在前 10 个字符中出现 [P?]（? 是数字）的行。
+# 3. 如果找到：从该行提取到末尾并输出。
+# 4. 如果未找到：无问题，返回 1。
 #
-# Note: codex review outputs to stderr, so we analyze the combined log file
-# which contains both stdout and stderr (redirected with 2>&1).
+# 注意：codex review 输出到 stderr，因此我们分析包含 stdout 和 stderr
+# （用 2>&1 重定向）的组合日志文件。
 detect_review_issues() {
     local round="$1"
     local log_file="$CACHE_DIR/round-${round}-codex-review.log"
     local result_file="$LOOP_DIR/round-${round}-review-result.md"
 
-    # Check if log file exists and is not empty
+    # 检查日志文件是否存在且非空
     if [[ ! -f "$log_file" || ! -s "$log_file" ]]; then
         echo "Error: Codex review log file not found or empty: $log_file" >&2
         return 2
@@ -757,11 +744,11 @@ detect_review_issues() {
     total_lines=$(wc -l < "$log_file")
     echo "Analyzing log file: $log_file ($total_lines lines)" >&2
 
-    # Only scan the last 50 lines - real issues always appear near the end
+    # 仅扫描最后 50 行 - 真正的问题总是出现在末尾附近
     local scan_lines=50
     local start_line=$((total_lines > scan_lines ? total_lines - scan_lines + 1 : 1))
 
-    # Use awk on the tail to find the first line where [P?] appears in first 10 chars
+    # 使用 awk 在 tail 上查找前 10 个字符中出现 [P?] 的第一行
     local relative_line
     relative_line=$(tail -n "$scan_lines" "$log_file" | awk '
         substr($0, 1, 10) ~ /\[P[0-9]\]/ {
@@ -771,19 +758,19 @@ detect_review_issues() {
     ')
 
     if [[ -n "$relative_line" && "$relative_line" -gt 0 ]]; then
-        # Convert relative line (within tail) to absolute line in the full file
+        # 将相对行（在 tail 内）转换为完整文件中的绝对行
         local found_line=$((start_line + relative_line - 1))
         echo "Found [P?] issue at line $found_line" >&2
 
-        # Extract from found_line to end
+        # 从 found_line 提取到末尾
         local extracted_content
         extracted_content=$(sed -n "${found_line},\$p" "$log_file")
 
-        # Save to result file for audit purposes
+        # 保存到结果文件以供审计
         printf '%s\n' "$extracted_content" > "$result_file"
         echo "Review issues extracted to: $result_file" >&2
 
-        # Output the content for the caller
+        # 为调用者输出内容
         printf '## Codex Review Issues\n\n%s\n' "$extracted_content"
         return 0
     fi
@@ -792,13 +779,13 @@ detect_review_issues() {
     return 1
 }
 
-# Convert a string to lowercase
+# 将字符串转换为小写
 to_lower() {
     echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
-# Check if a path (lowercase) matches a round file pattern
-# Usage: is_round_file "$lowercase_path" "summary|prompt|todos|contract"
+# 检查路径（小写）是否匹配轮次文件模式
+# 用法：is_round_file "$lowercase_path" "summary|prompt|todos|contract"
 is_round_file_type() {
     local path_lower="$1"
     local file_type="$2"
@@ -806,26 +793,26 @@ is_round_file_type() {
     echo "$path_lower" | grep -qE "round-[0-9]+-${file_type}\\.md\$"
 }
 
-# Extract round number from a filename
-# Usage: extract_round_number "round-5-summary.md"
-# Outputs the round number or empty string
+# 从文件名中提取轮次编号
+# 用法：extract_round_number "round-5-summary.md"
+# 输出轮次编号或空字符串
 extract_round_number() {
     local filename="$1"
     local filename_lower
     filename_lower=$(to_lower "$filename")
 
-    # Use ERE (-E) so | alternation works on both GNU and BSD sed (macOS)
+    # 使用 ERE（-E）以便 | 交替在 GNU 和 BSD sed（macOS）上都能工作
     echo "$filename_lower" | sed -En 's/.*round-([0-9]+)-(summary|prompt|todos|contract)\.md$/\1/p'
 }
 
-# Check if a file is in the allowlist for the active loop
-# Usage: is_allowlisted_file "$file_path" "$active_loop_dir"
-# Returns: 0 if allowlisted, 1 otherwise
+# 检查文件是否在活跃循环的允许列表中
+# 用法：is_allowlisted_file "$file_path" "$active_loop_dir"
+# 返回：0 如果在允许列表中，否则返回 1
 is_allowlisted_file() {
     local file_path="$1"
     local active_loop_dir="$2"
 
-    # Canonicalize both paths to resolve symlinks (e.g. /var -> /private/var on macOS).
+    # 规范化两个路径以解析符号链接（例如 /var -> /private/var 在 macOS 上）。
     local canonical_file canonical_loop
     canonical_file=$(canonicalize_path "$file_path" 2>/dev/null || echo "$file_path")
     canonical_loop=$(canonicalize_path "$active_loop_dir" 2>/dev/null || echo "$active_loop_dir")
@@ -846,8 +833,8 @@ is_allowlisted_file() {
     return 1
 }
 
-# Standard message for blocking todos file access
-# Usage: todos_blocked_message "Read|Write|Bash"
+# 阻止 todos 文件访问的标准消息
+# 用法：todos_blocked_message "Read|Write|Bash"
 todos_blocked_message() {
     local action="$1"
     local fallback="# Todos File Access Blocked
@@ -857,7 +844,7 @@ Do NOT create or access round-*-todos.md files. Use the native Task tools instea
     load_and_render_safe "$TEMPLATE_DIR" "block/todos-file-access.md" "$fallback"
 }
 
-# Standard message for blocking prompt file writes
+# 阻止提示文件写入的标准消息
 prompt_write_blocked_message() {
     local fallback="# Prompt File Write Blocked
 
@@ -866,7 +853,7 @@ You cannot write to round-*-prompt.md files. These contain instructions FROM Cod
     load_and_render_safe "$TEMPLATE_DIR" "block/prompt-file-write.md" "$fallback"
 }
 
-# Standard message for blocking state file modifications
+# 阻止状态文件修改的标准消息
 state_file_blocked_message() {
     local fallback="# State File Modification Blocked
 
@@ -875,7 +862,7 @@ You cannot modify state.md. This file is managed by the loop system."
     load_and_render_safe "$TEMPLATE_DIR" "block/state-file-modification.md" "$fallback"
 }
 
-# Standard message for blocking finalize-state file modifications
+# 阻止 finalize-state 文件修改的标准消息
 finalize_state_file_blocked_message() {
     local fallback="# Finalize State File Modification Blocked
 
@@ -884,8 +871,8 @@ You cannot modify finalize-state.md. This file is managed by the loop system dur
     load_and_render_safe "$TEMPLATE_DIR" "block/finalize-state-file-modification.md" "$fallback"
 }
 
-# Standard message for blocking round contract access during Finalize Phase
-# Usage: finalize_contract_blocked_message "read"
+# 在 Finalize 阶段阻止轮次合同访问的标准消息
+# 用法：finalize_contract_blocked_message "read"
 finalize_contract_blocked_message() {
     local action="$1"
     local fallback="# Finalize Contract Access Blocked
@@ -899,8 +886,8 @@ Use finalize-summary.md for finalize-only notes and goal-tracker.md for current 
         "ACTION=$action"
 }
 
-# Standard message for blocking summary file modifications via Bash
-# Usage: summary_bash_blocked_message "$correct_summary_path"
+# 通过 Bash 阻止摘要文件修改的标准消息
+# 用法：summary_bash_blocked_message "$correct_summary_path"
 summary_bash_blocked_message() {
     local correct_path="$1"
     local fallback="# Bash Write Blocked
@@ -910,8 +897,8 @@ Do not use Bash commands to modify summary files. Use the Write or Edit tool ins
     load_and_render_safe "$TEMPLATE_DIR" "block/summary-bash-write.md" "$fallback" "CORRECT_PATH=$correct_path"
 }
 
-# Standard message for blocking goal-tracker modifications via Bash in Round 0
-# Usage: goal_tracker_bash_blocked_message "$correct_goal_tracker_path"
+# 在第 0 轮通过 Bash 阻止目标跟踪器修改的标准消息
+# 用法：goal_tracker_bash_blocked_message "$correct_goal_tracker_path"
 goal_tracker_bash_blocked_message() {
     local correct_path="$1"
     local fallback="# Bash Write Blocked
@@ -921,15 +908,15 @@ Do not use Bash commands to modify goal-tracker.md. Use the Write or Edit tool i
     load_and_render_safe "$TEMPLATE_DIR" "block/goal-tracker-bash-write.md" "$fallback" "CORRECT_PATH=$correct_path"
 }
 
-# Check if a path (lowercase) targets goal-tracker.md
+# 检查路径（小写）是否指向 goal-tracker.md
 is_goal_tracker_path() {
     local path_lower="$1"
     echo "$path_lower" | grep -qE 'goal-tracker\.md$'
 }
 
-# Extract the immutable section from a goal-tracker content stream.
-# Supports both current trackers (with --- separator) and older trackers
-# that jump directly from IMMUTABLE SECTION to MUTABLE SECTION.
+# 从目标跟踪器内容流中提取不可变部分。
+# 支持当前跟踪器（带 --- 分隔符）和直接从 IMMUTABLE SECTION
+# 跳到 MUTABLE SECTION 的较旧跟踪器。
 extract_goal_tracker_immutable_from_stream() {
     awk '
         /^## IMMUTABLE SECTION[[:space:]]*$/ { capture=1 }
@@ -939,8 +926,8 @@ extract_goal_tracker_immutable_from_stream() {
     '
 }
 
-# Extract the immutable section from an on-disk goal-tracker file.
-# Usage: extract_goal_tracker_immutable_from_file "/path/to/goal-tracker.md"
+# 从磁盘上的目标跟踪器文件中提取不可变部分。
+# 用法：extract_goal_tracker_immutable_from_file "/path/to/goal-tracker.md"
 extract_goal_tracker_immutable_from_file() {
     local tracker_file="$1"
     if [[ ! -f "$tracker_file" ]]; then
@@ -949,15 +936,15 @@ extract_goal_tracker_immutable_from_file() {
     extract_goal_tracker_immutable_from_stream < "$tracker_file"
 }
 
-# Extract the immutable section from an in-memory goal-tracker string.
-# Usage: extract_goal_tracker_immutable_from_text "$content"
+# 从内存中的目标跟踪器字符串中提取不可变部分。
+# 用法：extract_goal_tracker_immutable_from_text "$content"
 extract_goal_tracker_immutable_from_text() {
     local tracker_content="$1"
     printf '%s' "$tracker_content" | extract_goal_tracker_immutable_from_stream
 }
 
-# Check whether a proposed goal-tracker update preserves the immutable section.
-# Usage: goal_tracker_mutable_update_allowed "/path/to/current.md" "$new_content"
+# 检查提议的目标跟踪器更新是否保留了不可变部分。
+# 用法：goal_tracker_mutable_update_allowed "/path/to/current.md" "$new_content"
 goal_tracker_mutable_update_allowed() {
     local tracker_file="$1"
     local updated_content="$2"
@@ -967,14 +954,14 @@ goal_tracker_mutable_update_allowed() {
     current_immutable=$(extract_goal_tracker_immutable_from_file "$tracker_file" 2>/dev/null || true)
     updated_immutable=$(extract_goal_tracker_immutable_from_text "$updated_content" 2>/dev/null || true)
 
-    # Legacy trackers without IMMUTABLE SECTION: allow edits unconditionally.
+    # 没有 IMMUTABLE SECTION 的旧跟踪器：无条件允许编辑。
     [[ -n "$current_immutable" ]] || return 0
     [[ "$current_immutable" == "$updated_immutable" ]]
 }
 
-# Render the post-edit contents for a literal Edit operation.
-# Returns non-zero if the edit preview cannot be produced.
-# Usage: preview_edit_result "/path/to/file" "$old_string" "$new_string" "true|false"
+# 为字面 Edit 操作渲染编辑后的内容。
+# 如果无法生成编辑预览则返回非零。
+# 用法：preview_edit_result "/path/to/file" "$old_string" "$new_string" "true|false"
 preview_edit_result() {
     local file_path="$1"
     local old_string="$2"
@@ -1001,25 +988,25 @@ preview_edit_result() {
     ' "$file_path"
 }
 
-# Check if a path (lowercase) targets state.md
+# 检查路径（小写）是否指向 state.md
 is_state_file_path() {
     local path_lower="$1"
     echo "$path_lower" | grep -qE 'state\.md$'
 }
 
-# Check if a path (lowercase) targets finalize-state.md
+# 检查路径（小写）是否指向 finalize-state.md
 is_finalize_state_file_path() {
     local path_lower="$1"
     echo "$path_lower" | grep -qE 'finalize-state\.md$'
 }
 
-# Check if a path (lowercase) targets methodology-analysis-state.md
+# 检查路径（小写）是否指向 methodology-analysis-state.md
 is_methodology_analysis_state_file_path() {
     local path_lower="$1"
     echo "$path_lower" | grep -qE 'methodology-analysis-state\.md$'
 }
 
-# Standard message for blocking methodology-analysis-state file modifications
+# 阻止 methodology-analysis-state 文件修改的标准消息
 methodology_analysis_state_file_blocked_message() {
     local fallback="# Methodology Analysis State File Modification Blocked
 
@@ -1028,78 +1015,76 @@ You cannot modify methodology-analysis-state.md. This file is managed by the loo
     load_and_render_safe "$TEMPLATE_DIR" "block/methodology-analysis-state-file-modification.md" "$fallback"
 }
 
-# Check if a path (lowercase) targets finalize-summary.md
+# 检查路径（小写）是否指向 finalize-summary.md
 is_finalize_summary_path() {
     local path_lower="$1"
     echo "$path_lower" | grep -qE 'finalize-summary\.md$'
 }
 
-# Normalize paths by removing /./ and collapsing // to /
-# This allows paths like /path/to/./state.md to match /path/to/state.md
+# 通过移除 /./ 和将 // 折叠为 / 来规范化路径
+# 这允许像 /path/to/./state.md 这样的路径匹配 /path/to/state.md
 _normalize_path() {
     echo "$1" | sed 's|/\./|/|g; s|//|/|g'
 }
 
-# Check if cancel operation is authorized via signal file
-# Usage: is_cancel_authorized "$active_loop_dir" "$command_lower"
-# Returns: 0 if authorized, non-zero otherwise
-#   1 - missing signal file
-#   2 - security violation (injection, command substitution, etc.)
-#   3 - mixed quote styles
-#   4 - multiple trailing spaces
-#   5 - invalid command structure
-#   6 - source file is a symlink (filesystem check)
+# 检查取消操作是否通过信号文件授权
+# 用法：is_cancel_authorized "$active_loop_dir" "$command_lower"
+# 返回：0 如果已授权，否则返回非零
+#   1 - 缺少信号文件
+#   2 - 安全违规（注入、命令替换等）
+#   3 - 混合引号样式
+#   4 - 多个尾随空格
+#   5 - 无效的命令结构
+#   6 - 源文件是符号链接（文件系统检查）
 #
-# Security notes:
-# - Normalizes $loop_dir/${loop_dir} to actual path before validation
-# - Rejects $(cmd) command substitution and backticks
-# - Rejects any remaining $ after normalization (prevents hidden vars like ${IFS})
-# - Enforces exactly two arguments: state.md or finalize-state.md source and cancel-state.md dest
-# - Rejects shell operators for command chaining
-# - Rejects mixed quote styles and multiple trailing spaces
-# - Rejects if source file is a symlink
+# 安全说明：
+# - 在验证之前将 $loop_dir/${loop_dir} 规范化为实际路径
+# - 拒绝 $(cmd) 命令替换和反引号
+# - 拒绝规范化后的任何剩余 $（防止隐藏变量如 ${IFS}）
+# - 强制恰好两个参数：state.md 或 finalize-state.md 源和 cancel-state.md 目标
+# - 拒绝用于命令链接的 shell 运算符
+# - 拒绝混合引号样式和多个尾随空格
+# - 如果源文件是符号链接则拒绝
 is_cancel_authorized() {
     local active_loop_dir="$1"
     local command_lower="$2"
 
     local cancel_signal="$active_loop_dir/.cancel-requested"
 
-    # Signal file must exist
+    # 信号文件必须存在
     if [[ ! -f "$cancel_signal" ]]; then
         return 1
     fi
 
-    # SECURITY: Reject command substitution and backticks
+    # 安全性：拒绝命令替换和反引号
     if echo "$command_lower" | grep -qE '\$\(|`'; then
         return 2
     fi
 
-    # Reject newlines (multi-command injection)
+    # 拒绝换行符（多命令注入）
     if [[ "$command_lower" == *$'\n'* ]]; then
         return 2
     fi
 
-    # Reject shell operators for command chaining
+    # 拒绝用于命令链接的 shell 运算符
     if echo "$command_lower" | grep -qE ';|&&|\|\||\|'; then
         return 2
     fi
 
-    # Reject multiple trailing spaces
+    # 拒绝多个尾随空格
     if echo "$command_lower" | grep -qE '[[:space:]]{2,}$'; then
         return 4
     fi
 
-    # Canonicalize the loop dir (idempotent: resolve_project_root already
-    # canonicalizes, but callers may supply a non-canonical override). Both
-    # sides of the upcoming string comparisons must be canonicalized through
-    # the same transformation or a symlinked prefix in the user's command
-    # (e.g. /var/... vs /private/var/... on macOS) will spuriously fail the
-    # authorization check.
+    # 规范化循环目录（幂等：resolve_project_root 已经规范化，
+    # 但调用者可能提供非规范化的覆盖）。即将到来的字符串比较的两侧
+    # 必须通过相同的转换规范化，否则用户命令中的符号链接前缀
+    # （例如 /var/... vs /private/var/... 在 macOS 上）将虚假失败授权检查。
     local canonical_loop_dir
     canonical_loop_dir="$(canonicalize_path "${active_loop_dir%/}")"
     canonical_loop_dir="${canonical_loop_dir:-${active_loop_dir%/}}"
 
-    # Normalize: Replace $loop_dir and ${loop_dir} with actual path
+    # 规范化：将 $loop_dir 和 ${loop_dir} 替换为实际路径
     local normalized="$command_lower"
     local loop_dir_lower
     loop_dir_lower="${canonical_loop_dir}/"
@@ -1108,22 +1093,22 @@ is_cancel_authorized() {
     normalized="${normalized//\$\{loop_dir\}/$loop_dir_lower}"
     normalized="${normalized//\$loop_dir/$loop_dir_lower}"
 
-    # After normalization, reject any remaining $ (prevents hidden vars like ${IFS})
+    # 规范化后，拒绝任何剩余的 $（防止隐藏变量如 ${IFS}）
     if echo "$normalized" | grep -qE '\$'; then
         return 2
     fi
 
-    # Must start with mv followed by space
+    # 必须以 mv 开头后跟空格
     if ! echo "$normalized" | grep -qE '^mv[[:space:]]+'; then
         return 5
     fi
 
-    # Extract arguments after "mv "
+    # 提取 "mv " 之后的参数
     local args
     args=$(echo "$normalized" | sed 's/^mv[[:space:]]*//')
 
-    # Detect quote types used in both arguments
-    # Check for mixed quotes by detecting if both ' and " are used as delimiters
+    # 检测两个参数中使用的引号类型
+    # 通过检测 ' 和 " 是否都用作分隔符来检查混合引号
     local has_single=false has_double=false
     local first_char
     first_char=$(echo "$args" | cut -c1)
@@ -1133,7 +1118,7 @@ is_cancel_authorized() {
         has_single=true
     fi
 
-    # Skip first argument to check second
+    # 跳过第一个参数以检查第二个
     local args_after_first
     if [[ "$first_char" == '"' ]]; then
         args_after_first=$(echo "$args" | sed 's/^"[^"]*"[[:space:]]*//')
@@ -1151,12 +1136,12 @@ is_cancel_authorized() {
         has_single=true
     fi
 
-    # Reject mixed quote styles
+    # 拒绝混合引号样式
     if [[ "$has_single" == "true" ]] && [[ "$has_double" == "true" ]]; then
         return 3
     fi
 
-    # Parse arguments, respecting quotes
+    # 解析参数，尊重引号
     local src dest
     if echo "$args" | grep -qE "^[\"']"; then
         local quote_char
@@ -1192,26 +1177,23 @@ is_cancel_authorized() {
         return 5
     fi
 
-    # Check for extra arguments
+    # 检查额外参数
     args=$(echo "$args" | sed 's/^[[:space:]]*//')
     if [[ -n "$args" ]]; then
         return 5
     fi
 
-    # Normalize and validate source path.
+    # 规范化和验证源路径。
     #
-    # Use canonicalize_path_prefix (NOT canonicalize_path): we need to resolve
-    # symlinks in the parent directory so a symlinked project prefix matches
-    # canonical_loop_dir, but we MUST NOT dereference a symlink at the leaf.
-    # Otherwise a symlink like /tmp/alias -> <loop>/state.md would canonicalize
-    # to <loop>/state.md and pass the check, but `mv` would then operate on
-    # the link path itself, escaping the loop directory and/or corrupting
-    # loop state. The on-disk symlink rejection below (src_original check)
-    # still fires because it probes the real state.md under canonical_loop_dir.
+    # 使用 canonicalize_path_prefix（不是 canonicalize_path）：我们需要解析
+    # 父目录中的符号链接，以便符号链接的项目前缀匹配 canonical_loop_dir，
+    # 但我们不能取消引用叶子处的符号链接。否则像 /tmp/alias -> <loop>/state.md
+    # 这样的符号链接会规范化为 <loop>/state.md 并通过检查，但 `mv` 会操作
+    # 链接路径本身，逃离循环目录和/或损坏循环状态。下面的磁盘符号链接拒绝
+    # （src_original 检查）仍然触发，因为它探测 canonical_loop_dir 下的真实 state.md。
     #
-    # Re-lowercase after canonicalization because realpath on case-insensitive
-    # filesystems may restore the original casing of path components, which
-    # would diverge from the already-lowercased expected_* values.
+    # 规范化后重新小写，因为在不区分大小写的文件系统上 realpath 可能
+    # 恢复路径组件的原始大小写，这将与已经小写的 expected_* 值不同。
     src=$(_normalize_path "$src")
     local src_canonical
     src_canonical="$(canonicalize_path_prefix "$src")"
@@ -1224,11 +1206,10 @@ is_cancel_authorized() {
         return 5
     fi
 
-    # Normalize and validate destination path. Uses canonicalize_path_prefix
-    # for the same reason as src: a symlink alias pointing at the real
-    # cancel-state.md must NOT pass authorization, because `mv` onto a
-    # symlink replaces the link rather than creating <loop>/cancel-state.md,
-    # corrupting loop state and moving state.md outside the loop dir.
+    # 规范化和验证目标路径。使用 canonicalize_path_prefix，
+    # 原因与 src 相同：指向真实 cancel-state.md 的符号链接别名
+    # 不能通过授权，因为 `mv` 到符号链接会替换链接而不是创建
+    # <loop>/cancel-state.md，损坏循环状态并将 state.md 移出循环目录。
     dest=$(_normalize_path "$dest")
     local dest_canonical
     dest_canonical="$(canonicalize_path_prefix "$dest")"
@@ -1239,11 +1220,11 @@ is_cancel_authorized() {
         return 5
     fi
 
-    # SECURITY: Reject if source file is a symlink (filesystem check)
-    # Determine source file by comparing against expected paths (not substring match)
-    # This avoids vulnerability when loop directory path contains "finalize" or "methodology"
-    # Use canonical_loop_dir so the symlink check runs against the real on-disk
-    # path rather than a user-supplied non-canonical form.
+    # 安全性：如果源文件是符号链接则拒绝（文件系统检查）
+    # 通过与预期路径比较（不是子字符串匹配）确定源文件
+    # 这避免了当循环目录路径包含 "finalize" 或 "methodology" 时的漏洞
+    # 使用 canonical_loop_dir 以便符号链接检查针对真实的磁盘路径
+    # 而不是用户提供的非规范形式。
     local src_original
     if [[ "$src_canonical" == "$expected_src_methodology" ]]; then
         src_original="${canonical_loop_dir}/methodology-analysis-state.md"
@@ -1259,39 +1240,39 @@ is_cancel_authorized() {
     return 0
 }
 
-# Check if a path is inside .humanize/rlcr directory
+# 检查路径是否在 .humanize/rlcr 目录内
 is_in_humanize_loop_dir() {
     local path="$1"
     echo "$path" | grep -q '\.humanize/rlcr/'
 }
 
-# Check if a git add command would add .humanize files to version control
-# Usage: git_adds_humanize "$command_lower"
-# Returns 0 if the command would add .humanize files, 1 otherwise
+# 检查 git add 命令是否会将 .humanize 文件添加到版本控制
+# 用法：git_adds_humanize "$command_lower"
+# 如果命令会添加 .humanize 文件则返回 0，否则返回 1
 #
-# IMPORTANT: This function receives LOWERCASED input from the validator.
-# Git flags like -A become -a after lowercasing, so we match both.
+# 重要：此函数从验证器接收小写输入。
+# Git 标志如 -A 在小写后变成 -a，因此我们匹配两者。
 #
-# Handles:
-# - git -C <dir> add (git options before add subcommand)
-# - Chained commands: cd repo && git add .humanize
-# - Shell operators: ;, &&, ||, |
+# 处理：
+# - git -C <dir> add（add 子命令之前的 git 选项）
+# - 链式命令：cd repo && git add .humanize
+# - Shell 运算符：;、&&、||、|
 #
-# Blocks:
-# - git add .humanize or git add .humanize/
-# - git add .humanize/* or git add .humanize/**
-# - git add -f .humanize* (force add)
-# - git add -f . or git add --force . (force add all - bypasses gitignore)
-# - git add -f -A or git add --force --all (force add all)
-# - git add -fA or similar combined flags
-# - git add -A or git add --all (when .humanize exists)
-# - git add . or git add * (when .humanize exists and not gitignored)
+# 阻止：
+# - git add .humanize 或 git add .humanize/
+# - git add .humanize/* 或 git add .humanize/**
+# - git add -f .humanize*（强制添加）
+# - git add -f . 或 git add --force .（强制添加全部 - 绕过 gitignore）
+# - git add -f -A 或 git add --force --all（强制添加全部）
+# - git add -fA 或类似的组合标志
+# - git add -A 或 git add --all（当 .humanize 存在时）
+# - git add . 或 git add *（当 .humanize 存在且未被 gitignore 时）
 #
 git_adds_humanize() {
     local cmd="$1"
 
-    # Split command on shell operators and check each segment
-    # This handles chained commands like: cd repo && git add .humanize
+    # 按 shell 运算符拆分命令并检查每个段
+    # 这处理链式命令，如：cd repo && git add .humanize
     local segments
     segments=$(echo "$cmd" | sed '
         s/&&/\n/g
@@ -1303,36 +1284,36 @@ git_adds_humanize() {
     while IFS= read -r segment; do
         [[ -z "$segment" ]] && continue
 
-        # Check if this segment contains a git add command
-        # Pattern: git (with optional flags/options) followed by add
-        # Handles:
+        # 检查此段是否包含 git add 命令
+        # 模式：git（带可选标志/选项）后跟 add
+        # 处理：
         # - git add
-        # - git -C dir add (short option with separate arg)
-        # - git --git-dir=x add (long option with = arg)
-        # - git -c key=value add (short option with = arg)
-        # The pattern allows any non-add tokens between git and add
+        # - git -C dir add（带单独参数的短选项）
+        # - git --git-dir=x add（带 = 参数的长选项）
+        # - git -c key=value add（带 = 参数的短选项）
+        # 模式允许 git 和 add 之间的任何非 add 令牌
         if ! echo "$segment" | grep -qE '(^|[[:space:]])git[[:space:]]+([^[:space:]]+[[:space:]]+)*add([[:space:]]|$)'; then
             continue
         fi
 
-        # Extract the part after "add" for analysis
+        # 提取 "add" 之后的部分进行分析
         local add_args
         add_args=$(echo "$segment" | sed -n 's/.*[[:space:]]add[[:space:]]*//p')
 
-        # Normalize add_args: strip quotes for path matching
-        # This handles: git add ".humanize", git add '.humanize'
+        # 规范化 add_args：为路径匹配剥离引号
+        # 这处理：git add ".humanize"、git add '.humanize'
         local add_args_normalized
         add_args_normalized=$(echo "$add_args" | sed "s/[\"']//g")
 
-        # Check for direct .humanize reference (blocked regardless of other flags)
-        # Handles: .humanize, ./.humanize, path/to/.humanize, ".humanize", '.humanize'
-        # Pattern matches .humanize at start, after space, after / or ./ AND followed by end, /, or space
-        # This avoids over-blocking .humanizeconfig or .humanize-backup.
+        # 检查直接的 .humanize 引用（无论其他标志如何都被阻止）
+        # 处理：.humanize、./.humanize、path/to/.humanize、".humanize"、'.humanize'
+        # 模式在开头、空格后、/ 或 ./ 后匹配 .humanize，且后跟结尾、/ 或空格
+        # 这避免了过度阻止 .humanizeconfig 或 .humanize-backup。
         if echo "$add_args_normalized" | grep -qE '(^|[[:space:]]|/)\.humanize($|/|[[:space:]])'; then
             return 0
         fi
 
-        # Check for -f or --force flag (including combined flags like -fa, -af)
+        # 检查 -f 或 --force 标志（包括组合标志如 -fa、-af）
         local has_force=false
         if echo "$add_args" | grep -qE '(^|[[:space:]])--force([[:space:]]|$)'; then
             has_force=true
@@ -1340,8 +1321,8 @@ git_adds_humanize() {
             has_force=true
         fi
 
-        # Check for -A/--all flag (including combined flags like -fa, -af)
-        # Note: input is lowercased, so -A becomes -a
+        # 检查 -A/--all 标志（包括组合标志如 -fa、-af）
+        # 注意：输入是小写的，所以 -A 变成 -a
         local has_all=false
         if echo "$add_args" | grep -qE '(^|[[:space:]])--all([[:space:]]|$)'; then
             has_all=true
@@ -1349,32 +1330,32 @@ git_adds_humanize() {
             has_all=true
         fi
 
-        # Check for broad scope targets: . or * alone
+        # 检查广泛范围目标：单独的 . 或 *
         local has_broad_scope=false
         if echo "$add_args" | grep -qE '(^|[[:space:]])(\.|\*)([[:space:]]|$)'; then
             has_broad_scope=true
         fi
 
-        # Force add with any broad scope (force bypasses gitignore entirely)
+        # 强制添加任何广泛范围（强制完全绕过 gitignore）
         if [[ "$has_force" == "true" ]]; then
             if [[ "$has_all" == "true" ]] || [[ "$has_broad_scope" == "true" ]]; then
                 return 0
             fi
         fi
 
-        # Check if .humanize exists - needed for non-force blocking
+        # 检查 .humanize 是否存在 - 非强制阻止需要
         if [[ ! -d ".humanize" ]]; then
             continue
         fi
 
-        # git add -A/--all when .humanize exists
-        # Always block because -A adds all changes including untracked files
+        # 当 .humanize 存在时 git add -A/--all
+        # 总是阻止，因为 -A 添加所有更改包括未跟踪的文件
         if [[ "$has_all" == "true" ]]; then
             return 0
         fi
 
-        # git add . or git add * when .humanize exists and not gitignored
-        # Only block if .humanize is NOT protected by gitignore
+        # 当 .humanize 存在且未被 gitignore 时 git add . 或 git add *
+        # 仅在 .humanize 未被 gitignore 保护时阻止
         if [[ "$has_broad_scope" == "true" ]]; then
             if ! git check-ignore -q .humanize 2>/dev/null; then
                 return 0
@@ -1385,8 +1366,8 @@ git_adds_humanize() {
     return 1
 }
 
-# Standard message for blocking git add .humanize commands
-# Usage: git_add_humanize_blocked_message
+# 阻止 git add .humanize 命令的标准消息
+# 用法：git_add_humanize_blocked_message
 git_add_humanize_blocked_message() {
     local fallback="# Git Add Blocked: .humanize Protection
 
@@ -1425,16 +1406,15 @@ IMPORTANT: The commit message must NOT contain the literal string \".humanize\" 
     load_and_render_safe "$TEMPLATE_DIR" "block/git-add-humanize.md" "$fallback"
 }
 
-# Return success if local Humanize runtime state has entered git tracking or the index.
-# Untracked .humanize state is allowed; tracked or staged state must be blocked.
-# Usage: git_has_tracked_humanize_state [project_root]
+# 如果本地 Humanize 运行时状态已进入 git 跟踪或索引则返回成功。
+# 未跟踪的 .humanize 状态是允许的；已跟踪或已暂存的状态必须被阻止。
+# 用法：git_has_tracked_humanize_state [project_root]
 #
-# Intentionally scoped to .humanize/ to stay consistent with git_adds_humanize,
-# which explicitly allows unrelated paths like .humanize-backup or
-# .humanizeconfig (see tests/test-humanize-escape.sh). ls-files covers both
-# committed entries and paths staged via git add; paths the user has staged for
-# removal via git rm --cached are correctly omitted so the user can unstick
-# themselves without being re-blocked.
+# 故意限定在 .humanize/ 范围内以与 git_adds_humanize 保持一致，
+# 它明确允许不相关的路径如 .humanize-backup 或 .humanizeconfig
+# （参见 tests/test-humanize-escape.sh）。ls-files 覆盖已提交的条目
+# 和通过 git add 暂存的路径；用户已通过 git rm --cached 暂存移除的路径
+# 被正确省略，以便用户可以自行解除阻塞而不被重新阻止。
 git_has_tracked_humanize_state() {
     local project_root="${1:-.}"
 
@@ -1449,8 +1429,8 @@ git_has_tracked_humanize_state() {
     return 1
 }
 
-# Standard message for blocking tracked/staged .humanize state.
-# Usage: git_tracked_humanize_blocked_message
+# 阻止已跟踪/已暂存的 .humanize 状态的标准消息。
+# 用法：git_tracked_humanize_blocked_message
 git_tracked_humanize_blocked_message() {
     local fallback="# Tracked Humanize State Blocked
 
@@ -1475,8 +1455,8 @@ These files are local Humanize loop state and must remain outside version contro
     load_and_render_safe "$TEMPLATE_DIR" "block/git-tracked-humanize.md" "$fallback"
 }
 
-# Standard message for blocking direct execution of hook scripts
-# Usage: stop_hook_direct_execution_blocked_message
+# 阻止直接执行钩子脚本的标准消息
+# 用法：stop_hook_direct_execution_blocked_message
 stop_hook_direct_execution_blocked_message() {
     local fallback="# Direct Execution of Hook Scripts Blocked
 
@@ -1489,9 +1469,9 @@ Simply complete your work and end your response. The hooks system will handle th
     load_and_render_safe "$TEMPLATE_DIR" "block/stop-hook-direct-execution.md" "$fallback"
 }
 
-# Check if a shell command attempts to modify a file matching the given pattern
-# Usage: command_modifies_file "$command_lower" "goal-tracker\.md"
-# Returns 0 if the command tries to modify the file, 1 otherwise
+# 检查 shell 命令是否尝试修改匹配给定模式的文件
+# 用法：command_modifies_file "$command_lower" "goal-tracker\.md"
+# 如果命令尝试修改文件则返回 0，否则返回 1
 command_modifies_file() {
     local command_lower="$1"
     local file_pattern="$2"
@@ -1519,8 +1499,8 @@ command_modifies_file() {
     return 1
 }
 
-# Standard message for blocking goal-tracker modifications after Round 0
-# Usage: goal_tracker_blocked_message "$current_round" "$correct_goal_tracker_path"
+# 在第 0 轮之后阻止目标跟踪器修改的标准消息
+# 用法：goal_tracker_blocked_message "$current_round" "$correct_goal_tracker_path"
 goal_tracker_blocked_message() {
     local current_round="$1"
     local correct_path="$2"
@@ -1540,19 +1520,19 @@ Rules:
         "CORRECT_PATH=$correct_path"
 }
 
-# End the loop by renaming state.md to indicate exit reason
-# Usage: end_loop "$loop_dir" "$state_file" "complete|cancel|maxiter|stop|unexpected"
-# Arguments:
-#   $1 - loop_dir: Path to the loop directory
-#   $2 - state_file: Path to the state.md file
-#   $3 - reason: One of complete, cancel, maxiter, stop, unexpected
-# Returns: 0 on success, 1 on failure
+# 通过重命名 state.md 来指示退出原因以结束循环
+# 用法：end_loop "$loop_dir" "$state_file" "complete|cancel|maxiter|stop|unexpected"
+# 参数：
+#   $1 - loop_dir：循环目录的路径
+#   $2 - state_file：state.md 文件的路径
+#   $3 - reason：complete、cancel、maxiter、stop、unexpected 之一
+# 返回：成功时为 0，失败时为 1
 end_loop() {
     local loop_dir="$1"
     local state_file="$2"
-    local reason="$3"  # complete, cancel, maxiter, stop, unexpected
+    local reason="$3"  # complete、cancel、maxiter、stop、unexpected
 
-    # Validate reason
+    # 验证原因
     case "$reason" in
         complete|cancel|maxiter|stop|unexpected)
             ;;
@@ -1575,14 +1555,12 @@ end_loop() {
     fi
 }
 
-# Source background-task helpers. Sourced at the bottom so every function
-# above is available to callers that only need loop-common.sh, while bg-aware
-# callers (the stop hook, the test suite) still get the bg helpers via a
-# single source of loop-common.sh.
+# 源码引入后台任务辅助函数。在底部源码引入，以便上面的每个函数
+# 对只需要 loop-common.sh 的调用者可用，而后台感知的调用者
+# （stop hook、测试套件）仍然通过 loop-common.sh 的单一源码引入获取后台辅助函数。
 #
-# _LOOP_COMMON_DIR is set here instead of at the top of the file because
-# loop-bg-tasks.sh lives in the same directory as this file and we want to
-# locate it regardless of how loop-common.sh was sourced.
+# _LOOP_COMMON_DIR 在这里设置而不是在文件顶部，因为 loop-bg-tasks.sh
+# 与此文件在同一目录中，我们希望无论 loop-common.sh 如何被源码引入都能定位它。
 _LOOP_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=loop-bg-tasks.sh
 source "$_LOOP_COMMON_DIR/loop-bg-tasks.sh"

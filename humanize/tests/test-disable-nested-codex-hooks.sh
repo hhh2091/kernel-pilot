@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Ensure Humanize's nested Codex reviewer calls disable native hooks to avoid recursion.
+# 确保 Humanize 的嵌套 Codex 审查调用禁用原生钩子以避免递归。
 #
 
 set -euo pipefail
@@ -70,8 +70,8 @@ setup_mock_codex() {
     mkdir -p "$bin_dir"
     cat > "$bin_dir/codex" <<EOF
 #!/usr/bin/env bash
-# The stop hook probes feature support with \`codex --help\`; advertise
-# --disable so the nested invocation is expected to include it.
+# stop hook 使用 \`codex --help\` 探测功能支持；宣传 --disable，
+# 以便嵌套调用预期包含它。
 if [[ "\$1" == "--help" ]]; then
     cat <<HELP
 Usage: codex [OPTIONS] <COMMAND>

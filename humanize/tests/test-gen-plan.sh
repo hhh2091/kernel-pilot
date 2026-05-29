@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Test script for gen-plan command structure validation
+# gen-plan 命令结构验证的测试脚本
 #
-# Validates that gen-plan command exists in proper structure with valid YAML frontmatter.
-# Tests both positive (must pass) and negative (must fail gracefully) scenarios.
+# 验证 gen-plan 命令以正确的结构存在且具有有效的 YAML 前置数据。
+# 测试正面（必须通过）和负面（必须优雅失败）场景。
 #
 
 set -euo pipefail
@@ -13,16 +13,16 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMMANDS_DIR="$PROJECT_ROOT/commands"
 AGENTS_DIR="$PROJECT_ROOT/agents"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色
 
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# Test helper functions
+# 测试辅助函数
 pass() {
     echo -e "${GREEN}PASS${NC}: $1"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -45,14 +45,14 @@ echo "========================================"
 echo ""
 
 # ========================================
-# Positive Tests (PT-1 to PT-9)
+# 正面测试 (PT-1 到 PT-9)
 # ========================================
 echo "========================================"
 echo "Positive Tests - Must Pass"
 echo "========================================"
 
 # ----------------------------------------
-# PT-1: Command file structure validation
+# PT-1：命令文件结构验证
 # ----------------------------------------
 echo ""
 echo "PT-1: Command file structure validation"
@@ -64,7 +64,7 @@ else
 fi
 
 # ----------------------------------------
-# PT-2: Command description validation
+# PT-2：命令描述验证
 # ----------------------------------------
 echo ""
 echo "PT-2: Command description validation"
@@ -78,7 +78,7 @@ if [[ -f "$GEN_PLAN_CMD" ]]; then
 fi
 
 # ----------------------------------------
-# PT-3: Allowed tools validation
+# PT-3：允许工具验证
 # ----------------------------------------
 echo ""
 echo "PT-3: Allowed tools validation"
@@ -91,7 +91,7 @@ if [[ -f "$GEN_PLAN_CMD" ]]; then
 fi
 
 # ----------------------------------------
-# PT-4: Argument hint validation
+# PT-4：参数提示验证
 # ----------------------------------------
 echo ""
 echo "PT-4: Argument hint validation"
@@ -104,7 +104,7 @@ if [[ -f "$GEN_PLAN_CMD" ]]; then
 fi
 
 # ----------------------------------------
-# PT-5: Agent file structure validation
+# PT-5：Agent 文件结构验证
 # ----------------------------------------
 echo ""
 echo "PT-5: Agent file structure validation"
@@ -116,7 +116,7 @@ else
 fi
 
 # ----------------------------------------
-# PT-5b: Claude/Codex deliberation workflow validation
+# PT-5b：Claude/Codex 协商工作流验证
 # ----------------------------------------
 echo ""
 echo "PT-5b: Claude/Codex deliberation workflow validation"
@@ -247,7 +247,7 @@ else
 fi
 
 # ----------------------------------------
-# PT-6: Agent name validation
+# PT-6：Agent 名称验证
 # ----------------------------------------
 echo ""
 echo "PT-6: Agent name validation"
@@ -261,7 +261,7 @@ if [[ -f "$RELEVANCE_AGENT" ]]; then
 fi
 
 # ----------------------------------------
-# PT-7: Agent model specification validation
+# PT-7：Agent 模型规范验证
 # ----------------------------------------
 echo ""
 echo "PT-7: Agent model specification validation"
@@ -275,7 +275,7 @@ if [[ -f "$RELEVANCE_AGENT" ]]; then
 fi
 
 # ----------------------------------------
-# PT-8: Agent tools specification validation
+# PT-8：Agent 工具规范验证
 # ----------------------------------------
 echo ""
 echo "PT-8: Agent tools specification validation"
@@ -288,7 +288,7 @@ if [[ -f "$RELEVANCE_AGENT" ]]; then
 fi
 
 # ----------------------------------------
-# PT-9: Version consistency check
+# PT-9：版本一致性检查
 # ----------------------------------------
 echo ""
 echo "PT-9: Version consistency check"
@@ -311,32 +311,32 @@ else
 fi
 
 # ========================================
-# Negative Tests (NT-1 to NT-6)
-# These tests create ACTUAL invalid fixtures to verify graceful failure
+# 负面测试 (NT-1 到 NT-6)
+# 这些测试创建实际的无效夹具以验证优雅失败
 # ========================================
 echo ""
 echo "========================================"
 echo "Negative Tests - Must Fail Gracefully"
 echo "========================================"
 
-# Setup test fixture directory (will be cleaned up)
+# 设置测试夹具目录（将被清理）
 TEST_FIXTURES_DIR=$(mktemp -d)
 trap "rm -rf $TEST_FIXTURES_DIR" EXIT
 
-# Helper function to validate command/agent naming
+# 验证命令/Agent 命名的辅助函数
 validate_name() {
     local name="$1"
     [[ "$name" =~ ^[a-z][a-z0-9-]*$ ]]
 }
 
-# Helper function to check YAML frontmatter
+# 检查 YAML 前置数据的辅助函数
 check_yaml_frontmatter() {
     local file="$1"
     head -1 "$file" | grep -q "^---$" && \
     grep -q "^description:" "$file"
 }
 
-# Helper function to check agent YAML frontmatter
+# 检查 Agent YAML 前置数据的辅助函数
 check_agent_yaml_frontmatter() {
     local file="$1"
     head -1 "$file" | grep -q "^---$" && \
@@ -345,7 +345,7 @@ check_agent_yaml_frontmatter() {
 }
 
 # ----------------------------------------
-# NT-1: Invalid name format validation
+# NT-1：无效名称格式验证
 # ----------------------------------------
 echo ""
 echo "NT-1: Invalid name format - rejects uppercase"
@@ -362,7 +362,7 @@ else
     fail "NT-1b: Should reject spaces" "Invalid name rejected" "Name accepted"
 fi
 
-# Verify gen-plan follows valid naming convention
+# 验证 gen-plan 遵循有效命名约定
 if validate_name "gen-plan"; then
     pass "NT-1c: gen-plan follows valid naming convention"
 else
@@ -376,12 +376,12 @@ else
 fi
 
 # ----------------------------------------
-# NT-2: Missing required frontmatter validation
+# NT-2：缺少必需前置数据验证
 # ----------------------------------------
 echo ""
 echo "NT-2: Missing required frontmatter - create invalid fixtures"
 
-# Create command missing description field
+# 创建缺少 description 字段的命令
 MISSING_DESC_DIR="$TEST_FIXTURES_DIR"
 cat > "$MISSING_DESC_DIR/missing-desc.md" << 'EOF'
 ---
@@ -396,7 +396,7 @@ else
     fail "NT-2a: Should reject missing description" "Missing desc rejected" "Accepted"
 fi
 
-# Create file with no frontmatter at all
+# 创建完全没有前置数据的文件
 cat > "$MISSING_DESC_DIR/no-frontmatter.md" << 'EOF'
 # No Frontmatter
 This command has no YAML frontmatter at all.
@@ -408,7 +408,7 @@ else
     fail "NT-2b: Should reject no frontmatter" "No frontmatter rejected" "Accepted"
 fi
 
-# Verify gen-plan.md has required fields
+# 验证 gen-plan.md 具有所需字段
 if [[ -f "$GEN_PLAN_CMD" ]]; then
     if check_yaml_frontmatter "$GEN_PLAN_CMD"; then
         pass "NT-2c: gen-plan.md has all required frontmatter fields"
@@ -417,7 +417,7 @@ if [[ -f "$GEN_PLAN_CMD" ]]; then
     fi
 fi
 
-# Verify agent has required fields
+# 验证 Agent 具有所需字段
 if [[ -f "$RELEVANCE_AGENT" ]]; then
     if check_agent_yaml_frontmatter "$RELEVANCE_AGENT"; then
         pass "NT-2d: draft-relevance-checker.md has all required frontmatter fields"
@@ -427,12 +427,12 @@ if [[ -f "$RELEVANCE_AGENT" ]]; then
 fi
 
 # ----------------------------------------
-# NT-3: YAML syntax validation
+# NT-3：YAML 语法验证
 # ----------------------------------------
 echo ""
 echo "NT-3: YAML syntax validation - malformed YAML fixtures"
 
-# Helper to check YAML syntax
+# 检查 YAML 语法的辅助函数
 check_yaml_syntax() {
     local file="$1"
     local frontmatter=$(awk '/^---$/{ if (++n == 2) exit; next } n == 1' "$file")
@@ -449,7 +449,7 @@ check_yaml_syntax() {
     $valid
 }
 
-# Create file with malformed YAML (missing colon)
+# 创建格式错误的 YAML 文件（缺少冒号）
 cat > "$TEST_FIXTURES_DIR/malformed-yaml.md" << 'EOF'
 ---
 description malformed
@@ -463,7 +463,7 @@ else
     fail "NT-3a: Should reject malformed YAML" "Invalid YAML rejected" "Accepted"
 fi
 
-# Verify gen-plan.md has valid YAML
+# 验证 gen-plan.md 具有有效的 YAML
 if [[ -f "$GEN_PLAN_CMD" ]]; then
     if check_yaml_syntax "$GEN_PLAN_CMD"; then
         pass "NT-3b: gen-plan.md has valid YAML syntax"
@@ -473,18 +473,18 @@ if [[ -f "$GEN_PLAN_CMD" ]]; then
 fi
 
 # ----------------------------------------
-# NT-6: Invalid model specification check
+# NT-6：无效模型规范检查
 # ----------------------------------------
 echo ""
 echo "NT-6: Model specification - invalid model fixtures"
 
-# Helper to validate model name
-# Accepts: short aliases (exact match) or full model IDs (prefix match)
+# 验证模型名称的辅助函数
+# 接受：短别名（精确匹配）或完整模型 ID（前缀匹配）
 validate_model_name() {
     local model="$1"
-    # Exact match for short aliases
+    # 短别名的精确匹配
     [[ "$model" =~ ^(opus|sonnet|haiku)$ ]] || \
-    # Prefix match for full model IDs
+    # 完整模型 ID 的前缀匹配
     [[ "$model" =~ ^(claude-|gpt-|o[0-9]|gemini-) ]]
 }
 
@@ -500,7 +500,7 @@ else
     fail "NT-6b: Should reject empty model" "Empty model rejected" "Accepted"
 fi
 
-# Test that short aliases require exact match (not prefix)
+# 测试短别名需要精确匹配（非前缀）
 if ! validate_model_name "opus-v2"; then
     pass "NT-6d: Correctly rejects opus-v2 (partial match)"
 else
@@ -519,7 +519,7 @@ else
     fail "NT-6f: Should reject sonnet-fast" "Rejected" "Accepted"
 fi
 
-# Verify agent has valid model
+# 验证 Agent 具有有效模型
 if [[ -f "$RELEVANCE_AGENT" ]]; then
     MODEL=$(awk 'BEGIN{f=0} /^---$/{f++; next} f==1 && /^model:/{sub(/^model:[[:space:]]*/,""); print; exit}' "$RELEVANCE_AGENT")
     if [[ -n "$MODEL" ]]; then
@@ -532,7 +532,7 @@ if [[ -f "$RELEVANCE_AGENT" ]]; then
 fi
 
 # ----------------------------------------
-# Content validation: No Emoji or CJK
+# 内容验证：无 Emoji 或 CJK 字符
 # ----------------------------------------
 echo ""
 echo "Content validation: No Emoji or CJK characters"
@@ -554,7 +554,7 @@ if [[ -f "$RELEVANCE_AGENT" ]]; then
 fi
 
 # ========================================
-# Script Tests: validate-gen-plan-io.sh
+# 脚本测试：validate-gen-plan-io.sh
 # ========================================
 echo ""
 echo "Script Tests: validate-gen-plan-io.sh"
@@ -562,11 +562,11 @@ echo "Script Tests: validate-gen-plan-io.sh"
 VALIDATE_SCRIPT="$PROJECT_ROOT/scripts/validate-gen-plan-io.sh"
 
 if [[ -x "$VALIDATE_SCRIPT" ]]; then
-    # Create temp directory for script tests
+    # 为脚本测试创建临时目录
     SCRIPT_TEST_DIR=$(mktemp -d)
     trap "rm -rf $SCRIPT_TEST_DIR" EXIT
 
-    # Test: --input without value should exit 6
+    # 测试：--input 不带值应该退出 6
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input 2>/dev/null || EXIT_CODE=$?
     if [[ $EXIT_CODE -eq 6 ]]; then
@@ -575,7 +575,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: --input without value should exit 6" "6" "$EXIT_CODE"
     fi
 
-    # Test: --output without value should exit 6
+    # 测试：--output 不带值应该退出 6
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --output 2>/dev/null || EXIT_CODE=$?
     if [[ $EXIT_CODE -eq 6 ]]; then
@@ -584,7 +584,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: --output without value should exit 6" "6" "$EXIT_CODE"
     fi
 
-    # Test: --input followed by another flag should exit 6
+    # 测试：--input 后跟另一个标志应该退出 6
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input --output /tmp/out.md 2>/dev/null || EXIT_CODE=$?
     if [[ $EXIT_CODE -eq 6 ]]; then
@@ -593,7 +593,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: --input followed by flag should exit 6" "6" "$EXIT_CODE"
     fi
 
-    # Test: Unknown option should exit 6
+    # 测试：未知选项应该退出 6
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --unknown-flag 2>/dev/null || EXIT_CODE=$?
     if [[ $EXIT_CODE -eq 6 ]]; then
@@ -602,7 +602,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: unknown option should exit 6" "6" "$EXIT_CODE"
     fi
 
-    # Test: Input file not found should exit 1
+    # 测试：输入文件未找到应该退出 1
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input "$SCRIPT_TEST_DIR/nonexistent.md" --output "$SCRIPT_TEST_DIR/out.md" 2>/dev/null || EXIT_CODE=$?
     if [[ $EXIT_CODE -eq 1 ]]; then
@@ -611,7 +611,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: input not found should exit 1" "1" "$EXIT_CODE"
     fi
 
-    # Test: Empty input file should exit 2
+    # 测试：空输入文件应该退出 2
     touch "$SCRIPT_TEST_DIR/empty.md"
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input "$SCRIPT_TEST_DIR/empty.md" --output "$SCRIPT_TEST_DIR/out.md" 2>/dev/null || EXIT_CODE=$?
@@ -621,7 +621,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: empty input should exit 2" "2" "$EXIT_CODE"
     fi
 
-    # Test: Output directory not found should exit 3
+    # 测试：输出目录未找到应该退出 3
     echo "content" > "$SCRIPT_TEST_DIR/valid.md"
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input "$SCRIPT_TEST_DIR/valid.md" --output "$SCRIPT_TEST_DIR/nonexistent_dir/out.md" 2>/dev/null || EXIT_CODE=$?
@@ -631,7 +631,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: output dir not found should exit 3" "3" "$EXIT_CODE"
     fi
 
-    # Test: Output file already exists should exit 4
+    # 测试：输出文件已存在应该退出 4
     touch "$SCRIPT_TEST_DIR/existing.md"
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input "$SCRIPT_TEST_DIR/valid.md" --output "$SCRIPT_TEST_DIR/existing.md" 2>/dev/null || EXIT_CODE=$?
@@ -641,7 +641,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: output exists should exit 4" "4" "$EXIT_CODE"
     fi
 
-    # Test: Output path is a directory should exit 4
+    # 测试：输出路径是目录应该退出 4
     mkdir -p "$SCRIPT_TEST_DIR/output_dir"
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input "$SCRIPT_TEST_DIR/valid.md" --output "$SCRIPT_TEST_DIR/output_dir" 2>/dev/null || EXIT_CODE=$?
@@ -651,7 +651,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: output is directory should exit 4" "4" "$EXIT_CODE"
     fi
 
-    # Test: Valid paths should exit 0
+    # 测试：有效路径应该退出 0
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input "$SCRIPT_TEST_DIR/valid.md" --output "$SCRIPT_TEST_DIR/new-output.md" 2>/dev/null || EXIT_CODE=$?
     if [[ $EXIT_CODE -eq 0 ]]; then
@@ -660,7 +660,7 @@ if [[ -x "$VALIDATE_SCRIPT" ]]; then
         fail "validate-gen-plan-io: valid paths should exit 0" "0" "$EXIT_CODE"
     fi
 
-    # Test: Valid paths with auto-start flag should exit 0
+    # 测试：带自动启动标志的有效路径应该退出 0
     EXIT_CODE=0
     "$VALIDATE_SCRIPT" --input "$SCRIPT_TEST_DIR/valid.md" --output "$SCRIPT_TEST_DIR/new-output-auto.md" --auto-start-rlcr-if-converged 2>/dev/null || EXIT_CODE=$?
     if [[ $EXIT_CODE -eq 0 ]]; then
@@ -705,7 +705,7 @@ else
     fail "validate-gen-plan-io.sh not found or not executable"
 fi
 
-# Test: Plan Structure block in gen-plan.md matches gen-plan-template.md
+# 测试：gen-plan.md 中的计划结构块与 gen-plan-template.md 匹配
 if [[ -f "$GEN_PLAN_CMD" ]] && [[ -f "$PLAN_TEMPLATE" ]]; then
     EXTRACTED=$(awk '/^```markdown[[:space:]]*$/{in_block=1;next} /^```[[:space:]]*$/ && in_block{exit} in_block' "$GEN_PLAN_CMD")
     if [[ "$EXTRACTED" == "$(<"$PLAN_TEMPLATE")" ]]; then
@@ -716,7 +716,7 @@ if [[ -f "$GEN_PLAN_CMD" ]] && [[ -f "$PLAN_TEMPLATE" ]]; then
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================"

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Tests for session_id feature in RLCR loop
+# RLCR 循环中 session_id 功能的测试
 #
-# Tests cover:
-# - session_id field in state.md
-# - PostToolUse hook (loop-post-bash-hook.sh) recording session_id
-# - find_active_loop session_id filtering
-# - Validator session_id extraction and filtering
-# - Cancel script works regardless of session_id
+# 测试覆盖：
+# - state.md 中的 session_id 字段
+# - PostToolUse 钩子（loop-post-bash-hook.sh）记录 session_id
+# - find_active_loop session_id 过滤
+# - 验证器 session_id 提取和过滤
+# - 取消脚本无论 session_id 如何都能工作
 #
 
 set -euo pipefail
@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 source "$SCRIPT_DIR/test-helpers.sh"
 
-# Source shared loop library
+# 加载共享循环库
 HOOKS_LIB_DIR="$(cd "$SCRIPT_DIR/../hooks/lib" && pwd)"
 source "$HOOKS_LIB_DIR/loop-common.sh"
 
@@ -24,7 +24,7 @@ echo "Session ID Feature Tests"
 echo "=========================================="
 echo ""
 
-# Mock setup script path used as command signature in signal files
+# 用作信号文件中命令签名的模拟设置脚本路径
 MOCK_SETUP_PATH="/mock/plugin/scripts/setup-rlcr-loop.sh"
 
 # ========================================
@@ -34,7 +34,7 @@ MOCK_SETUP_PATH="/mock/plugin/scripts/setup-rlcr-loop.sh"
 setup_test_dir
 init_test_git_repo "$TEST_DIR/project"
 
-# Create a valid plan file (gitignored)
+# 创建有效的计划文件（gitignore 中）
 mkdir -p "$TEST_DIR/project/temp"
 cat > "$TEST_DIR/project/temp/plan.md" << 'EOF'
 # Test Plan
@@ -45,18 +45,18 @@ Line 4 with more content.
 Line 5 final content line.
 EOF
 
-# Add .gitignore for temp/
+# 为 temp/ 添加 .gitignore
 echo "temp/" > "$TEST_DIR/project/.gitignore"
 cd "$TEST_DIR/project"
 git add .gitignore
 git commit -q -m "Add gitignore"
 
-# Run setup script
+# 运行设置脚本
 SETUP_SCRIPT="$SCRIPT_DIR/../scripts/setup-rlcr-loop.sh"
 cd "$TEST_DIR/project"
 CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$SETUP_SCRIPT" temp/plan.md > /dev/null 2>&1 || true
 
-# Find the state file
+# 查找状态文件
 STATE_FILE=$(find "$TEST_DIR/project/.humanize/rlcr" -name "state.md" -type f 2>/dev/null | head -1)
 
 if [[ -n "$STATE_FILE" ]] && grep -q "^session_id:" "$STATE_FILE"; then
@@ -115,7 +115,7 @@ init_test_git_repo "$TEST_DIR/project"
 mkdir -p "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00"
 mkdir -p "$TEST_DIR/project/.humanize"
 
-# Create state.md with empty session_id
+# 创建 state.md with empty session_id
 cat > "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" << 'EOF'
 ---
 current_round: 0
@@ -136,16 +136,16 @@ session_id:
 ---
 EOF
 
-# Create signal file pointing to state.md (with full script path as command signature)
+# 创建指向 state.md 的信号文件（带完整脚本路径作为命令签名）
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
-# Run PostToolUse hook with mock JSON input containing session_id
+# 运行带有包含 session_id 的模拟 JSON 输入的 PostToolUse 钩子
 POST_HOOK="$SCRIPT_DIR/../hooks/loop-post-bash-hook.sh"
 if [[ -f "$POST_HOOK" ]]; then
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"\\\"${MOCK_SETUP_PATH}\\\" plan.md\"},\"session_id\":\"test-session-abc-123\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
-    # Check if session_id was recorded
+    # 检查 session_id 是否已记录
     RECORDED_ID=$(grep "^session_id:" "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" | sed 's/session_id: *//')
     if [[ "$RECORDED_ID" == "test-session-abc-123" ]]; then
         pass "PostToolUse hook records session_id in state.md"
@@ -153,7 +153,7 @@ if [[ -f "$POST_HOOK" ]]; then
         fail "PostToolUse hook records session_id in state.md" "test-session-abc-123" "$RECORDED_ID"
     fi
 
-    # Check signal file was removed
+    # 检查信号文件是否已移除
     if [[ ! -f "$TEST_DIR/project/.humanize/.pending-session-id" ]]; then
         pass "PostToolUse hook removes signal file after recording"
     else
@@ -188,7 +188,7 @@ if [[ -f "$POST_HOOK" ]]; then
     MOCK_JSON='{"tool_name":"Bash","tool_input":{"command":"echo hello"},"session_id":"different-session","transcript_path":"/tmp/test","cwd":"/tmp","permission_mode":"default","hook_event_name":"PostToolUse"}'
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
-    # session_id should NOT be changed
+    # session_id 不应被更改
     RECORDED_ID=$(grep "^session_id:" "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" | sed 's/session_id: *//')
     if [[ "$RECORDED_ID" == "existing-session-id" ]]; then
         pass "PostToolUse hook is no-op without signal file"
@@ -403,7 +403,7 @@ start_branch: main
 ---
 EOF
 
-# Create newer inactive loop (completed, only complete-state.md)
+# 创建较新的非活跃循环（已完成，只有 complete-state.md）
 mkdir -p "$TEST_DIR/project/.humanize/rlcr/2026-02-01_00-00-00"
 cat > "$TEST_DIR/project/.humanize/rlcr/2026-02-01_00-00-00/complete-state.md" << 'EOF'
 ---
@@ -428,7 +428,7 @@ else
     fail "cancel script reports no active loop when newest dir is completed" "NO_LOOP in output" "$CANCEL_OUTPUT"
 fi
 
-# Verify the older stale loop was NOT touched
+# 验证较旧的陈旧循环未被触及
 if [[ -f "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" ]]; then
     pass "cancel script does not revive stale older loop"
 else
@@ -481,15 +481,15 @@ start_branch: main
 ---
 EOF
 
-# Create signal file with full script path as command signature
+# 创建带完整脚本路径作为命令签名的信号文件
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
 if [[ -f "$POST_HOOK" ]]; then
-    # Send a non-setup Bash command - hook should NOT consume the signal
+    # 发送非设置 Bash 命令 - 钩子不应消费信号
     MOCK_JSON='{"tool_name":"Bash","tool_input":{"command":"echo hello"},"session_id":"wrong-session","transcript_path":"/tmp/test","cwd":"/tmp","permission_mode":"default","hook_event_name":"PostToolUse"}'
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
-    # session_id should still be empty (signal not consumed)
+    # session_id 应该仍然为空（信号未被消费）
     RECORDED_ID=$(grep "^session_id:" "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" | sed 's/session_id: *//')
     if [[ -z "$RECORDED_ID" ]]; then
         pass "PostToolUse hook rejects non-setup Bash commands"
@@ -497,7 +497,7 @@ if [[ -f "$POST_HOOK" ]]; then
         fail "PostToolUse hook rejects non-setup Bash commands" "empty session_id" "$RECORDED_ID"
     fi
 
-    # Signal file should still exist
+    # 信号文件应该仍然存在
     if [[ -f "$TEST_DIR/project/.humanize/.pending-session-id" ]]; then
         pass "signal file preserved after non-setup Bash command"
     else
@@ -513,7 +513,7 @@ fi
 # ========================================
 
 if [[ -f "$POST_HOOK" ]]; then
-    # Now send the actual setup command (quoted invocation) - hook should consume the signal
+    # 现在发送实际设置命令（引用调用）- 钩子应该消费信号
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"\\\"${MOCK_SETUP_PATH}\\\" plan.md\"},\"session_id\":\"leader-session-id\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
@@ -551,7 +551,7 @@ EOF
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
 if [[ -f "$POST_HOOK" ]]; then
-    # session_id with special chars: slashes, ampersands, dots
+    # 带特殊字符的 session_id：斜杠、与号、点
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"${MOCK_SETUP_PATH} plan.md\"},\"session_id\":\"abc/def&ghi.jkl\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
@@ -562,7 +562,7 @@ if [[ -f "$POST_HOOK" ]]; then
         fail "PostToolUse hook handles special characters in session_id" "abc/def&ghi.jkl" "$RECORDED_ID"
     fi
 
-    # Signal file should be removed
+    # 信号文件应该被移除
     if [[ ! -f "$TEST_DIR/project/.humanize/.pending-session-id" ]]; then
         pass "signal file removed after special-char session_id recording"
     else
@@ -579,7 +579,7 @@ fi
 
 setup_test_dir
 
-# Create older loop dir with matching session_id
+# 创建带匹配 session_id 的较旧循环目录
 mkdir -p "$TEST_DIR/loop/2026-01-01_00-00-00"
 cat > "$TEST_DIR/loop/2026-01-01_00-00-00/state.md" << 'EOF'
 ---
@@ -593,7 +593,7 @@ start_branch: main
 ---
 EOF
 
-# Create newer loop dir with different session_id
+# 创建带不同 session_id 的较新循环目录
 mkdir -p "$TEST_DIR/loop/2026-02-01_00-00-00"
 cat > "$TEST_DIR/loop/2026-02-01_00-00-00/state.md" << 'EOF'
 ---
@@ -614,7 +614,7 @@ else
     fail "find_active_loop filter-first: skips newer non-matching, finds older matching" "2026-01-01 dir" "$RESULT"
 fi
 
-# Also verify the other session finds the newer dir
+# 同时验证另一个会话找到较新的目录
 RESULT=$(find_active_loop "$TEST_DIR/loop" "other-session")
 if [[ -n "$RESULT" ]] && [[ "$RESULT" == *"2026-02-01"* ]]; then
     pass "find_active_loop filter-first: other session finds its newer loop"
@@ -622,7 +622,7 @@ else
     fail "find_active_loop filter-first: other session finds its newer loop" "2026-02-01 dir" "$RESULT"
 fi
 
-# Without filter, should return newest (2026-02-01)
+# 不带过滤器时，应该返回最新的（2026-02-01）
 RESULT=$(find_active_loop "$TEST_DIR/loop")
 if [[ -n "$RESULT" ]] && [[ "$RESULT" == *"2026-02-01"* ]]; then
     pass "find_active_loop without filter returns newest active loop"
@@ -639,7 +639,7 @@ fi
 
 setup_test_dir
 
-# Create older matching active loop (state.md still present -- stale)
+# 创建较旧的匹配活跃循环（state.md 仍然存在 -- 陈旧）
 mkdir -p "$TEST_DIR/loop/2026-01-01_00-00-00"
 cat > "$TEST_DIR/loop/2026-01-01_00-00-00/state.md" << 'EOF'
 ---
@@ -653,7 +653,7 @@ start_branch: main
 ---
 EOF
 
-# Create newer dir that is in terminal state (complete-state.md, no state.md)
+# 创建处于终端状态的较新目录（complete-state.md，无 state.md）
 mkdir -p "$TEST_DIR/loop/2026-02-01_00-00-00"
 cat > "$TEST_DIR/loop/2026-02-01_00-00-00/complete-state.md" << 'EOF'
 ---
@@ -674,8 +674,8 @@ else
     fail "find_active_loop session filter: terminal newest blocks stale revival" "empty (no active loop)" "$RESULT"
 fi
 
-# Without filter: newest dir has terminal state, so no-filter returns empty
-# (only checks newest directory -- zombie-loop protection)
+# 不带过滤器：最新目录具有终端状态，所以无过滤器返回空
+（仅检查最新目录 -- 僵尸循环保护）
 RESULT=$(find_active_loop "$TEST_DIR/loop")
 if [[ -z "$RESULT" ]]; then
     pass "find_active_loop no-filter: returns empty when newest dir is terminal"
@@ -686,11 +686,11 @@ fi
 # ========================================
 # Test: find_active_loop session filter: different session finds its own active loop
 # ========================================
-# Session A has terminal newest, session B has active loop -- they don't interfere
+# 会话 A 的最新目录处于终端状态，会话 B 有活跃循环 -- 它们互不干扰
 
 setup_test_dir
 
-# Session A: older active (stale), newer completed
+# 会话 A：较旧活跃（陈旧），较新已完成
 mkdir -p "$TEST_DIR/loop/2026-01-01_00-00-00"
 cat > "$TEST_DIR/loop/2026-01-01_00-00-00/state.md" << 'EOF'
 ---
@@ -716,7 +716,7 @@ start_branch: main
 ---
 EOF
 
-# Session B: active loop in between
+# 会话 B：中间的活跃循环
 mkdir -p "$TEST_DIR/loop/2026-01-15_00-00-00"
 cat > "$TEST_DIR/loop/2026-01-15_00-00-00/state.md" << 'EOF'
 ---
@@ -812,7 +812,7 @@ SIGNAL_FILE="$TEST_DIR/project/.humanize/.pending-session-id"
 if [[ -f "$SIGNAL_FILE" ]]; then
     LINE_COUNT=$(wc -l < "$SIGNAL_FILE")
     SIGNATURE_LINE=$(sed -n '2p' "$SIGNAL_FILE")
-    # Line 2 should be the full resolved path ending in setup-rlcr-loop.sh
+    # 第 2 行应该是以 setup-rlcr-loop.sh 结尾的完整解析路径
     if [[ "$LINE_COUNT" -ge 2 ]] && [[ "$SIGNATURE_LINE" == *"/setup-rlcr-loop.sh" ]] && [[ "$SIGNATURE_LINE" == /* ]]; then
         pass "signal file contains full script path as command signature"
     else
@@ -846,7 +846,7 @@ EOF
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
 if [[ -f "$POST_HOOK" ]]; then
-    # Command contains the script name as text but is NOT an actual invocation
+    # 命令包含脚本名称作为文本但不是实际调用
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo ${MOCK_SETUP_PATH}\"},\"session_id\":\"attacker-session\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
@@ -863,7 +863,7 @@ if [[ -f "$POST_HOOK" ]]; then
         fail "signal file preserved after echo-with-path false positive" "signal file exists" "removed"
     fi
 
-    # Also test with basename-only substring (cat setup-rlcr-loop.sh)
+    # 同时测试仅基本名称子字符串（cat setup-rlcr-loop.sh）
     MOCK_JSON='{"tool_name":"Bash","tool_input":{"command":"cat setup-rlcr-loop.sh"},"session_id":"attacker-session","transcript_path":"/tmp/test","cwd":"/tmp","permission_mode":"default","hook_event_name":"PostToolUse"}'
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
@@ -903,7 +903,7 @@ EOF
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
 if [[ -f "$POST_HOOK" ]]; then
-    # Quoted path with suffix concatenated (no space boundary after closing quote)
+    # 带后缀连接的引用路径（关闭引号后无空格边界）
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"\\\"${MOCK_SETUP_PATH}\\\"foo\"},\"session_id\":\"attacker\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
@@ -948,7 +948,7 @@ EOF
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
 if [[ -f "$POST_HOOK" ]]; then
-    # Unquoted invocation (no surrounding quotes on path)
+    # 未引用调用（路径周围无引号）
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"${MOCK_SETUP_PATH} plan.md --agent-teams\"},\"session_id\":\"unquoted-session\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
@@ -986,7 +986,7 @@ EOF
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
 if [[ -f "$POST_HOOK" ]]; then
-    # Quoted invocation with tab-delimited args (tab = \t in JSON)
+    # 带制表符分隔参数的引用调用（制表符 = JSON 中的 \t）
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"\\\"${MOCK_SETUP_PATH}\\\"\\tplan.md\"},\"session_id\":\"tab-quoted-session\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 
@@ -1031,7 +1031,7 @@ EOF
 printf '%s\n%s\n' "$TEST_DIR/project/.humanize/rlcr/2026-01-01_00-00-00/state.md" "$MOCK_SETUP_PATH" > "$TEST_DIR/project/.humanize/.pending-session-id"
 
 if [[ -f "$POST_HOOK" ]]; then
-    # Unquoted invocation with tab-delimited args (tab = \t in JSON)
+    # 带制表符分隔参数的未引用调用（制表符 = JSON 中的 \t）
     MOCK_JSON="{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"${MOCK_SETUP_PATH}\\tplan.md --agent-teams\"},\"session_id\":\"tab-unquoted-session\",\"transcript_path\":\"/tmp/test\",\"cwd\":\"/tmp\",\"permission_mode\":\"default\",\"hook_event_name\":\"PostToolUse\"}"
     echo "$MOCK_JSON" | CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$POST_HOOK" > /dev/null 2>&1 || true
 

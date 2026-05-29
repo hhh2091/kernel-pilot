@@ -1,5 +1,5 @@
 {
-  "description": "Humanize Plugin Hooks - Validation hooks and Stop hooks for /start-rlcr-loop",
+  "description": "Humanize 插件 Hook - 用于 /start-rlcr-loop 的验证 hook 和 Stop hook",
   "hooks": {
     "UserPromptSubmit": [
       {

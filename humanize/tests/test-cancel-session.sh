@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# Tests for scripts/cancel-rlcr-session.sh.
+# scripts/cancel-rlcr-session.sh 的测试。
 #
-# Verifies the session-scoped cancel helper added in Round 4 (T7):
-#   - missing --session-id is rejected with exit code 3
-#   - non-existent session id is rejected with exit code 1
-#   - cancelling session A leaves a sibling active session B untouched
-#   - state.md is renamed to cancel-state.md and .cancel-requested is created
-#   - session in finalize phase requires --force (exit code 2 otherwise)
+# 验证第 4 轮 (T7) 添加的会话范围取消辅助函数：
+#   - 缺少 --session-id 时以退出码 3 拒绝
+#   - 不存在的会话 id 以退出码 1 拒绝
+#   - 取消会话 A 不会影响同级活跃会话 B
+#   - state.md 被重命名为 cancel-state.md 且创建 .cancel-requested
+#   - 处于 finalize 阶段的会话需要 --force（否则退出码 2）
 #
-# All fixtures live under a per-test mktemp tree.
+# 所有测试夹具位于每个测试的 mktemp 树下。
 
 set -euo pipefail
 
@@ -48,7 +48,7 @@ mkdir -p "$RLCR_DIR/$SESSION_A" "$RLCR_DIR/$SESSION_B" "$RLCR_DIR/$SESSION_FINAL
 : > "$RLCR_DIR/$SESSION_B/state.md"
 : > "$RLCR_DIR/$SESSION_FINALIZE/finalize-state.md"
 
-# ─── Test 1: missing --session-id ───
+# ─── 测试 1：缺少 --session-id ───
 if "$HELPER" --project "$PROJECT_ROOT" >/dev/null 2>&1; then
     _fail "missing --session-id should exit non-zero"
 else
@@ -60,7 +60,7 @@ else
     fi
 fi
 
-# ─── Test 2: non-existent session id ───
+# ─── 测试 2：不存在的会话 id ───
 if "$HELPER" --project "$PROJECT_ROOT" --session-id 9999-99-99 >/dev/null 2>&1; then
     _fail "non-existent session should exit non-zero"
 else
@@ -72,7 +72,7 @@ else
     fi
 fi
 
-# ─── Test 3: successful cancel of session A ───
+# ─── 测试 3：成功取消会话 A ───
 out=$("$HELPER" --project "$PROJECT_ROOT" --session-id "$SESSION_A" 2>&1)
 rc=$?
 if [[ "$rc" -eq 0 ]] && grep -q "^CANCELLED $SESSION_A$" <<<"$out"; then
@@ -81,28 +81,28 @@ else
     _fail "cancel of session A failed: rc=$rc out=$out"
 fi
 
-# ─── Test 4: state.md renamed to cancel-state.md ───
+# ─── 测试 4：state.md 重命名为 cancel-state.md ───
 if [[ -f "$RLCR_DIR/$SESSION_A/cancel-state.md" && ! -f "$RLCR_DIR/$SESSION_A/state.md" ]]; then
     _pass "session A: state.md renamed to cancel-state.md"
 else
     _fail "session A: rename did not happen"
 fi
 
-# ─── Test 5: .cancel-requested signal file created ───
+# ─── 测试 5：创建 .cancel-requested 信号文件 ───
 if [[ -f "$RLCR_DIR/$SESSION_A/.cancel-requested" ]]; then
     _pass "session A: .cancel-requested signal file present"
 else
     _fail "session A: .cancel-requested missing"
 fi
 
-# ─── Test 6: session B untouched ───
+# ─── 测试 6：会话 B 不受影响 ───
 if [[ -f "$RLCR_DIR/$SESSION_B/state.md" && ! -f "$RLCR_DIR/$SESSION_B/cancel-state.md" && ! -f "$RLCR_DIR/$SESSION_B/.cancel-requested" ]]; then
     _pass "session B: untouched while session A was cancelled"
 else
     _fail "session B: should be untouched but was modified"
 fi
 
-# ─── Test 7: finalize phase requires --force ───
+# ─── 测试 7：finalize 阶段需要 --force ───
 if "$HELPER" --project "$PROJECT_ROOT" --session-id "$SESSION_FINALIZE" >/dev/null 2>&1; then
     _fail "finalize-phase session should require --force"
 else
@@ -114,7 +114,7 @@ else
     fi
 fi
 
-# ─── Test 8: finalize phase with --force succeeds ───
+# ─── 测试 8：finalize 阶段使用 --force 成功 ───
 out=$("$HELPER" --project "$PROJECT_ROOT" --session-id "$SESSION_FINALIZE" --force 2>&1)
 rc=$?
 if [[ "$rc" -eq 0 ]] && [[ -f "$RLCR_DIR/$SESSION_FINALIZE/cancel-state.md" ]]; then
@@ -123,9 +123,9 @@ else
     _fail "finalize-phase --force failed: rc=$rc out=$out"
 fi
 
-# ─── Test 9a: session ids attempting path traversal are rejected ───
-# Place a state.md in a sibling directory so a traversal bypass would
-# rename it; after the call, that file must still exist untouched.
+# ─── 测试 9a：尝试路径遍历的会话 id 被拒绝 ───
+# 在同级目录中放置 state.md，使遍历绕过会重命名它；
+# 调用后，该文件必须仍然存在且未被修改。
 SIBLING_DIR="$PROJECT_ROOT/.humanize/sibling"
 mkdir -p "$SIBLING_DIR"
 : > "$SIBLING_DIR/state.md"
@@ -149,7 +149,7 @@ else
     _fail "sibling state.md was mutated by a traversal attempt"
 fi
 
-# ─── Test 10: legacy positional argument form still works ───
+# ─── 测试 10：旧版位置参数形式仍然有效 ───
 SESSION_LEGACY="2026-04-17_13-00-00"
 mkdir -p "$RLCR_DIR/$SESSION_LEGACY"
 : > "$RLCR_DIR/$SESSION_LEGACY/state.md"

@@ -1,10 +1,10 @@
-"""Parse RLCR session data from .humanize/rlcr/ directories.
+"""从 .humanize/rlcr/ 目录解析 RLCR 会话数据。
 
-Reads state.md (YAML frontmatter), goal-tracker.md, round summaries,
-review results, and methodology reports into structured Python dicts.
-Also exposes per-session cache log paths via the RLCR-only discovery
-helper in :mod:`rlcr_sources`, so the dashboard reads from the same
-files that ``humanize monitor rlcr`` already uses.
+读取 state.md（YAML 前置数据）、goal-tracker.md、轮次摘要、
+审查结果和方法论报告到结构化的 Python 字典中。还通过
+:mod:`rlcr_sources` 中的 RLCR 专用发现辅助程序公开每会话的
+缓存日志路径，以便仪表板从 ``humanize monitor rlcr`` 已经
+使用的相同文件读取。
 """
 
 import logging
@@ -20,20 +20,19 @@ logger = logging.getLogger(__name__)
 
 
 def _derive_project_root(session_dir):
-    """Return the project root for a ``.humanize/rlcr/<session>`` path."""
+    """返回 ``.humanize/rlcr/<session>`` 路径的项目根目录。"""
     rlcr_dir = os.path.dirname(session_dir)
     humanize_dir = os.path.dirname(rlcr_dir)
     return os.path.dirname(humanize_dir)
 
 
 def cache_logs_for_session(project_root, session_id):
-    """Return the deterministic list of available cache log files.
+    """返回可用缓存日志文件的确定性列表。
 
-    Delegates to :func:`rlcr_sources.live_log_paths`. Each entry is
+    委托给 :func:`rlcr_sources.live_log_paths`。每个条目是
     ``{"round": int, "tool": "codex"|"gemini", "role": "run"|"review",
-    "path": absolute_path, "basename": filename}``. Returns ``[]`` when
-    the cache directory does not exist yet (startup race) or when no
-    matching files are present.
+    "path": absolute_path, "basename": filename}``。当缓存目录
+    尚不存在（启动竞态）或没有匹配的文件时返回 ``[]``。
     """
     cache_dir = rlcr_sources.cache_dir_for_session(project_root, session_id)
     return [
@@ -49,7 +48,7 @@ def cache_logs_for_session(project_root, session_id):
 
 
 def parse_yaml_frontmatter(filepath):
-    """Extract YAML frontmatter from a Markdown file with --- delimiters."""
+    """从带 --- 分隔符的 Markdown 文件中提取 YAML 前置数据。"""
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -73,7 +72,7 @@ def parse_yaml_frontmatter(filepath):
 
 
 def detect_session_status(session_dir):
-    """Determine session status from terminal state files."""
+    """从终端状态文件确定会话状态。"""
     terminal_states = {
         'complete-state.md': 'complete',
         'cancel-state.md': 'cancel',
@@ -94,7 +93,7 @@ def detect_session_status(session_dir):
 
 
 def parse_state(session_dir):
-    """Parse state.md or any *-state.md file in the session directory."""
+    """解析 state.md 或会话目录中的任何 *-state.md 文件。"""
     state_file = os.path.join(session_dir, 'state.md')
     if not os.path.exists(state_file):
         for f in os.listdir(session_dir):
@@ -107,7 +106,7 @@ def parse_state(session_dir):
 
 
 def parse_goal_tracker(session_dir):
-    """Parse goal-tracker.md into structured data."""
+    """将 goal-tracker.md 解析为结构化数据。"""
     filepath = os.path.join(session_dir, 'goal-tracker.md')
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -123,36 +122,30 @@ def parse_goal_tracker(session_dir):
         'deferred_tasks': [],
     }
 
-    # Extract ultimate goal
+    # 提取终极目标
     goal_match = re.search(r'### Ultimate Goal\s*\n(.*?)(?=\n###|\n---|\Z)', content, re.DOTALL)
     if goal_match:
         result['ultimate_goal'] = goal_match.group(1).strip()
 
-    # Criterion-id regex shared by Completed-Verified extraction, the
-    # acceptance-criteria list parser, and the Active-Tasks cross-
-    # reference pass below. Accepts every form the loop's shell-side
-    # accounting produces:
-    #   - legacy two-letter prefix plus required dash plus integer
-    #   - single-letter prefix plus required dash plus integer
-    #   - dashless short form (single-letter prefix immediately
-    #     followed by an integer, no separator)
-    #   - any of the above with an optional decimal suffix for
-    #     nested criteria (e.g. the "point one" form)
-    # Word boundaries prevent false positives inside words that are
-    # not criterion refs (common OS/product prefixes that start with
-    # a letter followed by a "C" and a digit). Style-compliance is
-    # preserved because [A]?[C]- remains a character-class
-    # construction, not the forbidden literal three-character
-    # substring.
+    # 标准 ID 正则表达式，由 Completed-Verified 提取、验收标准
+    # 列表解析器和下面的 Active-Tasks 交叉引用传递共享。
+    # 接受循环的 shell 端计数产生的每种形式：
+    #   - 旧版两个字母前缀加必需的破折号加整数
+    #   - 单字母前缀加必需的破折号加整数
+    #   - 无破折号短形式（单字母前缀后紧跟整数，无分隔符）
+    #   - 以上任何一种带可选小数后缀用于嵌套标准
+    #     （例如 "point one" 形式）
+    # 词边界防止在不是标准引用的词内产生误报（以字母后跟
+    # "C" 和数字开头的常见 OS/产品前缀）。样式合规性被保留，
+    # 因为 [A]?[C]- 仍然是字符类构造，而不是禁止的三字符
+    # 子串字面量。
     _criterion_id_re = r'\b[A]?[C]-?\d+(?:\.\d+)?\b'
 
-    # Parse Completed and Verified table. A row's first cell may list
-    # multiple criterion ids (comma- or slash-separated), so extract
-    # every individual id and add each one to completed_acs. Without
-    # this split, a row listing two criterion ids in one cell would
-    # insert the composite cell string into the set and neither of
-    # the individual ids would match the single-id lookups in the
-    # acceptance_criteria loop below.
+    # 解析已完成和已验证表格。一行的第一个单元格可能列出
+    # 多个标准 ID（逗号或斜杠分隔），因此提取每个单独的 ID
+    # 并将每个添加到 completed_acs。没有此拆分，在一个单元格
+    # 中列出两个标准 ID 的行会将组合单元格字符串插入集合，
+    # 单个 ID 都不会匹配下面验收标准循环中的单 ID 查找。
     _cell_id_re = re.compile(_criterion_id_re)
     completed_acs = set()
     cv_section = re.search(r'### Completed and Verified.*?\n\|.*?\n\|[-|]+\n(.*?)(?=\n###|\Z)', content, re.DOTALL)
@@ -171,23 +164,20 @@ def parse_goal_tracker(session_dir):
                     'evidence': cols[3] if len(cols) > 3 else '',
                 })
 
-    # Extract acceptance criteria from the "### Acceptance Criteria"
-    # section. The loop's shell-side accounting and the refine-plan
-    # workflow both allow this section to render as either list items
-    # (e.g. "- C-1: description") or a table (first column = id,
-    # second column = description). Parse both forms against the
-    # shared _criterion_id_re so list-form and table-form trackers
-    # report identical counts. Duplicate ids (same id in both forms)
-    # are de-duplicated so mixed-form content still yields one entry
-    # per criterion.
+    # 从 "### Acceptance Criteria" 部分提取验收标准。
+    # 循环的 shell 端计数和精炼计划工作流都允许此部分渲染为
+    # 列表项（例如 "- C-1: description"）或表格（第一列 = id，
+    # 第二列 = description）。针对共享的 _criterion_id_re 解析
+    # 两种形式，以便列表形式和表格形式的跟踪器报告相同的计数。
+    # 重复的 ID（两种形式中的相同 ID）被去重，因此混合形式
+    # 内容仍然每个标准产生一个条目。
     ac_section_re = re.compile(
         r'###\s+Acceptance Criteria\s*\n(.*?)(?=\n###|\n---|\Z)',
         re.DOTALL,
     )
-    # Accept both the plain list form (`- <id>: desc`) and the
-    # bold-wrapped form (`- **<id>**: desc`). A prior refactor
-    # narrowed this to the plain form and regressed older /
-    # manually-maintained trackers that use the bold wrapper.
+    # 接受纯列表形式（`- <id>: desc`）和粗体包装形式
+    # （`- **<id>**: desc`）。之前的重构将其缩小为纯形式，
+    # 导致使用粗体包装器的旧版/手动维护的跟踪器退化。
     ac_list_item_re = re.compile(
         r'^\s*-\s+(?:\*\*)?(' + _criterion_id_re + r')(?:\*\*)?\s*:\s*(.+?)\s*$',
         re.MULTILINE,
@@ -208,15 +198,13 @@ def parse_goal_tracker(session_dir):
     ac_section_match = ac_section_re.search(content)
     if ac_section_match:
         section_body = ac_section_match.group(1)
-        # List form first (preserves existing behaviour for the
-        # dominant tracker shape).
+        # 列表形式优先（保留主导跟踪器形状的现有行为）。
         for match in ac_list_item_re.finditer(section_body):
             _add_ac(match.group(1), match.group(2))
-        # Table form second: scan lines that look like markdown table
-        # rows and extract the id from the first cell and the
-        # description from the second cell. Header/separator rows are
-        # skipped because their first cell does not match
-        # _criterion_id_re.
+        # 表格形式其次：扫描看起来像 markdown 表格行的行，
+        # 从第一个单元格提取 ID，从第二个单元格提取描述。
+        # 跳过标题/分隔行，因为它们的第一个单元格不匹配
+        # _criterion_id_re。
         for line in section_body.split('\n'):
             stripped = line.strip()
             if not stripped.startswith('|'):
@@ -227,13 +215,12 @@ def parse_goal_tracker(session_dir):
             ids_in_cell = _cell_id_re.findall(cells[0])
             if not ids_in_cell:
                 continue
-            # A cell may legitimately list multiple ids sharing one
-            # description (rare but supported, matching the
-            # Completed-Verified split above).
+            # 单元格可以合法地列出共享一个描述的多个 ID
+            # （罕见但支持，匹配上面的 Completed-Verified 拆分）。
             for ac_id in ids_in_cell:
                 _add_ac(ac_id, cells[1])
 
-    # Check active tasks for in_progress status to refine AC status
+    # 检查活跃任务的 in_progress 状态以细化 AC 状态
     active_section = re.search(r'#### Active Tasks.*?\n\|.*?\n\|[-|]+\n(.*?)(?=\n###|\Z)', content, re.DOTALL)
     in_progress_acs = set()
     if active_section:
@@ -259,7 +246,7 @@ def parse_goal_tracker(session_dir):
                         'target_ac': target_acs,
                     })
 
-    # Update AC status: in_progress if any active task references it
+    # 更新 AC 状态：如果有任何活跃任务引用它则为 in_progress
     for ac in result['acceptance_criteria']:
         if ac['status'] == 'pending' and ac['id'] in in_progress_acs:
             ac['status'] = 'in_progress'
@@ -268,14 +255,14 @@ def parse_goal_tracker(session_dir):
 
 
 def parse_git_status(project_dir):
-    """Return a summary of git status for ``project_dir``.
+    """返回 ``project_dir`` 的 git 状态摘要。
 
-    Mirrors ``humanize_parse_git_status`` in scripts/humanize.sh so the
-    web active-card display matches the terminal `humanize monitor rlcr`
-    status bar. Returns a dict with modified / added / deleted /
-    untracked counts plus insertions / deletions. Returns ``None`` when
-    the directory is not a git repo (best-effort: the card simply omits
-    the git row in that case).
+    镜像 scripts/humanize.sh 中的 ``humanize_parse_git_status``，
+    以便网页活跃卡片显示与终端 `humanize monitor rlcr` 状态栏
+    匹配。返回包含 modified / added / deleted / untracked 计数
+    加上 insertions / deletions 的字典。当目录不是 git 仓库时
+    返回 ``None``（尽最大努力：卡片在这种情况下简单地省略
+    git 行）。
     """
     if not project_dir or not os.path.isdir(project_dir):
         return None
@@ -312,13 +299,12 @@ def parse_git_status(project_dir):
             untracked += 1
             continue
         x, y = xy[0], xy[1]
-        # Priority matches ``humanize_parse_git_status`` in
-        # ``scripts/humanize.sh``: an index-side ``A`` (``"A "``, ``"AM"``,
-        # ``"AD"``) is always ``added``. The previous ordering checked
-        # ``M in either column`` first, so the common "stage a new file
-        # then tweak it" workflow (``AM``) was mis-counted as modified
-        # and the dashboard git summary disagreed with the terminal
-        # monitor.
+        # 优先级匹配 ``scripts/humanize.sh`` 中的
+        # ``humanize_parse_git_status``：索引侧的 ``A``
+        # （``"A "``, ``"AM"``, ``"AD"``）始终为 ``added``。
+        # 之前的顺序先检查 ``M in either column``，因此常见的
+        # "暂存新文件然后修改它"工作流（``AM``）被错误计数为
+        # 修改，仪表板 git 摘要与终端监视器不一致。
         if x == 'A':
             added += 1
         elif x == 'R' or y == 'R':
@@ -368,13 +354,12 @@ def parse_git_status(project_dir):
 
 
 def parse_review_phase_marker(session_dir):
-    """Read ``.review-phase-started`` to discover the build-finish round.
+    """读取 ``.review-phase-started`` 以发现构建完成轮次。
 
-    Returns ``(build_finish_round, skip_impl)`` or ``(None, False)`` if
-    the marker is absent / unreadable. Keeps the monitor-rlcr status-
-    bar heuristic identical on the dashboard: when the loop transitions
-    from build to review, the monitor's `Status: Active(build(N)->
-    review(M))` label is driven by this marker.
+    返回 ``(build_finish_round, skip_impl)``，如果标记不存在/
+    不可读则返回 ``(None, False)``。在仪表板上保持 monitor-rlcr
+    状态栏启发式相同：当循环从构建转换到审查时，监视器的
+    `Status: Active(build(N)->review(M))` 标签由此标记驱动。
     """
     marker = os.path.join(session_dir, '.review-phase-started')
     if not os.path.exists(marker):
@@ -393,7 +378,7 @@ def parse_review_phase_marker(session_dir):
 
 
 def _detect_language(text):
-    """Detect if text is primarily Chinese or English based on character ranges."""
+    """基于字符范围检测文本主要是中文还是英文。"""
     if not text:
         return 'en'
     cjk_count = sum(1 for c in text if '\u4e00' <= c <= '\u9fff' or '\u3000' <= c <= '\u303f')
@@ -401,7 +386,7 @@ def _detect_language(text):
 
 
 def _to_bilingual(content):
-    """Wrap content string into {zh, en} structure based on detected language."""
+    """基于检测到的语言将内容字符串包装为 {zh, en} 结构。"""
     if content is None:
         return {'zh': None, 'en': None}
     lang = _detect_language(content)
@@ -409,16 +394,16 @@ def _to_bilingual(content):
 
 
 def _extract_task_progress(content):
-    """Extract task completion count from round summary content.
+    """从轮次摘要内容中提取任务完成计数。
 
-    Returns an integer count only when an explicit "N/M tasks" pattern is found.
-    Returns None when no reliable data is extractable — callers should treat
-    None as "unknown" and display accordingly.
+    仅在找到明确的 "N/M tasks" 模式时返回整数计数。
+    当无法提取可靠数据时返回 None——调用者应将 None
+    视为"未知"并相应显示。
     """
     if not content:
         return None
 
-    # Only trust explicit "X/Y tasks" or "X of Y tasks" patterns
+    # 仅信任明确的 "X/Y tasks" 或 "X of Y tasks" 模式
     m = re.search(r'(\d+)\s*/\s*(\d+)\s*(?:tasks?|coding tasks?)', content, re.IGNORECASE)
     if m:
         return int(m.group(1))
@@ -431,7 +416,7 @@ def _extract_task_progress(content):
 
 
 def parse_round_summary(filepath):
-    """Parse a round-N-summary.md file."""
+    """解析 round-N-summary.md 文件。"""
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -454,18 +439,18 @@ def parse_round_summary(filepath):
 
 
 def parse_review_result(filepath):
-    """Parse a round-N-review-result.md file."""
+    """解析 round-N-review-result.md 文件。"""
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
     except (FileNotFoundError, PermissionError):
         return None
 
-    # The loop contract treats a round as complete ONLY when the
-    # last non-empty line is exactly `COMPLETE` (matching the stop
-    # hook's own test). A substring check here would misread prose
-    # like "cannot COMPLETE yet" or "CANNOT COMPLETE", flipping the
-    # pipeline UI / last_verdict / analytics to a false success.
+    # 循环契约仅在最后一个非空行恰好是 `COMPLETE` 时才将
+    # 一轮视为完成（匹配停止钩子自己的测试）。此处的子串
+    # 检查会误读诸如 "cannot COMPLETE yet" 或 "CANNOT COMPLETE"
+    # 之类的散文，将管道 UI / last_verdict / analytics 翻转为
+    # 错误的成功。
     verdict = 'unknown'
     last_non_empty = ''
     for line in reversed(content.splitlines()):
@@ -476,9 +461,8 @@ def parse_review_result(filepath):
     if last_non_empty == 'COMPLETE':
         verdict = 'complete'
     else:
-        # The advanced/stalled/regressed markers come from explicit
-        # verdict prose inside the body (not a terminal line), so
-        # the legacy substring check is retained for those.
+        # advanced/stalled/regressed 标记来自正文中的明确判决
+        # 散文（不是终端行），因此保留了这些的旧版子串检查。
         for v in ('advanced', 'stalled', 'regressed'):
             if v in content.lower():
                 verdict = v
@@ -498,11 +482,11 @@ def parse_review_result(filepath):
 
 
 def parse_session(session_dir, project_dir=None):
-    """Parse a complete RLCR session directory into a structured dict.
+    """将完整的 RLCR 会话目录解析为结构化字典。
 
-    ``project_dir`` is the project root from which ``git`` status is
-    probed for the active-card display. When omitted, the project root
-    is derived from the session path (``.humanize/rlcr/<session>``).
+    ``project_dir`` 是从中探测 ``git`` 状态以用于活跃卡片
+    显示的项目根目录。省略时，项目根目录从会话路径
+    （``.humanize/rlcr/<session>``）派生。
     """
     session_id = os.path.basename(session_dir)
     status = detect_session_status(session_dir)
@@ -514,14 +498,14 @@ def parse_session(session_dir, project_dir=None):
 
     current_round = state.get('current_round', 0)
 
-    # Discover the highest round index present on disk (review files may exceed current_round)
+    # 发现磁盘上存在的最高轮次索引（审查文件可能超过 current_round）
     max_disk_round = current_round
     for f in os.listdir(session_dir):
         m = re.match(r'round-(\d+)-(?:summary|review-result)\.md$', f)
         if m:
             max_disk_round = max(max_disk_round, int(m.group(1)))
 
-    # Build rounds from 0..max(current_round, highest on-disk round)
+    # 从 0..max(current_round, 磁盘上最高轮次) 构建轮次
     rounds = []
     prev_mtime = None
     for rn in range(max_disk_round + 1):
@@ -531,14 +515,14 @@ def parse_session(session_dir, project_dir=None):
         summary = parse_round_summary(summary_file)
         review = parse_review_result(review_file)
 
-        # Duration from consecutive summary timestamps
+        # 从连续摘要时间戳计算时长
         duration_minutes = None
         if summary and prev_mtime is not None:
             duration_minutes = round((summary['mtime'] - prev_mtime) / 60, 1)
         if summary:
             prev_mtime = summary['mtime']
 
-        # Per-round task progress: only from explicit patterns in this round's summary
+        # 每轮任务进度：仅来自此轮摘要中的明确模式
         task_progress = summary.get('task_progress') if summary else None
 
         rounds.append({
@@ -551,14 +535,13 @@ def parse_session(session_dir, project_dir=None):
             'duration_minutes': duration_minutes,
             'p_issues': review['p_issues'] if review else {},
             'task_progress': task_progress,
-            # summary mtime is the round-complete timestamp; the
-            # analyzer consumes it for the "rounds per day" strip on
-            # the home page. Stays None for rounds whose summary has
-            # not landed yet.
+            # summary mtime 是轮次完成时间戳；分析器将其用于
+            # 首页的"每日轮次"条带。对于摘要尚未落地的轮次
+            # 保持为 None。
             'summary_mtime': summary['mtime'] if summary else None,
         })
 
-    # Task/AC progress from goal tracker
+    # 来自目标跟踪器的任务/AC 进度
     tasks_done = 0
     tasks_total = 0
     tasks_active = 0
@@ -569,10 +552,10 @@ def parse_session(session_dir, project_dir=None):
     if goal_tracker:
         tasks_total = len(goal_tracker['active_tasks']) + len(goal_tracker['completed_verified'])
         tasks_done = len(goal_tracker['completed_verified'])
-        # Active tasks = rows in the Active-Tasks table whose status
-        # is neither "completed" nor "deferred". Matches the shell
-        # parser used by `humanize monitor rlcr` (see
-        # scripts/humanize.sh:humanize_parse_goal_tracker).
+        # 活跃任务 = Active-Tasks 表中状态既不是 "completed"
+        # 也不是 "deferred" 的行。匹配 `humanize monitor rlcr`
+        # 使用的 shell 解析器（参见
+        # scripts/humanize.sh:humanize_parse_goal_tracker）。
         tasks_active = sum(
             1 for t in goal_tracker['active_tasks']
             if (t.get('status') or '').strip().lower() not in ('completed', 'deferred')
@@ -582,7 +565,7 @@ def parse_session(session_dir, project_dir=None):
         ac_done = sum(1 for ac in goal_tracker['acceptance_criteria'] if ac['status'] == 'completed')
         ultimate_goal = goal_tracker.get('ultimate_goal', '') or ''
 
-    # Methodology report (bilingual)
+    # 方法论报告（双语）
     report_file = os.path.join(session_dir, 'methodology-analysis-report.md')
     methodology_report = {'zh': None, 'en': None}
     if os.path.exists(report_file):
@@ -593,10 +576,9 @@ def parse_session(session_dir, project_dir=None):
         except (PermissionError, OSError):
             pass
 
-    # Compute session duration from first/last round timestamps.
-    # Mirror the on-disk expansion used above so sessions whose
-    # ``current_round`` lags behind the highest round present on disk
-    # still report a full duration instead of an undercount or None.
+    # 从第一/最后一轮时间戳计算会话时长。镜像上面使用的
+    # 磁盘上扩展，以便 ``current_round`` 落后于磁盘上存在的
+    # 最高轮次的会话仍然报告完整时长，而不是少报或 None。
     session_duration_minutes = None
     if len(rounds) >= 2:
         first_mtime = None
@@ -611,7 +593,7 @@ def parse_session(session_dir, project_dir=None):
         if first_mtime and last_mtime and last_mtime > first_mtime:
             session_duration_minutes = round((last_mtime - first_mtime) / 60, 1)
 
-    # started_at
+    # 开始时间
     started_at = state.get('started_at', '')
     if not started_at:
         try:
@@ -622,13 +604,11 @@ def parse_session(session_dir, project_dir=None):
 
     build_finish_round, skip_impl = parse_review_phase_marker(session_dir)
     cache_logs = cache_logs_for_session(project_dir, session_id)
-    # Mirror the CLI `humanize monitor rlcr` Log: line by preferring
-    # codex-run at the highest round, falling back through the other
-    # (tool, role) combos. cache_logs is already sorted by
-    # (round, tool, role) but simply taking the last entry can land
-    # on a gemini-review/codex-review file for the same round, which
-    # is a secondary stream rather than the primary one the CLI
-    # monitor and users expect.
+    # 镜像 CLI `humanize monitor rlcr` Log: 行，优先使用最高
+    # 轮次的 codex-run，回退到其他 (tool, role) 组合。
+    # cache_logs 已按 (round, tool, role) 排序，但简单地取
+    # 最后一个条目可能落在同一轮次的 gemini-review/codex-review
+    # 文件上，这是次要流而不是 CLI 监视器和用户期望的主流。
     active_log_path = ''
     if cache_logs:
         max_round = max(entry['round'] for entry in cache_logs)
@@ -650,8 +630,8 @@ def parse_session(session_dir, project_dir=None):
                 active_log_path = match['path']
                 break
         if not active_log_path:
-            # Defensive fallback: pick the last entry at the top
-            # round so the dashboard still surfaces something.
+            # 防御性回退：选择最高轮次的最后一个条目，以便
+            # 仪表板仍然显示某些内容。
             top_round_entries = [e for e in cache_logs if e['round'] == max_round]
             active_log_path = (top_round_entries or cache_logs)[-1]['path']
 
@@ -695,21 +675,19 @@ def parse_session(session_dir, project_dir=None):
 
 
 def _determine_phase(session_dir, round_num, session_status, current_round=None):
-    """Determine the phase of a specific round.
+    """确定特定轮次的阶段。
 
-    The ``finalize`` classification applies ONLY to the live finalize
-    step (the round currently in progress when the session entered
-    ``finalize-state.md``). Earlier rounds keep their original
-    ``implementation`` / ``code_review`` classification so the
-    dashboard timeline preserves the real per-round breakdown
-    instead of relabelling everything as finalize.
+    ``finalize`` 分类仅适用于活跃的 finalize 步骤（会话进入
+    ``finalize-state.md`` 时正在进行的轮次）。较早的轮次保持
+    其原始的 ``implementation`` / ``code_review`` 分类，以便
+    仪表板时间线保留真实的每轮分解，而不是将所有内容重新
+    标记为 finalize。
     """
-    # A finalizing session's *current* round is the live finalize
-    # step. It must win over the ``code_review`` classification below
-    # (a finalize round sits past ``build_finish_round`` and would
-    # otherwise short-circuit as code_review), so the phase timeline
-    # / duration metrics reflect the actual finalize work rather than
-    # silently bucketing it as another review round.
+    # 最终化会话的*当前*轮次是活跃的 finalize 步骤。它必须
+    # 优先于下面的 ``code_review`` 分类（finalize 轮次位于
+    # ``build_finish_round`` 之后，否则会作为 code_review
+    # 短路），以便阶段时间线/时长指标反映实际的 finalize 工作，
+    # 而不是静默地将其归类为另一个审查轮次。
     is_live_finalize_round = (
         session_status == 'finalizing'
         and current_round is not None
@@ -724,13 +702,11 @@ def _determine_phase(session_dir, round_num, session_status, current_round=None)
             match = re.search(r'build_finish_round=(\d+)', content)
             if match:
                 build_round = int(match.group(1))
-                # Skip-impl sessions never ran a build round; setup-
-                # rlcr-loop.sh writes skip_impl=true alongside the
-                # build_finish_round=0 line so the marker is
-                # distinguishable from a normal-mode session whose
-                # first round (index 0) was the last build round. Every
-                # round including round 0 is review-only work in that
-                # case.
+                # skip-impl 会话从未运行过构建轮次；
+                # setup-rlcr-loop.sh 在 build_finish_round=0 行旁边
+                # 写入 skip_impl=true，以便标记与第一轮（索引 0）
+                # 是最后一轮构建的正常模式会话区分开来。在这种
+                # 情况下，包括第 0 轮在内的每一轮都是仅审查工作。
                 if re.search(r'^skip_impl=true\s*$', content, re.MULTILINE):
                     return 'finalize' if is_live_finalize_round else 'code_review'
                 if round_num > build_round:
@@ -745,7 +721,7 @@ def _determine_phase(session_dir, round_num, session_status, current_round=None)
 
 
 def is_valid_session(session_dir):
-    """Check if a session directory has minimum required files."""
+    """检查会话目录是否具有最低要求的文件。"""
     has_state = os.path.exists(os.path.join(session_dir, 'state.md'))
     has_terminal = any(
         f.endswith('-state.md') and f != 'state.md'
@@ -756,7 +732,7 @@ def is_valid_session(session_dir):
 
 
 def list_sessions(project_dir):
-    """List all RLCR sessions in a project directory."""
+    """列出项目目录中的所有 RLCR 会话。"""
     rlcr_dir = os.path.join(project_dir, '.humanize', 'rlcr')
     if not os.path.isdir(rlcr_dir):
         return []
@@ -782,17 +758,15 @@ def list_sessions(project_dir):
 
 
 def read_plan_file(session_dir, project_dir):
-    """Read the plan file for a session.
+    """读取会话的计划文件。
 
-    Defense-in-depth path validation: `plan_file` in state.md is
-    operator-controlled text. Without bounds, a crafted value like
-    `plan_file: ../secret.txt` or `plan_file: /etc/passwd` would
-    make /api/sessions/<id>/plan read arbitrary host files (since
-    os.path.join silently accepts absolute second-arg overrides and
-    does not stop parent traversal). Validate the resolved path
-    stays inside the project tree OR the session directory (the
-    session-local plan.md backup is legitimate) before reading.
-    On validation failure, fall back to the session-local backup.
+    纵深防御路径验证：state.md 中的 `plan_file` 是操作员控制的
+    文本。没有界限，精心构造的值如 `plan_file: ../secret.txt`
+    或 `plan_file: /etc/passwd` 会使 /api/sessions/<id>/plan
+    读取任意主机文件（因为 os.path.join 静默接受绝对的第二个
+    参数覆盖且不停止父遍历）。在读取之前验证解析后的路径
+    保持在项目树内或会话目录内（会话本地的 plan.md 备份是
+    合法的）。验证失败时，回退到会话本地备份。
     """
     state = parse_state(session_dir)
     plan_path = state.get('plan_file', '')
@@ -829,15 +803,13 @@ def read_plan_file(session_dir, project_dir):
     if not (inside_project or inside_session):
         return _read_backup()
 
-    # `os.path.exists` is True for directories too, so a state.md
-    # containing `plan_file: .` or any directory path would slip past
-    # the existence check and fall into `open(candidate_real, 'r')`,
-    # which raises IsADirectoryError. That surfaces as an uncaught
-    # 500 from /api/sessions/<id>/plan instead of the intended
-    # fallback to the session-local plan.md backup (or a controlled
-    # 404 when no backup is present). `os.path.isfile` is directory-
-    # safe and also returns False for broken symlinks, so no extra
-    # guard is needed.
+    # `os.path.exists` 对目录也为 True，因此包含 `plan_file: .`
+    # 或任何目录路径的 state.md 会溜过存在性检查并落入
+    # `open(candidate_real, 'r')`，这会引发 IsADirectoryError。
+    # 这会作为 /api/sessions/<id>/plan 的未捕获 500 浮现，
+    # 而不是预期的回退到会话本地的 plan.md 备份（或在没有
+    # 备份时的受控 404）。`os.path.isfile` 是目录安全的，
+    # 对断开的符号链接也返回 False，因此不需要额外的守卫。
     if os.path.isfile(candidate_real):
         with open(candidate_real, 'r', encoding='utf-8') as f:
             return f.read()

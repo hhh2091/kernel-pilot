@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# TRUE End-to-End Monitor Tests for monitor tests
+# 监控测试的真实端到端监控测试
 #
-# This test runs the REAL _humanize_monitor_codex function (not stubs)
-# and verifies graceful stop behavior when .humanize/rlcr is deleted.
+# 此测试运行真实的 _humanize_monitor_codex 函数（非存根）
+# 并验证删除 .humanize/rlcr 时的优雅停止行为。
 #
-# Validates:
-# - Clean exit with user-friendly message when .humanize deleted
-# - No zsh/bash "no matches found" errors
-# - Terminal state properly restored (scroll region reset)
-# - Works correctly in both bash and zsh
+# 验证：
+# - 删除 .humanize 时带用户友好消息的干净退出
+# - 无 zsh/bash "no matches found" 错误
+# - 终端状态正确恢复（滚动区域重置）
+# - 在 bash 和 zsh 中均正确工作
 #
 
 set -euo pipefail
@@ -17,7 +17,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
@@ -51,10 +51,10 @@ cleanup_test() {
 trap cleanup_test EXIT
 
 # ========================================
-# Test 1: Real _humanize_monitor_codex with directory deletion (bash)
+# 测试 1：真实 _humanize_monitor_codex 目录删除（bash）
 # ========================================
 monitor_test_bash_deletion() {
-    echo "Test 1: Real _humanize_monitor_codex with directory deletion (bash)"
+    echo "测试 1：真实 _humanize_monitor_codex 目录删除（bash）"
     echo ""
 
     # Create test project directory
@@ -92,21 +92,21 @@ Test goal
 |----|------|
 GOALTRACKER_EOF1
 
-    # Create a fake HOME with cache directory for log files
+    # 创建带有日志文件缓存目录的模拟 HOME
     FAKE_HOME="$TEST_BASE/home1"
     mkdir -p "$FAKE_HOME"
 
-    # Create cache directory matching the project path
+    # 创建与项目路径匹配的缓存目录
     SANITIZED_PROJECT=$(echo "$TEST_PROJECT" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g')
     CACHE_DIR="$FAKE_HOME/.cache/humanize/$SANITIZED_PROJECT/2026-01-16_10-00-00"
     mkdir -p "$CACHE_DIR"
     echo "Round 1 started" > "$CACHE_DIR/round-1-codex-run.log"
 
-    # Create the test runner script
+    # 创建测试运行脚本
     # This script runs the REAL _humanize_monitor_codex function
     cat > "$TEST_PROJECT/run_real_monitor.sh" << 'MONITOR_SCRIPT'
 #!/usr/bin/env bash
-# Run the REAL _humanize_monitor_codex function
+# 运行真实的 _humanize_monitor_codex 函数
 
 PROJECT_DIR="$1"
 PROJECT_ROOT="$2"
@@ -115,11 +115,11 @@ OUTPUT_FILE="$4"
 
 cd "$PROJECT_DIR"
 
-# Override HOME and XDG_CACHE_HOME to use our fake home with cache
+# 覆盖 HOME 和 XDG_CACHE_HOME 以使用带缓存的模拟 home
 export HOME="$FAKE_HOME"
 export XDG_CACHE_HOME="$FAKE_HOME/.cache"
 
-# Create shim functions for terminal commands (non-interactive mode)
+# 为终端命令创建垫片函数（非交互模式）
 tput() {
     case "$1" in
         cols) echo "80" ;;
@@ -141,10 +141,10 @@ clear() {
 }
 export -f clear
 
-# Source the humanize.sh script to get the REAL _humanize_monitor_codex function
+# 加载 humanize.sh 脚本以获取真实的 _humanize_monitor_codex 函数
 source "$PROJECT_ROOT/scripts/humanize.sh"
 
-# Run the REAL monitor function and capture all output
+# 运行真实的监控函数并捕获所有输出
 _humanize_monitor_codex 2>&1
 exit_code=$?
 
@@ -153,25 +153,25 @@ MONITOR_SCRIPT
 
     chmod +x "$TEST_PROJECT/run_real_monitor.sh"
 
-    # Run the monitor in background and capture output
+    # 在后台运行监控器并捕获输出
     OUTPUT_FILE="$TEST_BASE/output1.txt"
     "$TEST_PROJECT/run_real_monitor.sh" "$TEST_PROJECT" "$PROJECT_ROOT" "$FAKE_HOME" "$OUTPUT_FILE" > "$OUTPUT_FILE" 2>&1 &
     MONITOR_PID=$!
 
-    # Wait for monitor to start (check for initial output)
+    # 等待监控器启动（检查初始输出）
     sleep 2
 
-    # Delete the .humanize/rlcr directory to trigger graceful stop
+    # 删除 .humanize/rlcr 目录以触发优雅停止
     rm -rf "$TEST_PROJECT/.humanize/rlcr"
 
-    # Wait for monitor to exit (bounded loop)
+    # 等待监控器退出（有界循环）
     WAIT_COUNT=0
     while kill -0 $MONITOR_PID 2>/dev/null && [[ $WAIT_COUNT -lt 20 ]]; do
         sleep 0.5
         WAIT_COUNT=$((WAIT_COUNT + 1))
     done
 
-    # Force kill if still running (should not happen)
+    # 如果仍在运行则强制终止（不应发生）
     if kill -0 $MONITOR_PID 2>/dev/null; then
         kill $MONITOR_PID 2>/dev/null || true
         wait $MONITOR_PID 2>/dev/null || true
@@ -181,10 +181,10 @@ MONITOR_SCRIPT
         pass "Monitor exited after directory deletion"
     fi
 
-    # Read captured output
+    # 读取捕获的输出
     output=$(cat "$OUTPUT_FILE" 2>/dev/null || echo "")
 
-    # Verify: Clean exit with user-friendly message
+    # 验证：带用户友好消息的干净退出
     if echo "$output" | grep -q "Monitoring stopped:"; then
         pass "Graceful stop message displayed"
     else
@@ -197,29 +197,29 @@ MONITOR_SCRIPT
         fail "Deletion reason" "Missing 'directory no longer exists' in output"
     fi
 
-    # Verify: No glob errors
+    # 验证：无 glob 错误
     if echo "$output" | grep -qE 'no matches found|bad pattern'; then
         fail "Glob errors present" "Found glob errors: $(echo "$output" | grep -E 'no matches found|bad pattern')"
     else
         pass "No glob errors in output"
     fi
 
-    # Verify: Terminal state restored (scroll region reset)
-    # Check for the scroll region reset escape sequence \033[r
+    # 验证：终端状态已恢复（滚动区域重置）
+    # 检查滚动区域重置转义序列 \033[r
     if echo "$output" | grep -q 'Stopped monitoring'; then
         pass "Cleanup message displayed"
     else
         fail "Cleanup message" "Missing 'Stopped monitoring' in output"
     fi
 
-    # Check source code for scroll reset (backup verification)
+    # 检查源代码中的滚动重置（备用验证）
     if grep -q 'printf "\\033\[r"' "$PROJECT_ROOT/scripts/humanize.sh"; then
         pass "Scroll region reset in source"
     else
         fail "Scroll reset" "Missing scroll reset escape in source"
     fi
 
-    # Verify exit code is 0
+    # 验证退出码为 0
     if echo "$output" | grep -q "EXIT_CODE:0"; then
         pass "Exit code 0 on graceful stop"
     else
@@ -228,7 +228,7 @@ MONITOR_SCRIPT
 }
 
 # ========================================
-# Test 2: Real _humanize_monitor_codex with directory deletion (zsh)
+# 测试 2：真实 _humanize_monitor_codex 目录删除（zsh）
 # ========================================
 monitor_test_zsh_deletion() {
     echo ""
@@ -238,7 +238,7 @@ monitor_test_zsh_deletion() {
     if ! command -v zsh &>/dev/null; then
         echo "SKIP: zsh not available"
     else
-        # Create test project directory for zsh
+        # 为 zsh 创建测试项目目录
         TEST_PROJECT_ZSH="$TEST_BASE/project_zsh"
         mkdir -p "$TEST_PROJECT_ZSH/.humanize/rlcr/2026-01-16_11-00-00"
 
@@ -273,7 +273,7 @@ Test goal
 |----|------|
 GOALTRACKER_EOF
 
-        # Create fake HOME for zsh test
+        # 为 zsh 测试创建模拟 HOME
         FAKE_HOME_ZSH="$TEST_BASE/home_zsh"
         mkdir -p "$FAKE_HOME_ZSH"
 
@@ -283,10 +283,10 @@ GOALTRACKER_EOF
         mkdir -p "$CACHE_DIR_ZSH"
         echo "Round 1 started" > "$CACHE_DIR_ZSH/round-1-codex-run.log"
 
-        # Create zsh test runner script
+        # 创建 zsh 测试运行脚本
         cat > "$TEST_PROJECT_ZSH/run_real_monitor_zsh.zsh" << 'ZSH_MONITOR_SCRIPT'
 #!/bin/zsh
-# Run the REAL _humanize_monitor_codex function under zsh
+# 在 zsh 下运行真实的 _humanize_monitor_codex 函数
 
 PROJECT_DIR="$1"
 PROJECT_ROOT="$2"
@@ -294,11 +294,11 @@ FAKE_HOME="$3"
 
 cd "$PROJECT_DIR"
 
-# Override HOME and XDG_CACHE_HOME
+# 覆盖 HOME 和 XDG_CACHE_HOME
 export HOME="$FAKE_HOME"
 export XDG_CACHE_HOME="$FAKE_HOME/.cache"
 
-# Create shim functions for terminal commands
+# 为终端命令创建垫片函数
 tput() {
     case "$1" in
         cols) echo "80" ;;
@@ -309,10 +309,10 @@ tput() {
 
 clear() { : }
 
-# Source the humanize.sh script
+# 加载 humanize.sh 脚本
 source "$PROJECT_ROOT/scripts/humanize.sh"
 
-# Run the REAL monitor function
+# 运行真实的监控函数
 _humanize_monitor_codex 2>&1
 exit_code=$?
 
@@ -321,18 +321,18 @@ ZSH_MONITOR_SCRIPT
 
         chmod +x "$TEST_PROJECT_ZSH/run_real_monitor_zsh.zsh"
 
-        # Run the zsh monitor in background
+        # 在后台运行 zsh 监控器
         OUTPUT_FILE_ZSH="$TEST_BASE/output_zsh.txt"
         zsh "$TEST_PROJECT_ZSH/run_real_monitor_zsh.zsh" "$TEST_PROJECT_ZSH" "$PROJECT_ROOT" "$FAKE_HOME_ZSH" > "$OUTPUT_FILE_ZSH" 2>&1 &
         MONITOR_PID_ZSH=$!
 
-        # Wait for monitor to start
+        # 等待监控器启动
         sleep 2
 
-        # Delete the directory
+        # 删除目录
         rm -rf "$TEST_PROJECT_ZSH/.humanize/rlcr"
 
-        # Wait for exit
+        # 等待退出
         WAIT_COUNT=0
         while kill -0 $MONITOR_PID_ZSH 2>/dev/null && [[ $WAIT_COUNT -lt 20 ]]; do
             sleep 0.5
@@ -350,7 +350,7 @@ ZSH_MONITOR_SCRIPT
 
         output_zsh=$(cat "$OUTPUT_FILE_ZSH" 2>/dev/null || echo "")
 
-        # Verify: Works correctly in zsh
+        # 验证：在 zsh 中正确工作
         if echo "$output_zsh" | grep -q "Monitoring stopped:"; then
             pass "zsh graceful stop message"
         else
@@ -372,14 +372,14 @@ ZSH_MONITOR_SCRIPT
 }
 
 # ========================================
-# Test 3: Real _humanize_monitor_codex with SIGINT/Ctrl+C
+# 测试 3：真实 _humanize_monitor_codex SIGINT/Ctrl+C
 # ========================================
 monitor_test_bash_sigint() {
     echo ""
     echo "Test 3: Real _humanize_monitor_codex with SIGINT/Ctrl+C"
     echo ""
 
-    # Create test project directory for SIGINT test
+    # 为 SIGINT 测试创建测试项目目录
     TEST_PROJECT_SIGINT="$TEST_BASE/project_sigint"
     mkdir -p "$TEST_PROJECT_SIGINT/.humanize/rlcr/2026-01-16_12-00-00"
 
@@ -414,7 +414,7 @@ Test goal for SIGINT
 |----|------|
 GOALTRACKER_SIGINT
 
-    # Create fake HOME for SIGINT test
+    # 为 SIGINT 测试创建模拟 HOME
     FAKE_HOME_SIGINT="$TEST_BASE/home_sigint"
     mkdir -p "$FAKE_HOME_SIGINT"
 
@@ -424,10 +424,10 @@ GOALTRACKER_SIGINT
     mkdir -p "$CACHE_DIR_SIGINT"
     echo "Round 1 started" > "$CACHE_DIR_SIGINT/round-1-codex-run.log"
 
-    # Create the test runner script for SIGINT test
+    # 为 SIGINT 测试创建测试运行脚本
     cat > "$TEST_PROJECT_SIGINT/run_real_monitor_sigint.sh" << 'SIGINT_SCRIPT_EOF'
 #!/usr/bin/env bash
-# Run the REAL _humanize_monitor_codex function for SIGINT testing
+# 为 SIGINT 测试运行真实的 _humanize_monitor_codex 函数
 
 PROJECT_DIR="$1"
 PROJECT_ROOT="$2"
@@ -461,7 +461,7 @@ clear() {
 }
 export -f clear
 
-# Source the humanize.sh script
+# 加载 humanize.sh 脚本
 source "$PROJECT_ROOT/scripts/humanize.sh"
 
 # Run the REAL monitor function
@@ -473,15 +473,15 @@ SIGINT_SCRIPT_EOF
 
     chmod +x "$TEST_PROJECT_SIGINT/run_real_monitor_sigint.sh"
 
-    # Run the monitor in background (explicitly with bash)
+    # 在后台运行监控器（显式使用 bash）
     OUTPUT_FILE_SIGINT="$TEST_BASE/output_sigint.txt"
     bash "$TEST_PROJECT_SIGINT/run_real_monitor_sigint.sh" "$TEST_PROJECT_SIGINT" "$PROJECT_ROOT" "$FAKE_HOME_SIGINT" > "$OUTPUT_FILE_SIGINT" 2>&1 &
     MONITOR_PID_SIGINT=$!
 
-    # Wait for monitor to start (check if process is running)
+    # 等待监控器启动（检查进程是否运行）
     sleep 3
 
-    # Debug: show early output
+    # 调试：显示早期输出
     if [[ -f "$OUTPUT_FILE_SIGINT" ]]; then
         early_output=$(head -c 500 "$OUTPUT_FILE_SIGINT" 2>/dev/null || true)
         if [[ -n "$early_output" ]]; then
@@ -489,22 +489,22 @@ SIGINT_SCRIPT_EOF
         fi
     fi
 
-    # Verify monitor is running before sending SIGINT
+    # 在发送 SIGINT 前验证监控器正在运行
     if kill -0 $MONITOR_PID_SIGINT 2>/dev/null; then
-        # Send SIGINT (Ctrl+C) to the monitor process group
-        # Using negative PID sends to entire process group
+        # 向监控器进程组发送 SIGINT (Ctrl+C)
+        # 使用负 PID 发送到整个进程组
         kill -INT -$MONITOR_PID_SIGINT 2>/dev/null || kill -INT $MONITOR_PID_SIGINT 2>/dev/null || true
 
-        # Wait for monitor to exit
+        # 等待监控器退出
         WAIT_COUNT=0
         while kill -0 $MONITOR_PID_SIGINT 2>/dev/null && [[ $WAIT_COUNT -lt 20 ]]; do
             sleep 0.5
             WAIT_COUNT=$((WAIT_COUNT + 1))
         done
 
-        # Force kill if still running
+        # 如果仍在运行则强制终止
         if kill -0 $MONITOR_PID_SIGINT 2>/dev/null; then
-            # Try SIGTERM before SIGKILL
+            # 在 SIGKILL 前尝试 SIGTERM
             kill -TERM $MONITOR_PID_SIGINT 2>/dev/null || true
             sleep 1
             if kill -0 $MONITOR_PID_SIGINT 2>/dev/null; then
@@ -518,7 +518,7 @@ SIGINT_SCRIPT_EOF
             pass "bash monitor exited after SIGINT"
         fi
     else
-        # Debug: show what happened
+        # 调试：显示发生了什么
         if [[ -f "$OUTPUT_FILE_SIGINT" ]]; then
             fail "bash SIGINT start" "Monitor exited early. Output: $(head -c 300 "$OUTPUT_FILE_SIGINT" 2>/dev/null | tr '\n' ' ' || echo 'empty')"
         else
@@ -529,7 +529,7 @@ SIGINT_SCRIPT_EOF
     # Read captured output
     output_sigint=$(cat "$OUTPUT_FILE_SIGINT" 2>/dev/null || echo "")
 
-    # Verify clean exit message for SIGINT
+    # 验证 SIGINT 的干净退出消息
     if echo "$output_sigint" | grep -qE 'Stopped|Monitoring stopped|interrupt|signal'; then
         pass "bash SIGINT cleanup message"
     else
@@ -541,7 +541,7 @@ SIGINT_SCRIPT_EOF
         fi
     fi
 
-    # Verify no glob errors
+    # 验证无 glob 错误
     if echo "$output_sigint" | grep -qE 'no matches found|bad pattern'; then
         fail "bash SIGINT glob errors" "Found glob errors"
     else
@@ -550,7 +550,7 @@ SIGINT_SCRIPT_EOF
 }
 
 # ========================================
-# Test 4: Real _humanize_monitor_codex with SIGINT/Ctrl+C
+# 测试 4：真实 _humanize_monitor_codex SIGINT/Ctrl+C
 # ========================================
 monitor_test_zsh_sigint() {
     echo ""
@@ -560,11 +560,11 @@ monitor_test_zsh_sigint() {
     if ! command -v zsh &>/dev/null; then
         echo "SKIP: zsh not available for SIGINT test"
     else
-        # Create test project for zsh SIGINT
+        # 为 zsh SIGINT 创建测试项目
         TEST_PROJECT_ZSH_SIGINT="$TEST_BASE/project_zsh_sigint"
         mkdir -p "$TEST_PROJECT_ZSH_SIGINT/.humanize/rlcr/2026-01-16_13-00-00"
 
-        # Create state.md
+        # 创建 state.md
         cat > "$TEST_PROJECT_ZSH_SIGINT/.humanize/rlcr/2026-01-16_13-00-00/state.md" << 'STATE'
 ---
 current_round: 1
@@ -595,7 +595,7 @@ Test goal for zsh SIGINT
 |----|------|
 GOALTRACKER_ZSH_SIGINT
 
-        # Create fake HOME
+        # 创建模拟 HOME
         FAKE_HOME_ZSH_SIGINT="$TEST_BASE/home_zsh_sigint"
         mkdir -p "$FAKE_HOME_ZSH_SIGINT"
 
@@ -605,10 +605,10 @@ GOALTRACKER_ZSH_SIGINT
         mkdir -p "$CACHE_DIR_ZSH_SIGINT"
         echo "Round 1 started" > "$CACHE_DIR_ZSH_SIGINT/round-1-codex-run.log"
 
-        # Create zsh test runner
+        # 创建 zsh 测试运行器
         cat > "$TEST_PROJECT_ZSH_SIGINT/run_real_monitor_zsh_sigint.zsh" << 'ZSH_SIGINT_SCRIPT'
 #!/bin/zsh
-# Run the REAL _humanize_monitor_codex function under zsh for SIGINT testing
+# 在 zsh 下为 SIGINT 测试运行真实的 _humanize_monitor_codex 函数
 
 PROJECT_DIR="$1"
 PROJECT_ROOT="$2"
@@ -639,7 +639,7 @@ ZSH_SIGINT_SCRIPT
 
         chmod +x "$TEST_PROJECT_ZSH_SIGINT/run_real_monitor_zsh_sigint.zsh"
 
-        # Run zsh monitor in background
+        # 在后台运行 zsh 监控器
         OUTPUT_FILE_ZSH_SIGINT="$TEST_BASE/output_zsh_sigint.txt"
         zsh "$TEST_PROJECT_ZSH_SIGINT/run_real_monitor_zsh_sigint.zsh" "$TEST_PROJECT_ZSH_SIGINT" "$PROJECT_ROOT" "$FAKE_HOME_ZSH_SIGINT" > "$OUTPUT_FILE_ZSH_SIGINT" 2>&1 &
         MONITOR_PID_ZSH_SIGINT=$!
@@ -647,7 +647,7 @@ ZSH_SIGINT_SCRIPT
         sleep 2
 
         if kill -0 $MONITOR_PID_ZSH_SIGINT 2>/dev/null; then
-            # Send SIGINT
+            # 发送 SIGINT
             kill -INT $MONITOR_PID_ZSH_SIGINT 2>/dev/null || true
 
             # Wait for exit
@@ -686,7 +686,7 @@ ZSH_SIGINT_SCRIPT
 }
 
 # ========================================
-# Run all tests and print summary when executed directly
+# 直接执行时运行所有测试并打印摘要
 # ========================================
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     echo "========================================"

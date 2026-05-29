@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 #
-# Template loading functions for RLCR loop hooks
+# RLCR 循环钩子的模板加载函数
 #
-# This library provides functions to load and render prompt templates.
+# 此库提供加载和渲染提示模板的函数。
 #
-# Template Variable Syntax
+# 模板变量语法
 # ========================
-# Templates use {{VARIABLE_NAME}} syntax for placeholders.
-# - Variable names: uppercase letters, numbers, underscores only
-# - Example: {{PLAN_FILE}}, {{CURRENT_ROUND}}, {{GOAL_TRACKER_FILE}}
-# - Single-pass substitution: {{VAR}} in a value will NOT be expanded
-# - Missing variables: placeholder is kept as-is (e.g., {{UNDEFINED}})
+# 模板使用 {{VARIABLE_NAME}} 语法作为占位符。
+# - 变量名：仅大写字母、数字、下划线
+# - 示例：{{PLAN_FILE}}、{{CURRENT_ROUND}}、{{GOAL_TRACKER_FILE}}
+# - 单次替换：值中的 {{VAR}} 不会被展开
+# - 缺失变量：占位符保持原样（例如 {{UNDEFINED}}）
 #
-# Available functions:
-# - get_template_dir: Get path to template directory
-# - load_template: Load a template file by name
-# - render_template: Replace {{VAR}} placeholders with values
-# - load_and_render: Load and render in one call
-# - load_and_render_safe: Same as above but with fallback for missing templates
-# - validate_template_dir: Check if template directory is valid
+# 可用函数：
+# - get_template_dir：获取模板目录路径
+# - load_template：按名称加载模板文件
+# - render_template：用值替换 {{VAR}} 占位符
+# - load_and_render：在一次调用中加载和渲染
+# - load_and_render_safe：与上面相同，但对缺失模板有回退
+# - validate_template_dir：检查模板目录是否有效
 #
 
-# Get the template directory path
-# This is relative to the hooks/lib directory (goes up 2 levels to plugin root)
+# 获取模板目录路径
+# 这是相对于 hooks/lib 目录的（向上 2 级到插件根）
 get_template_dir() {
     local script_dir="$1"
     local plugin_root
@@ -30,9 +30,9 @@ get_template_dir() {
     echo "$plugin_root/prompt-template"
 }
 
-# Load a template file and output its contents
-# Usage: load_template "$TEMPLATE_DIR" "codex/full-alignment-review.md"
-# Returns empty string if file not found
+# 加载模板文件并输出其内容
+# 用法：load_template "$TEMPLATE_DIR" "codex/full-alignment-review.md"
+# 如果文件未找到则返回空字符串
 load_template() {
     local template_dir="$1"
     local template_name="$2"
@@ -45,20 +45,20 @@ load_template() {
     fi
 }
 
-# Render a template with multiple variable substitutions (single-pass)
-# Usage: render_template "$template_content" "VAR1=value1" "VAR2=value2" ...
-# Variables should be passed as VAR=value pairs
+# 使用多次变量替换渲染模板（单次传递）
+# 用法：render_template "$template_content" "VAR1=value1" "VAR2=value2" ...
+# 变量应作为 VAR=value 对传递
 #
-# IMPORTANT: This uses a single-pass approach to prevent placeholder injection.
-# If a variable value contains {{OTHER_VAR}}, it will NOT be replaced.
-# This prevents content like REVIEW_CONTENT from having its {{...}} patterns
-# accidentally substituted, which could corrupt prompts.
+# 重要：这使用单次传递方法来防止占位符注入。
+# 如果变量值包含 {{OTHER_VAR}}，它不会被替换。
+# 这防止像 REVIEW_CONTENT 这样的内容的 {{...}} 模式被意外替换，
+# 这可能会损坏提示。
 render_template() {
     local content="$1"
     shift
 
-    # Build environment variables for all substitutions
-    # Using TMPL_VAR_ prefix to avoid conflicts
+    # 为所有替换构建环境变量
+    # 使用 TMPL_VAR_ 前缀以避免冲突
     local -a env_vars=()
     for var_assignment in "$@"; do
         local var_name="${var_assignment%%=*}"
@@ -66,9 +66,9 @@ render_template() {
         env_vars+=("TMPL_VAR_${var_name}=${var_value}")
     done
 
-    # Single-pass replacement using awk
-    # Scans for {{VAR}} patterns and replaces them with values from environment
-    # Replaced content goes directly to output without re-scanning
+    # 使用 awk 的单次替换
+    # 扫描 {{VAR}} 模式并用环境中的值替换它们
+    # 替换的内容直接进入输出而不重新扫描
     local awk_exit=0
     content=$(env ${env_vars[@]+"${env_vars[@]}"} awk '
     BEGIN {
@@ -135,8 +135,8 @@ render_template() {
     echo "$content"
 }
 
-# Load and render a template in one step
-# Usage: load_and_render "$TEMPLATE_DIR" "block/git-not-clean.md" "GIT_ISSUES=uncommitted changes"
+# 在一步中加载和渲染模板
+# 用法：load_and_render "$TEMPLATE_DIR" "block/git-not-clean.md" "GIT_ISSUES=uncommitted changes"
 load_and_render() {
     local template_dir="$1"
     local template_name="$2"
@@ -150,9 +150,9 @@ load_and_render() {
     fi
 }
 
-# Append content from another template file
-# Usage: append_template "$base_content" "$TEMPLATE_DIR" "claude/post-alignment.md"
-# Only appends if the template exists and is non-empty.
+# 从另一个模板文件追加内容
+# 用法：append_template "$base_content" "$TEMPLATE_DIR" "claude/post-alignment.md"
+# 仅在模板存在且非空时追加。
 append_template() {
     local base_content="$1"
     local template_dir="$2"
@@ -168,10 +168,10 @@ append_template() {
 }
 
 # ========================================
-# Safe versions with fallback messages
+# 带有回退消息的安全版本
 # ========================================
 
-# Emit a fallback message, optionally rendering template variables.
+# 发出回退消息，可选地渲染模板变量。
 _emit_fallback() {
     local fallback_msg="$1"
     shift
@@ -182,9 +182,9 @@ _emit_fallback() {
     fi
 }
 
-# Load and render with a fallback message if template fails
-# Usage: load_and_render_safe "$TEMPLATE_DIR" "block/message.md" "fallback message" "VAR=value" ...
-# Returns fallback message if template is missing or empty
+# 如果模板失败则加载和渲染带有回退消息
+# 用法：load_and_render_safe "$TEMPLATE_DIR" "block/message.md" "fallback message" "VAR=value" ...
+# 如果模板缺失或为空则返回回退消息
 load_and_render_safe() {
     local template_dir="$1"
     local template_name="$2"
@@ -210,9 +210,9 @@ load_and_render_safe() {
     echo "$result"
 }
 
-# Validate that TEMPLATE_DIR exists and contains templates
-# Usage: validate_template_dir "$TEMPLATE_DIR"
-# Returns 0 if valid, 1 if not
+# 验证 TEMPLATE_DIR 存在且包含模板
+# 用法：validate_template_dir "$TEMPLATE_DIR"
+# 如果有效则返回 0，否则返回 1
 validate_template_dir() {
     local template_dir="$1"
 

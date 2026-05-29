@@ -1,10 +1,10 @@
 /*
- * Humanize Viz — Design System
- * Aesthetic: "Mission Control" — refined dark dashboard with warm orange accents
- * Font: Archivo (display), DM Sans (body), JetBrains Mono (code)
+ * Humanize Viz — 设计系统
+ * 美学风格："任务控制台" — 精致的深色仪表板，配以暖橙色点缀
+ * 字体：Archivo（标题）、DM Sans（正文）、JetBrains Mono（代码）
  */
 
-/* ─── Design Tokens ─── */
+/* ─── 设计令牌 ─── */
 :root {
     --font-display: 'Archivo', 'Noto Sans SC', sans-serif;
     --font-body: 'DM Sans', 'Noto Sans SC', sans-serif;
@@ -36,7 +36,7 @@
     --space-16: 64px;
 }
 
-/* ─── Dark Theme ─── */
+/* ─── 深色主题 ─── */
 [data-theme="dark"] {
     --bg-0: #0f0f12;
     --bg-1: #17171c;
@@ -75,7 +75,7 @@
     color-scheme: dark;
 }
 
-/* ─── Light Theme ─── */
+/* ─── 浅色主题 ─── */
 [data-theme="light"] {
     --bg-0: #f8f6f2;
     --bg-1: #ffffff;
@@ -114,7 +114,7 @@
     color-scheme: light;
 }
 
-/* ─── Reset & Base ─── */
+/* ─── 重置与基础 ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
@@ -133,7 +133,7 @@ body {
                 color var(--duration-base) var(--ease-out);
 }
 
-/* ─── Grain Overlay ─── */
+/* ─── 颗粒纹理叠加层 ─── */
 .grain-overlay {
     position: fixed;
     inset: 0;
@@ -145,7 +145,7 @@ body {
     background-size: 256px;
 }
 
-/* ─── Typography ─── */
+/* ─── 排版 ─── */
 h1, h2, h3, h4, h5 {
     font-family: var(--font-display);
     font-weight: 700;
@@ -183,13 +183,13 @@ a:hover { color: var(--accent-hover); }
     color: var(--text-0);
 }
 
-/* Scrollbar */
+/* 滚动条 */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
-/* ─── Badges ─── */
+/* ─── 徽章 ─── */
 .badge {
     display: inline-flex;
     align-items: center;
@@ -209,14 +209,14 @@ a:hover { color: var(--accent-hover); }
 .badge-stop, .badge-maxiter { background: rgba(251, 191, 36, 0.12); color: var(--verdict-stalled); }
 .badge-unknown, .badge-analyzing, .badge-finalizing { background: rgba(107, 114, 128, 0.12); color: var(--verdict-unknown); }
 
-/* ─── Verdict Colors ─── */
+/* ─── 判定颜色 ─── */
 .verdict-advanced { color: var(--verdict-advanced); }
 .verdict-stalled { color: var(--verdict-stalled); }
 .verdict-regressed { color: var(--verdict-regressed); }
 .verdict-unknown { color: var(--verdict-unknown); }
 .verdict-complete { color: var(--verdict-complete); }
 
-/* ─── Buttons ─── */
+/* ─── 按钮 ─── */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -253,7 +253,7 @@ a:hover { color: var(--accent-hover); }
 .btn-danger { color: var(--verdict-regressed); }
 .btn-danger:hover { background: rgba(248,113,113,0.08); border-color: var(--verdict-regressed); }
 
-/* ─── Tabs ─── */
+/* ─── 标签页 ─── */
 .tabs {
     display: flex;
     gap: 0;
@@ -275,7 +275,7 @@ a:hover { color: var(--accent-hover); }
 .tab:hover { color: var(--text-0); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-/* ─── Modal ─── */
+/* ─── 模态框 ─── */
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -330,7 +330,7 @@ a:hover { color: var(--accent-hover); }
     border-top: 1px solid var(--border-0);
 }
 
-/* ─── Dropdown ─── */
+/* ─── 下拉菜单 ─── */
 .dropdown { position: relative; }
 
 .dropdown-menu {
@@ -367,7 +367,7 @@ a:hover { color: var(--accent-hover); }
 .dropdown-item.danger:hover { background: rgba(248,113,113,0.06); }
 .dropdown-divider { border: none; border-top: 1px solid var(--border-0); margin: var(--space-1) 0; }
 
-/* ─── Markdown ─── */
+/* ─── Markdown 样式 ─── */
 .md h1 { font-size: 1.3rem; margin: var(--space-5) 0 var(--space-3); }
 .md h2 { font-size: 1.1rem; margin: var(--space-4) 0 var(--space-2); color: var(--accent); }
 .md h3 { font-size: 0.95rem; margin: var(--space-3) 0 var(--space-2); }
@@ -380,7 +380,7 @@ a:hover { color: var(--accent-hover); }
 .md th { background: var(--bg-3); color: var(--text-2); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
 .md blockquote { border-left: 3px solid var(--accent); padding-left: 14px; color: var(--text-2); margin: var(--space-3) 0; }
 
-/* ─── Progress Bar ─── */
+/* ─── 进度条 ─── */
 .progress-bar {
     width: 100%;
     height: 5px;
@@ -395,7 +395,7 @@ a:hover { color: var(--accent-hover); }
     transition: width var(--duration-slow) var(--ease-out);
 }
 
-/* ─── Pulse Keyframes ─── */
+/* ─── 脉冲关键帧 ─── */
 @keyframes pulse-ring {
     0% { box-shadow: 0 0 0 0 var(--accent-glow); }
     70% { box-shadow: 0 0 0 10px transparent; }
@@ -427,7 +427,7 @@ a:hover { color: var(--accent-hover); }
     to { opacity: 1; transform: translateX(0); }
 }
 
-/* ─── Print ─── */
+/* ─── 打印样式 ─── */
 @media print {
     .topbar, .grain-overlay, .dropdown { display: none !important; }
     body { background: #fff; color: #000; }

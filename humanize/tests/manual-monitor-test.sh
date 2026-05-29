@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# Manual Test Script for tests
+# 测试手动测试脚本
 #
-# This script helps verify that:
-# - Deleting .humanize/ results in clean exit with user-friendly message
-# - Terminal state is properly restored after graceful stop
+# 此脚本用于验证以下内容：
+# - 删除 .humanize/ 目录后能正常退出并显示友好的用户消息
+# - 优雅停止后终端状态能正确恢复
 #
-# Usage:
-# 1. In terminal 1: cd to project root, run ./tests/manual-monitor-test.sh setup
-# 2. In terminal 2: cd to project root, run: source scripts/humanize.sh && humanize monitor rlcr
-# 3. In terminal 1: run ./tests/manual-monitor-test.sh delete
-# 4. Observe terminal 2: should see clean exit message, terminal should be restored
-# 5. Clean up: run ./tests/manual-monitor-test.sh cleanup
+# 使用方法：
+# 1. 在终端 1 中：cd 到项目根目录，运行 ./tests/manual-monitor-test.sh setup
+# 2. 在终端 2 中：cd 到项目根目录，运行：source scripts/humanize.sh && humanize monitor rlcr
+# 3. 在终端 1 中：运行 ./tests/manual-monitor-test.sh delete
+# 4. 观察终端 2：应看到正常的退出消息，终端应已恢复
+# 5. 清理：运行 ./tests/manual-monitor-test.sh cleanup
 #
 
 set -euo pipefail

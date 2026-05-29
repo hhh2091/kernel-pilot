@@ -1,4 +1,4 @@
-/* Pipeline — snake-path node layout with SVG connectors + zoom/pan + flyout detail */
+/* Pipeline — 蛇形路径节点布局，带 SVG 连接器 + 缩放/平移 + 弹出详情 */
 
 const PL = {
     COLS: 4,
@@ -13,15 +13,15 @@ const PL = {
 let _scale = 1, _tx = 0, _ty = 0
 let _dragging = false, _dragStartX = 0, _dragStartY = 0, _dragTx = 0, _dragTy = 0
 
-// Window-level drag listeners are installed exactly once across the
-// lifetime of the page. renderPipeline() is invoked on every SSE-
-// driven session refresh, so registering window listeners per render
-// would leak a growing number of handlers and process each drag event
-// N times after N re-renders. The per-viewport mousedown listener
-// stays per-render (the viewport DOM node is replaced on every render
-// anyway) but the window-level mousemove/mouseup pair is persistent.
-// onDragMove/onDragEnd are safe no-ops when _dragging is false, so
-// installing them once is correct.
+// 窗口级别的拖拽监听器在页面生命周期内只安装一次。
+// renderPipeline() 在每次 SSE 驱动的会话刷新时被调用，
+// 因此每次渲染都注册窗口监听器会泄漏不断增长的处理器数量，
+// 并在 N 次重新渲染后将每个拖拽事件处理 N 次。
+// 每个视口的 mousedown 监听器保持每渲染一次
+// （视口 DOM 节点在每次渲染时都会被替换），
+// 但窗口级别的 mousemove/mouseup 对是持久的。
+// onDragMove/onDragEnd 在 _dragging 为 false 时是安全的空操作，
+// 因此只安装一次是正确的。
 let _dragListenersInstalled = false
 function _ensureDragListeners() {
     if (_dragListenersInstalled) return
@@ -39,7 +39,7 @@ function renderPipeline(container, session) {
     }
 
     const isActive = session.status === 'active'
-    // Total node count: rounds + 1 ghost node for active sessions
+    // 总节点数：轮次 + 活跃会话的 1 个幽灵节点
     const totalNodes = isActive ? rounds.length + 1 : rounds.length
     const positions = computePositions(totalNodes)
     const totalW = PL.PADDING * 2 + PL.COLS * PL.NODE_W + (PL.COLS - 1) * PL.GAP_X
@@ -57,7 +57,7 @@ function renderPipeline(container, session) {
         nodesHtml += renderNodeCard(r, session, positions[idx])
     })
 
-    // Ghost "in progress" node for active sessions
+    // 活跃会话的幽灵"进行中"节点
     if (isActive) {
         const ghostPos = positions[rounds.length]
         nodesHtml += renderGhostNode(session, ghostPos)
@@ -93,20 +93,18 @@ function renderPipeline(container, session) {
     setTimeout(() => plFit(), 50)
 }
 
-// Incremental pipeline update used by WS-push driven refreshes.
-// Appends new node cards for rounds that weren't in the DOM yet,
-// updates in place the ones whose verdict / active flag changed,
-// refreshes the ghost node, and only touches the SVG connectors'
-// paths. The outer #pl-viewport with its zoom / pan / controls is
-// left intact, so the user's current view (scale, translate)
-// survives across rounds instead of snapping back to fit every
-// time a new round arrives.
+// WS 推送驱动刷新使用的增量 pipeline 更新。
+// 为尚未在 DOM 中的轮次追加新节点卡片，
+// 就地更新裁决结果/活跃标志已更改的节点，
+// 刷新幽灵节点，只修改 SVG 连接器的路径。
+// 外层的 #pl-viewport 及其缩放/平移/控件保持不变，
+// 使用户的当前视图（缩放、平移）在轮次间保留，
+// 而不是每次新轮次到达时都回到适应视图。
 function _updatePipelineIncremental(container, session) {
     const canvas = container && container.querySelector('#pl-canvas')
     const svg = canvas && canvas.querySelector('.pl-svg')
     if (!canvas || !svg) {
-        // No incremental substrate yet (empty state or never
-        // rendered). Fall back to the full render path.
+        // 尚无增量基底（空状态或从未渲染）。回退到完整渲染路径。
         renderPipeline(container, session)
         return
     }
@@ -123,12 +121,12 @@ function _updatePipelineIncremental(container, session) {
     const rows = Math.ceil(totalNodes / PL.COLS)
     const totalH = PL.PADDING * 2 + rows * PL.NODE_H + (rows - 1) * (PL.GAP_Y + PL.TURN_H)
 
-    // 1) Update / append real (non-ghost) node cards.
+    // 1) 更新/追加真实（非幽灵）节点卡片。
     const existing = Array.from(canvas.querySelectorAll('.canvas-tile:not(.is-queued)'))
     existing.sort((a, b) => Number(a.dataset.round) - Number(b.dataset.round))
 
-    // Put existing nodes into a round-number -> element map so we can
-    // update or replace them without assuming DOM order.
+    // 将现有节点放入轮次号 -> 元素的映射中，以便
+    // 在不假设 DOM 顺序的情况下更新或替换它们。
     const byRound = new Map(existing.map(el => [Number(el.dataset.round), el]))
 
     for (let i = 0; i < rounds.length; i++) {
@@ -136,7 +134,7 @@ function _updatePipelineIncremental(container, session) {
         const pos = positions[i]
         const el = byRound.get(r.number)
         if (!el) {
-            // New round -> append.
+            // 新轮次 -> 追加。
             const tmp = document.createElement('div')
             tmp.innerHTML = renderNodeCard(r, session, pos).trim()
             canvas.appendChild(tmp.firstChild)
@@ -147,20 +145,19 @@ function _updatePipelineIncremental(container, session) {
         const verdictChanged = el.dataset.verdict !== verdict
         const activeChanged = el.classList.contains('active-round') !== shouldActive
         if (verdictChanged || activeChanged) {
-            // Replace the single node in place (cheap) to re-render
-            // the verdict dot, active indicator and mini-stats.
+            // 就地替换单个节点（低成本）以重新渲染裁决点、
+            // 活跃指示器和迷你统计。
             const tmp = document.createElement('div')
             tmp.innerHTML = renderNodeCard(r, session, pos).trim()
             el.replaceWith(tmp.firstChild)
         }
         byRound.delete(r.number)
     }
-    // Any leftover entries in byRound are rounds that disappeared
-    // from the payload (shouldn't happen in normal flow; defensive).
+    // byRound 中的任何剩余条目是从载荷中消失的轮次
+    // （在正常流程中不应发生；防御性措施）。
     for (const el of byRound.values()) el.remove()
 
-    // 2) Ghost node — remove the old one, add a fresh one at the
-    // new position when the session is still active.
+    // 2) 幽灵节点 — 移除旧的，当会话仍然活跃时在新位置添加一个新的。
     const oldGhost = canvas.querySelector('.canvas-tile.is-queued')
     if (oldGhost) oldGhost.remove()
     if (isActive) {
@@ -170,10 +167,9 @@ function _updatePipelineIncremental(container, session) {
         canvas.appendChild(tmp.firstChild)
     }
 
-    // 3) Redraw the SVG connectors. The SVG is a single sub-element
-    // of the canvas; innerHTML-swapping its <line>/<path> children
-    // does not blow away the surrounding canvas or the user's zoom
-    // state.
+    // 3) 重绘 SVG 连接器。SVG 是画布的单个子元素；
+    // 用 innerHTML 替换其 <line>/<path> 子元素不会破坏
+    // 周围的画布或用户的缩放状态。
     let svgPaths = ''
     for (let i = 0; i < totalNodes - 1; i++) {
         const isLastEdge = isActive && i === rounds.length - 1
@@ -184,14 +180,13 @@ function _updatePipelineIncremental(container, session) {
     svg.setAttribute('height', String(totalH))
     svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`)
 
-    // 4) Canvas size may have grown (new row).
+    // 4) 画布大小可能已增长（新行）。
     canvas.style.width = `${totalW}px`
     canvas.style.height = `${totalH}px`
 }
 
-// Expose for app.js's targeted refresh path. Kept as a window
-// property (rather than a module export) to match the project's
-// existing non-modular script loading.
+// 为 app.js 的有针对性刷新路径暴露。保持为 window 属性
+// （而非模块导出）以匹配项目现有的非模块化脚本加载方式。
 window._updatePipelineIncremental = _updatePipelineIncremental
 
 function computePositions(count) {
@@ -242,10 +237,9 @@ function renderNodeCard(r, session, pos) {
     if (r.bitlesson_delta && r.bitlesson_delta !== 'none') stats.push('BL+')
     if (!hasSummary) stats.push('…')
 
-    // Reference-kit canvas tile: verdict-colored left stripe, mono
-    // micro-stats row, optional sweep-bar when the node is the
-    // in-flight round. Positioning / connector logic still driven
-    // by the snake-path layout above.
+    // 参考工具画布卡片：裁决色左条纹、等宽微统计行、
+    // 节点为运行中轮次时可选的扫描条。定位/连接器逻辑
+    // 仍由上面的蛇形路径布局驱动。
     const classes = ['canvas-tile']
     classes.push(`verdict-${verdict}`)
     if (isActive) classes.push('is-running')
@@ -281,9 +275,8 @@ function renderNodeCard(r, session, pos) {
 
 function renderGhostNode(session, pos) {
     const nextRound = session.current_round + 1
-    // Reference-kit "queued / awaiting" tile: dashed accent border,
-    // dim, no click handler. Paired with the pl-edge-active
-    // animated connector drawn in the SVG layer above.
+    // 参考工具"排队/等待"卡片：虚线强调边框、暗淡、无点击处理器。
+    // 与上面 SVG 层绘制的 pl-edge-active 动画连接器配对。
     return `
         <div class="canvas-tile is-queued"
              style="left:${pos.x}px;top:${pos.y}px;width:${PL.NODE_W}px;height:${PL.NODE_H}px">
@@ -299,7 +292,7 @@ function renderGhostNode(session, pos) {
 }
 
 
-// ─── Flyout Modal (expand from node to center) ───
+// ─── 弹出模态框（从节点展开到中心） ───
 
 function openFlyout(nodeEl, roundNum) {
     if (_dragging) return
@@ -308,10 +301,9 @@ function openFlyout(nodeEl, roundNum) {
     const round = session.rounds.find(r => r.number === roundNum)
     if (!round) return
 
-    // Auto-collapse the session-detail log panel while the flyout is
-    // open so the reader has more screen real estate for the node's
-    // expanded details. closeFlyout() restores whatever state the
-    // user had (normal/expanded) before the click.
+    // 弹出面板打开时自动折叠会话详情日志面板，
+    // 使读者有更多屏幕空间查看节点的展开详情。
+    // closeFlyout() 恢复用户在点击前的任何状态（正常/展开）。
     if (typeof window.autoCollapseSessionLog === 'function') {
         window.autoCollapseSessionLog()
     }
@@ -320,11 +312,11 @@ function openFlyout(nodeEl, roundNum) {
     const panel = document.getElementById('flyout-panel')
     if (!overlay || !panel) return
 
-    // Get node position on screen
+    // 获取节点在屏幕上的位置
     const rect = nodeEl.getBoundingClientRect()
     const vpRect = overlay.parentElement.getBoundingClientRect()
 
-    // Set initial position to match node
+    // 设置初始位置以匹配节点
     panel.style.transition = 'none'
     panel.style.left = (rect.left - vpRect.left) + 'px'
     panel.style.top = (rect.top - vpRect.top) + 'px'
@@ -334,10 +326,10 @@ function openFlyout(nodeEl, roundNum) {
     panel.style.borderRadius = '14px'
     panel.innerHTML = ''
 
-    // Show overlay
+    // 显示遮罩层
     overlay.classList.add('visible')
 
-    // Animate to center
+    // 动画移动到中心
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             const targetW = Math.min(720, vpRect.width - 80)
@@ -353,7 +345,7 @@ function openFlyout(nodeEl, roundNum) {
             panel.style.opacity = '1'
             panel.style.borderRadius = '20px'
 
-            // Fill content after animation starts
+            // 动画开始后填充内容
             setTimeout(() => {
                 panel.innerHTML = buildFlyoutContent(round, session)
             }, 150)
@@ -376,8 +368,7 @@ function closeFlyout() {
         panel.innerHTML = ''
     }, 300)
 
-    // Restore the log panel to whatever state it had before the
-    // flyout auto-collapsed it.
+    // 将日志面板恢复到弹出面板自动折叠之前的状态。
     if (typeof window.restoreSessionLog === 'function') {
         window.restoreSessionLog()
     }
@@ -420,7 +411,7 @@ function buildFlyoutContent(round, session) {
         </div>`
 }
 
-// ─── Zoom / Pan ───
+// ─── 缩放 / 平移 ───
 function applyTransform() {
     const canvas = document.getElementById('pl-canvas')
     if (canvas) canvas.style.transform = `translate(${_tx}px, ${_ty}px) scale(${_scale})`

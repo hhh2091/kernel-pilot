@@ -1,6 +1,6 @@
 {
   "name": "humanize",
-  "description": "Humanize - An iterative development plugin that uses Codex to review Claude's work. Creates a feedback loop where Claude implements plans and Codex independently reviews progress, ensuring quality through continuous refinement.",
+  "description": "Humanize - 一个使用 Codex 审查 Claude 工作的迭代开发插件。创建一个反馈循环，Claude 实施计划，Codex 独立审查进度，通过持续改进确保质量。",
   "version": "1.17.0",
   "author": {
     "name": "PolyArch"

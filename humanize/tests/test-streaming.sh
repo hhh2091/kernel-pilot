@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 #
-# Behavior tests for viz/server/log_streamer.py and the parser/watcher
-# extensions added in the streaming block (T3+T4+T5).
+# viz/server/log_streamer.py 的行为测试以及流式块（T3+T4+T5）
+# 中添加的解析器/监视器扩展。
 #
-# Covers the contract in docs/streaming-protocol.md:
-#   - Snapshot of an existing file (chunked at 64 KiB)
-#   - Append after new bytes are written
-#   - Truncation: file size shrinks below known offset
-#   - Rotation: same path, new inode
-#   - Missing file at startup: no events, no crash
-#   - Missing then reappear: resync(recreated) + fresh snapshot
-#   - EOF: subsequent polls are no-ops
-#   - Replay with Last-Event-Id: in-window returns newer events; out
-#     of window returns resync(overflow)
-#   - Parser cache_logs_for_session integrates rlcr_sources discovery
+# 覆盖 docs/streaming-protocol.md 中的契约：
+#   - 现有文件的快照（以 64 KiB 分块）
+#   - 写入新字节后追加
+#   - 截断：文件大小缩小到已知偏移量以下
+#   - 轮转：相同路径，新 inode
+#   - 启动时文件缺失：无事件，无崩溃
+#   - 缺失后重新出现：resync(recreated) + 新快照
+#   - EOF：后续轮询为空操作
+#   - 使用 Last-Event-Id 重放：窗口内返回较新事件；
+#     窗口外返回 resync(overflow)
+#   - 解析器 cache_logs_for_session 集成 rlcr_sources 发现
 #
-# No network access; all fixtures live under per-test mktemp tree.
+# 无网络访问；所有夹具位于每个测试的 mktemp 树下。
 
 set -euo pipefail
 
@@ -44,7 +44,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 CACHE_DIR="$TMP_DIR/cache"
 mkdir -p "$CACHE_DIR"
 
-# Helper: run a python driver and capture its output
+# 辅助函数：运行 python 驱动器并捕获其输出
 _run_py() {
     python3 -c "
 import sys
@@ -53,7 +53,7 @@ $1
 "
 }
 
-# ─── Test Group 1: Missing file at startup ───
+# ─── 测试组 1：启动时文件缺失 ───
 echo
 echo "Group 1: Missing file at startup"
 
@@ -79,7 +79,7 @@ else
     _fail "expected resync(missing) on first poll, got: $(grep '^POLL:' <<<"$OUTPUT")"
 fi
 
-# ─── Test Group 2: Snapshot existing file ───
+# ─── 测试组 2：现有文件快照 ───
 echo
 echo "Group 2: Snapshot of existing file"
 
@@ -111,7 +111,7 @@ else
     _fail "snapshot payload wrong: $OUTPUT"
 fi
 
-# ─── Test Group 3: Append after writes ───
+# ─── 测试组 3：写入后追加 ───
 echo
 echo "Group 3: Append after writes"
 
@@ -135,7 +135,7 @@ else
     _fail "append event wrong: $OUTPUT"
 fi
 
-# ─── Test Group 4: Truncation triggers resync + fresh snapshot ───
+# ─── 测试组 4：截断触发 resync + 新快照 ───
 echo
 echo "Group 4: Truncation"
 
@@ -151,14 +151,14 @@ for e in events:
     print('TYPE:', e['type'], e.get('reason', ''), 'OFFSET:', e.get('offset', '-'))
 ")"
 
-# Expect: resync(truncated), snapshot
+# 期望：resync(truncated)，snapshot
 if grep -q '^TYPE: resync truncated' <<<"$OUTPUT" && grep -q '^TYPE: snapshot' <<<"$OUTPUT"; then
     _pass "truncation triggers resync(truncated) followed by fresh snapshot"
 else
     _fail "truncation behavior wrong: $OUTPUT"
 fi
 
-# ─── Test Group 5: Rotation (inode change) ───
+# ─── 测试组 5：轮转（inode 变更）───
 echo
 echo "Group 5: Rotation (file recreated with different inode)"
 
@@ -179,16 +179,16 @@ for e in events:
     print('TYPE:', e['type'], e.get('reason', ''))
 ")"
 
-# We may see resync(missing) first if poll happens between unlink and recreate;
-# in this test the recreate is synchronous so we expect resync(rotated) followed by snapshot.
-# Allow either pattern as long as resync occurs and a snapshot follows.
+# 如果轮询发生在 unlink 和 recreate 之间，可能先看到 resync(missing)；
+# 在此测试中 recreate 是同步的，因此我们期望 resync(rotated) 后跟快照。
+# 只要 resync 发生且快照跟随，允许任一模式。
 if grep -q '^TYPE: resync' <<<"$OUTPUT" && grep -q '^TYPE: snapshot' <<<"$OUTPUT"; then
     _pass "rotation triggers resync followed by fresh snapshot"
 else
     _fail "rotation behavior wrong: $OUTPUT"
 fi
 
-# ─── Test Group 6: Missing then reappear ───
+# ─── 测试组 6：缺失后重新出现 ───
 echo
 echo "Group 6: Missing file reappears"
 
@@ -216,7 +216,7 @@ else
     _fail "reappear behavior wrong: $OUTPUT"
 fi
 
-# ─── Test Group 7: EOF + subsequent polls ───
+# ─── 测试组 7：EOF + 后续轮询 ───
 echo
 echo "Group 7: EOF marking is sticky"
 
@@ -242,7 +242,7 @@ else
     _fail "eof stickiness wrong: $OUTPUT"
 fi
 
-# ─── Test Group 8: Replay with Last-Event-Id ───
+# ─── 测试组 8：使用 Last-Event-Id 重放 ───
 echo
 echo "Group 8: Replay with Last-Event-Id"
 
@@ -288,7 +288,7 @@ else
     _fail "replay(0) result wrong: $OUTPUT"
 fi
 
-# Also verify out-of-window: directly invoke replay with id much smaller than oldest after window slides
+# 同时验证窗口外：直接调用 replay，id 远小于窗口滑动后的最旧 id
 OUTPUT_OW="$(_run_py "
 from log_streamer import LogStream, EVENT_RETENTION
 import os
@@ -313,12 +313,12 @@ else
     _fail "out-of-window replay wrong: $OUTPUT_OW"
 fi
 
-# ─── Test Group 9: Snapshot chunking at 64 KiB ───
+# ─── 测试组 9：64 KiB 快照分块 ───
 echo
 echo "Group 9: Snapshot chunking"
 
 BIGLOG="$CACHE_DIR/round-7-codex-run.log"
-# 130 KiB of bytes -> expect 3 snapshot chunks of (64,64,2) KiB
+# 130 KiB 字节 -> 期望 3 个快照块（64,64,2）KiB
 python3 -c "open('$BIGLOG','wb').write(b'x' * (130 * 1024))"
 
 OUTPUT="$(_run_py "
@@ -339,7 +339,7 @@ else
     _fail "chunking wrong: $OUTPUT"
 fi
 
-# ─── Test Group 10: Parser integration (cache_logs_for_session) ───
+# ─── 测试组 10：解析器集成（cache_logs_for_session）───
 echo
 echo "Group 10: parser.cache_logs_for_session"
 
@@ -348,7 +348,7 @@ SID="2026-04-17_99-99-99"
 mkdir -p "$PROJECT_ROOT/.humanize/rlcr/$SID"
 : > "$PROJECT_ROOT/.humanize/rlcr/$SID/state.md"
 
-# Need to seed cache logs at the rlcr_sources-derived path under XDG_CACHE_HOME
+# 需要在 XDG_CACHE_HOME 下的 rlcr_sources 派生路径中播种缓存日志
 PROJECT_CACHE_DIR="$TMP_DIR/cache_xdg/humanize/$(printf '%s' "$PROJECT_ROOT" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g')/$SID"
 mkdir -p "$PROJECT_CACHE_DIR"
 : > "$PROJECT_CACHE_DIR/round-0-codex-run.log"
@@ -379,7 +379,7 @@ else
     _fail "cache_logs_for_session ordering wrong: $OUTPUT"
 fi
 
-# ─── Test Group 11: Shared stream registry + reconnect semantics ───
+# ─── 测试组 11：共享流注册表 + 重连语义 ───
 echo
 echo "Group 11: LogStreamRegistry + reconnect semantics"
 
@@ -396,7 +396,7 @@ print('LEN_AFTER_DUP_KEY:', len(reg))
 s3 = reg.get_or_create('$CACHE_DIR', 'sid-B', 'round-8-codex-run.log')
 print('DIFFERENT:', s1 is not s3)
 print('LEN_AFTER_NEW_KEY:', len(reg))
-# streams_in_cache_dir returns both streams targeting the same basename
+# streams_in_cache_dir 返回两个目标为相同基名的流
 streams = reg.streams_in_cache_dir('$CACHE_DIR', 'round-8-codex-run.log')
 print('STREAMS_FOR_BASENAME:', len(streams))
 ")"
@@ -411,9 +411,9 @@ else
     _fail "registry sharing wrong: $OUTPUT"
 fi
 
-# Reconnect simulation: client saw events up through id=N; second
-# connection to the SAME registered stream with Last-Event-Id=N must
-# only receive events newer than N, never an `append` from offset 0.
+# 重连模拟：客户端看到 id=N 为止的事件；使用 Last-Event-Id=N
+# 对同一注册流的第二次连接必须只接收比 N 更新的事件，
+# 永远不会从偏移 0 收到 `append`。
 OUTPUT="$(_run_py "
 from log_streamer import LogStreamRegistry
 reg = LogStreamRegistry()
@@ -443,8 +443,8 @@ else
     _fail "reconnect semantics wrong: $OUTPUT"
 fi
 
-# Reconnect with Last-Event-Id from a DIFFERENT stream (unknown to this one)
-# must produce resync(overflow) + snapshot path, not append from offset 0.
+# 使用来自不同流的 Last-Event-Id 重连（对此流未知）
+# 必须产生 resync(overflow) + 快照路径，而不是从偏移 0 追加。
 OUTPUT="$(_run_py "
 from log_streamer import LogStreamRegistry, EVENT_RETENTION
 reg = LogStreamRegistry()
@@ -471,37 +471,33 @@ else
     _fail "out-of-window reconnect wrong: $OUTPUT"
 fi
 
-# ─── Idle stream eviction without follow-up release ───
-# Regression: a stream whose refcount drops to zero without EOF should
-# not survive forever when no subsequent release() ever fires. Sweeps
-# must also run on other registry interactions (acquire,
-# streams_in_cache_dir) so idle retention deques are reclaimed under
-# low-churn traffic.
+# ─── 无后续释放的空闲流驱逐 ───
+# 回归：引用计数降至零但没有 EOF 的流在没有后续 release()
+# 触发时不应永远存活。扫描也必须在其他注册表交互（acquire、
+# streams_in_cache_dir）上运行，以便在低流量下回收空闲保留队列。
 SWEEPLOG="$CACHE_DIR/round-9-codex-run.log"
 : > "$SWEEPLOG"
 
 OUTPUT="$(_run_py "
 import time
 from log_streamer import LogStreamRegistry
-# Use a non-zero TTL and rewind the recorded idle timestamp so the
-# next sweep observes the TTL as elapsed without real waiting. Reaching
-# into a private dict is acceptable in a white-box regression test:
-# the point is to verify which call-sites sweep, not real-time timing.
+# 使用非零 TTL 并回退记录的空闲时间戳，使下次扫描观察到
+# TTL 已过期而无需真实等待。在白盒回归测试中访问私有字典
+# 是可接受的：重点是验证哪些调用点执行扫描，而非实时计时。
 reg = LogStreamRegistry(idle_ttl_seconds=60.0)
-# Stream A: one-off disconnect, no EOF, no further release on the same key.
+# 流 A：一次性断开，无 EOF，同一键上无后续释放。
 reg.acquire('$CACHE_DIR', 'sid-sweep-A', 'round-9-codex-run.log')
 reg.release('sid-sweep-A', 'round-9-codex-run.log')
 print('A_PRESENT_BEFORE_SWEEP:', ('sid-sweep-A', 'round-9-codex-run.log') in reg)
-# Force A's idle_since far in the past so any subsequent sweep evicts it.
+# 强制 A 的 idle_since 远在过去，使任何后续扫描驱逐它。
 reg._idle_since[('sid-sweep-A', 'round-9-codex-run.log')] = time.monotonic() - 1e6
-# New acquire on a different session must trigger the sweep.
+# 不同会话上的新 acquire 必须触发扫描。
 reg.acquire('$CACHE_DIR', 'sid-sweep-B', 'round-9-codex-run.log')
 print('A_EVICTED_BY_ACQUIRE:', ('sid-sweep-A', 'round-9-codex-run.log') not in reg)
 print('B_PRESENT:', ('sid-sweep-B', 'round-9-codex-run.log') in reg)
 
-# Independent registry: verify streams_in_cache_dir() (invoked by the
-# cache watcher callback on every observed write) also evicts idle
-# streams even when no release() follows.
+# 独立注册表：验证 streams_in_cache_dir()（由缓存监视器回调
+# 在每次观察到写入时调用）也会驱逐空闲流，即使没有后续 release()。
 reg2 = LogStreamRegistry(idle_ttl_seconds=60.0)
 reg2.acquire('$CACHE_DIR', 'sid-sweep-C', 'round-9-codex-run.log')
 reg2.release('sid-sweep-C', 'round-9-codex-run.log')
@@ -519,7 +515,7 @@ else
     _fail "idle-stream sweep regression: $OUTPUT"
 fi
 
-# ─── Summary ───
+# ─── 总结 ───
 echo
 echo "========================================"
 printf 'Passed: \033[0;32m%d\033[0m\n' "$PASS_COUNT"

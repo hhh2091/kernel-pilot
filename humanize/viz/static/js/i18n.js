@@ -1,4 +1,4 @@
-/* UI labels — English only */
+/* UI 标签 — 仅英文 */
 
 const _LABELS = {
     'app.title': 'Humanize Viz',
@@ -78,7 +78,7 @@ function t(key) {
     return _LABELS[key] || key
 }
 
-// Content language selection from {zh, en} objects — prefer English
+// 从 {zh, en} 对象中选择内容语言 — 优先英文
 function selectLang(content) {
     if (!content) return null
     if (typeof content === 'string') return content
@@ -88,21 +88,19 @@ function selectLang(content) {
     return null
 }
 
-// Safe Markdown rendering — parse then sanitize to prevent XSS.
-// Fails closed to plain-text escape when the DOMPurify CDN dep isn't
-// loaded (offline, blocked by firewall, or a CSP that forbids
-// unpkg.com). The earlier implementation returned the raw
-// marked.parse() output in that case, which re-opens the XSS
-// surface the sanitizer was supposed to close — plan files, round
-// summaries, review results, methodology reports, and the Preview
-// Issue modal all feed markdown into the DOM through this helper.
+// 安全 Markdown 渲染 — 先解析再消毒以防止 XSS。
+// 当 DOMPurify CDN 依赖未加载时（离线、被防火墙阻止、
+// 或 CSP 禁止 unpkg.com），回退到纯文本转义。
+// 之前的实现在这种情况下返回原始的 marked.parse() 输出，
+// 这会重新打开消毒器本应关闭的 XSS 攻击面 — 计划文件、
+// 轮次摘要、审查结果、方法论报告和预览 Issue 模态框
+// 都通过此辅助函数将 markdown 注入 DOM。
 function safeMd(text) {
     if (!text) return ''
     if (typeof DOMPurify === 'undefined' || typeof marked === 'undefined') {
-        // Fall back to escaped plain text so a missing CDN dep is a
-        // visible degradation (monospace text) rather than a silent
-        // XSS foot-gun. Mirrors the _esc() round-trip that every
-        // attribute-level escape in app.js / pipeline.js uses.
+        // 回退到转义的纯文本，使缺失的 CDN 依赖成为可见的
+        // 降级（等宽文本）而不是无声的 XSS 隐患。镜像了
+        // app.js / pipeline.js 中每个属性级别转义使用的 _esc() 往返。
         const d = document.createElement('div')
         d.textContent = String(text)
         return `<pre style="white-space:pre-wrap;word-break:break-word;margin:0">${d.innerHTML}</pre>`

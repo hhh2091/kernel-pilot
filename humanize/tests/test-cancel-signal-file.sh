@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Tests for cancel-rlcr-loop signal file mechanism
+# cancel-rlcr-loop 信号文件机制测试
 #
-# Tests:
-# - POSITIVE: mv state.md to cancel-state.md allowed when signal file exists
-# - NEGATIVE: mv state.md to cancel-state.md blocked without signal file
-# - NEGATIVE: Other state.md modifications blocked even with signal file
-# - NEGATIVE: Signal file in wrong directory does not authorize cancel
+# 测试：
+# - 正向：信号文件存在时允许 mv state.md 到 cancel-state.md
+# - 反向：没有信号文件时阻止 mv state.md 到 cancel-state.md
+# - 反向：即使有信号文件也阻止其他 state.md 修改
+# - 反向：错误目录中的信号文件不授权取消
 #
 
 set -uo pipefail
@@ -14,7 +14,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Test helpers
+# 测试辅助函数
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -25,18 +25,18 @@ TESTS_FAILED=0
 pass() { echo -e "${GREEN}PASS${NC}: $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
 fail() { echo -e "${RED}FAIL${NC}: $1"; echo "  Expected: $2"; echo "  Got: $3"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
 
-# Setup test environment
+# 设置测试环境
 TEST_DIR=$(mktemp -d)
 trap "rm -rf $TEST_DIR" EXIT
 
-# Source the common library
+# 引入公共库
 source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
 
 echo "=== Test: Cancel Signal File Mechanism ==="
 echo ""
 
 # ========================================
-# Setup: Create test loop directory with state.md
+# 设置：创建带有 state.md 的测试循环目录
 # ========================================
 
 setup_test_loop() {
@@ -58,8 +58,8 @@ EOF
     export CLAUDE_PROJECT_DIR="$TEST_DIR"
 }
 
-# Helper to simulate hook validation
-# Uses jq to properly encode the command string (handles special chars like ${})
+# 模拟钩子验证的辅助函数
+# 使用 jq 正确编码命令字符串（处理特殊字符如 ${}）
 run_bash_validator() {
     local command="$1"
     local hook_input
@@ -74,7 +74,7 @@ run_bash_validator() {
 }
 
 # ========================================
-# POSITIVE TEST 1: mv allowed with signal file
+# 正向测试 1：有信号文件时允许 mv
 # ========================================
 
 echo "POSITIVE TEST 1: mv state.md to cancel-state.md allowed when signal file exists"
@@ -94,13 +94,13 @@ else
 fi
 
 # ========================================
-# POSITIVE TEST 2: mv allowed with different path format
+# 正向测试 2：不同路径格式时允许 mv
 # ========================================
 
 echo "POSITIVE TEST 2: mv allowed with relative-style path"
 setup_test_loop "positive-2"
 touch "$LOOP_DIR/.cancel-requested"
-# Use a command with ./ prefix to test slightly different path format
+# 使用带 ./ 前缀的命令测试略有不同的路径格式
 COMMAND="mv ${LOOP_DIR}/./state.md ${LOOP_DIR}/cancel-state.md"
 
 set +e
@@ -115,12 +115,12 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 1: mv blocked without signal file
+# 反向测试 1：没有信号文件时阻止 mv
 # ========================================
 
 echo "NEGATIVE TEST 1: mv state.md to cancel-state.md blocked without signal file"
 setup_test_loop "negative-1"
-# Do NOT create signal file
+# 不创建信号文件
 COMMAND="mv ${LOOP_DIR}/state.md ${LOOP_DIR}/cancel-state.md"
 
 set +e
@@ -135,7 +135,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 2: Other state.md modifications blocked even with signal
+# 反向测试 2：即使有信号文件也阻止其他 state.md 修改
 # ========================================
 
 echo "NEGATIVE TEST 2: echo > state.md blocked even with signal file"
@@ -155,7 +155,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 3: sed -i blocked even with signal
+# 反向测试 3：即使有信号也阻止 sed -i
 # ========================================
 
 echo "NEGATIVE TEST 3: sed -i state.md blocked even with signal file"
@@ -175,7 +175,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 4: mv to wrong destination blocked
+# 反向测试 4：mv 到错误目标被阻止
 # ========================================
 
 echo "NEGATIVE TEST 4: mv state.md to wrong destination blocked even with signal"
@@ -195,14 +195,14 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 5: Signal file in wrong directory
+# 反向测试 5：错误目录中的信号文件
 # ========================================
 
 echo "NEGATIVE TEST 5: Signal file in wrong directory does not authorize"
 setup_test_loop "negative-5"
-# Create signal file in WRONG directory (parent)
+# 在错误的目录（父目录）中创建信号文件
 touch "$TEST_DIR/.humanize/rlcr/.cancel-requested"
-# NOT in the active loop dir
+# 不在活跃循环目录中
 COMMAND="mv ${LOOP_DIR}/state.md ${LOOP_DIR}/cancel-state.md"
 
 set +e
@@ -217,7 +217,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 6: rm state.md blocked even with signal
+# 反向测试 6：即使有信号也阻止 rm state.md
 # ========================================
 
 echo "NEGATIVE TEST 6: rm state.md blocked even with signal file"
@@ -237,7 +237,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 7: Command injection attempt blocked
+# 反向测试 7：命令注入尝试被阻止
 # ========================================
 
 echo "NEGATIVE TEST 7: Command injection via && blocked even with signal"
@@ -257,7 +257,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 8: Command injection via ; blocked
+# 反向测试 8：通过 ; 的命令注入被阻止
 # ========================================
 
 echo "NEGATIVE TEST 8: Command injection via semicolon blocked even with signal"
@@ -277,7 +277,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 9: mv state.md to non-state.md destination blocked (BYPASS FIX)
+# 反向测试 9：mv state.md 到非 state.md 目标被阻止（绕过修复）
 # ========================================
 
 echo "NEGATIVE TEST 9: mv state.md to arbitrary destination blocked (even with signal)"
@@ -297,7 +297,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 10: Command substitution $() injection blocked
+# 反向测试 10：命令替换 $() 注入被阻止
 # ========================================
 
 echo "NEGATIVE TEST 10: Command substitution via \$() blocked even with signal"
@@ -317,7 +317,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 11: Backtick command substitution blocked
+# 反向测试 11：反引号命令替换被阻止
 # ========================================
 
 echo "NEGATIVE TEST 11: Backtick command substitution blocked even with signal"
@@ -337,15 +337,15 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 12: Newline-separated command injection blocked
+# 反向测试 12：换行符分隔的命令注入被阻止
 # ========================================
-# Note: Testing the is_cancel_authorized helper directly since JSON parsing
-# of literal newlines in command strings is not straightforward
+# 注意：直接测试 is_cancel_authorized 辅助函数，因为 JSON 解析
+# 命令字符串中的字面换行符并不简单
 
 echo "NEGATIVE TEST 12: Newline-separated command injection blocked in helper"
 setup_test_loop "negative-12"
 touch "$LOOP_DIR/.cancel-requested"
-# Command with embedded newline - test helper directly
+# 带有嵌入换行符的命令 - 直接测试辅助函数
 COMMAND_WITH_NEWLINE="mv ${LOOP_DIR}/state.md ${LOOP_DIR}/cancel-state.md
 rm -rf /"
 COMMAND_LOWER=$(to_lower "$COMMAND_WITH_NEWLINE")
@@ -357,15 +357,15 @@ else
 fi
 
 # ========================================
-# POSITIVE TEST 3: mv with single-quoted paths allowed
+# 正向测试 3：允许带单引号路径的 mv
 # ========================================
-# Test that paths with quotes work correctly
-# Note: We use single quotes here since double quotes break JSON parsing in the test harness
+# 测试带引号的路径是否正常工作
+# 注意：这里使用单引号，因为双引号会破坏测试工具中的 JSON 解析
 
 echo "POSITIVE TEST 3: mv with single-quoted paths allowed with signal"
 setup_test_loop "positive-3"
 touch "$LOOP_DIR/.cancel-requested"
-# Use single quotes around paths to test quoted path handling
+# 使用单引号包围路径以测试带引号路径处理
 COMMAND="mv '${LOOP_DIR}/state.md' '${LOOP_DIR}/cancel-state.md'"
 
 set +e
@@ -380,7 +380,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 13: mv with -- option blocked (state.md as source)
+# 反向测试 13：带 -- 选项的 mv 被阻止（state.md 作为源）
 # ========================================
 
 echo "NEGATIVE TEST 13: mv -- state.md /tmp/foo blocked (options before source)"
@@ -400,7 +400,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 14: cp -f state.md blocked (options before source)
+# 反向测试 14：cp -f state.md 被阻止（选项在源之前）
 # ========================================
 
 echo "NEGATIVE TEST 14: cp -f state.md /backup blocked (options before source)"
@@ -420,7 +420,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 15: mv with 3 args blocked (extra argument)
+# 反向测试 15：带 3 个参数的 mv 被阻止（额外参数）
 # ========================================
 
 echo "NEGATIVE TEST 15: mv state.md /tmp cancel-state.md blocked (3 args)"
@@ -440,20 +440,20 @@ else
 fi
 
 # ========================================
-# POSITIVE TEST 4: Literal $LOOP_DIR-style command allowed (documented format)
+# 正向测试 4：允许字面 $LOOP_DIR 风格命令（文档化格式）
 # ========================================
-# Tests the documented cancel command format with ${LOOP_DIR} variable syntax
-# The is_cancel_authorized function normalizes this to the actual path
-# IMPORTANT: We pass the literal ${loop_dir} string WITHOUT pre-expansion
-# to verify that normalization works correctly
+# 测试带有 ${LOOP_DIR} 变量语法的文档化取消命令格式
+# is_cancel_authorized 函数将其规范化为实际路径
+# 重要：我们传递字面 ${loop_dir} 字符串而不预展开，
+# 以验证规范化是否正确工作
 
 echo "POSITIVE TEST 4: Literal LOOP_DIR variable syntax allowed with signal (helper)"
 setup_test_loop "positive-4"
 touch "$LOOP_DIR/.cancel-requested"
-# Pass literal ${loop_dir} string to test normalization in is_cancel_authorized
-# Note: command_lower receives the lowercased variable name
+# 传递字面 ${loop_dir} 字符串以测试 is_cancel_authorized 中的规范化
+# 注意：command_lower 接收小写的变量名
 COMMAND_LOWER='mv "${loop_dir}state.md" "${loop_dir}cancel-state.md"'
-# DO NOT pre-expand - the helper should normalize ${loop_dir} to actual path
+# 不要预展开 - 辅助函数应该将 ${loop_dir} 规范化为实际路径
 
 if is_cancel_authorized "$LOOP_DIR" "$COMMAND_LOWER"; then
     pass "Literal LOOP_DIR variable syntax allowed (helper normalizes)"
@@ -462,16 +462,16 @@ else
 fi
 
 # ========================================
-# POSITIVE TEST 5: Literal LOOP_DIR through validator (documented format)
+# 正向测试 5：通过验证器的字面 LOOP_DIR（文档化格式）
 # ========================================
-# Tests the full validator flow with literal ${LOOP_DIR} variable syntax
-# This verifies the documented cancel command format works end-to-end
+# 使用字面 ${LOOP_DIR} 变量语法测试完整的验证器流程
+# 这验证了文档化的取消命令格式端到端工作
 
 echo "POSITIVE TEST 5: Literal LOOP_DIR through validator with signal"
 setup_test_loop "positive-5"
 touch "$LOOP_DIR/.cancel-requested"
-# Pass literal command with ${loop_dir} (lowercased for command_lower matching)
-# Note: run_bash_validator lowercases the command, so we use lowercase var name
+# 传递带有 ${loop_dir} 的字面命令（小写用于 command_lower 匹配）
+# 注意：run_bash_validator 将命令小写，因此我们使用小写变量名
 COMMAND='mv "${loop_dir}state.md" "${loop_dir}cancel-state.md"'
 
 set +e
@@ -486,9 +486,9 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 16: mv -- 'state.md' blocked (quoted relative path)
+# 反向测试 16：mv -- 'state.md' 被阻止（带引号的相对路径）
 # ========================================
-# Uses single quotes since double quotes break JSON parsing in test harness
+# 使用单引号，因为双引号会破坏测试工具中的 JSON 解析
 
 echo "NEGATIVE TEST 16: mv -- quoted relative state.md blocked"
 setup_test_loop "negative-16"
@@ -507,7 +507,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 17: Extra args before state.md blocked
+# 反向测试 17：state.md 之前的额外参数被阻止
 # ========================================
 
 echo "NEGATIVE TEST 17: mv /tmp/extra state.md cancel-state.md blocked (extra arg before)"
@@ -527,7 +527,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 18: Hidden variable like ${IFS} blocked
+# 反向测试 18：隐藏变量如 ${IFS} 被阻止
 # ========================================
 
 echo "NEGATIVE TEST 18: Hidden variable injection blocked"
@@ -546,7 +546,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 19: sudo mv state.md blocked (prefix bypass attempt)
+# 反向测试 19：sudo mv state.md 被阻止（前缀绕过尝试）
 # ========================================
 
 echo "NEGATIVE TEST 19: sudo mv state.md blocked (prefix bypass)"
@@ -566,7 +566,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 20: Leading whitespace mv state.md blocked
+# 反向测试 20：前导空格的 mv state.md 被阻止
 # ========================================
 
 echo "NEGATIVE TEST 20: Leading whitespace mv state.md blocked"
@@ -586,7 +586,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 21: env prefix mv state.md blocked
+# 反向测试 21：env 前缀的 mv state.md 被阻止
 # ========================================
 
 echo "NEGATIVE TEST 21: env prefix mv state.md blocked"
@@ -606,7 +606,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 22: sudo -u root mv state.md blocked (prefix with options)
+# 反向测试 22：sudo -u root mv state.md 被阻止（带选项的前缀）
 # ========================================
 
 echo "NEGATIVE TEST 22: sudo -u root mv state.md blocked (prefix with options)"
@@ -626,7 +626,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 23: command -- mv state.md blocked (prefix with options)
+# 反向测试 23：command -- mv state.md 被阻止（带选项的前缀）
 # ========================================
 
 echo "NEGATIVE TEST 23: command -- mv state.md blocked (prefix with options)"
@@ -646,7 +646,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 24: Chained command via semicolon blocked
+# 反向测试 24：通过分号链接的命令被阻止
 # ========================================
 
 echo "NEGATIVE TEST 24: true; mv state.md blocked (chained via semicolon)"
@@ -666,7 +666,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 25: Chained command via && blocked
+# 反向测试 25：通过 && 链接的命令被阻止
 # ========================================
 
 echo "NEGATIVE TEST 25: true && mv state.md blocked (chained via &&)"
@@ -686,7 +686,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 26: Chained command via || blocked
+# 反向测试 26：通过 || 链接的命令被阻止
 # ========================================
 
 echo "NEGATIVE TEST 26: false || mv state.md blocked (chained via ||)"
@@ -706,7 +706,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 27: Chained command via pipe blocked
+# 反向测试 27：通过管道链接的命令被阻止
 # ========================================
 
 echo "NEGATIVE TEST 27: echo foo | mv state.md blocked (chained via pipe)"
@@ -726,7 +726,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 28: Background operator & bypass blocked
+# 反向测试 28：后台运算符 & 绕过被阻止
 # ========================================
 
 echo "NEGATIVE TEST 28: true & mv state.md blocked (background operator)"
@@ -746,7 +746,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 29: Background & without trailing space (true& mv)
+# 反向测试 29：无尾部空格的后台 &（true& mv）
 # ========================================
 
 echo "NEGATIVE TEST 29: true& mv state.md blocked (no trailing space after &)"
@@ -766,7 +766,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 30: Background & without leading space (true &mv)
+# 反向测试 30：无前导空格的后台 &（true &mv）
 # ========================================
 
 echo "NEGATIVE TEST 30: true &mv state.md blocked (no leading space before &)"
@@ -786,7 +786,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 31: Pipe+stderr |& bypass blocked
+# 反向测试 31：管道+stderr |& 绕过被阻止
 # ========================================
 
 echo "NEGATIVE TEST 31: echo foo |& mv state.md blocked (pipe+stderr)"
@@ -806,7 +806,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 32: sh -c wrapper bypass blocked
+# 反向测试 32：sh -c 包装器绕过被阻止
 # ========================================
 
 echo "NEGATIVE TEST 32: sh -c wrapper bypass blocked"
@@ -826,7 +826,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 33: bash -c wrapper bypass blocked
+# 反向测试 33：bash -c 包装器绕过被阻止
 # ========================================
 
 echo "NEGATIVE TEST 33: bash -c wrapper bypass blocked"
@@ -846,7 +846,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 34: Redirection-prefixed mv state.md blocked (2>/tmp/x mv)
+# 反向测试 34：重定向前缀的 mv state.md 被阻止（2>/tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 34: 2>/tmp/x mv state.md blocked (redirection prefix)"
@@ -866,7 +866,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 35: Redirection-prefixed mv state.md blocked (>/tmp/x mv)
+# 反向测试 35：重定向前缀的 mv state.md 被阻止（>/tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 35: >/tmp/x mv state.md blocked (redirection prefix)"
@@ -886,7 +886,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 36: Redirection-prefixed mv state.md blocked (2>&1 mv)
+# 反向测试 36：重定向前缀的 mv state.md 被阻止（2>&1 mv）
 # ========================================
 
 echo "NEGATIVE TEST 36: 2>&1 mv state.md blocked (fd redirection prefix)"
@@ -906,7 +906,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 37: Spaced redirection-prefixed mv state.md blocked (2> /tmp/x mv)
+# 反向测试 37：带空格的重定向前缀的 mv state.md 被阻止（2> /tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 37: 2> /tmp/x mv state.md blocked (spaced redirection)"
@@ -926,7 +926,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 38: &> redirection-prefixed mv state.md blocked (&>/tmp/x mv)
+# 反向测试 38：&> 重定向前缀的 mv state.md 被阻止（&>/tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 38: &>/tmp/x mv state.md blocked (&> redirection)"
@@ -946,7 +946,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 39: Spaced &> redirection-prefixed mv state.md blocked (&> /tmp/x mv)
+# 反向测试 39：带空格的 &> 重定向前缀的 mv state.md 被阻止（&> /tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 39: &> /tmp/x mv state.md blocked (spaced &> redirection)"
@@ -966,7 +966,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 40: Append redirection-prefixed mv state.md blocked (>>/tmp/x mv)
+# 反向测试 40：追加重定向前缀的 mv state.md 被阻止（>>/tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 40: >>/tmp/x mv state.md blocked (append redirection)"
@@ -986,7 +986,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 41: Spaced append redirection-prefixed mv state.md blocked (>> /tmp/x mv)
+# 反向测试 41：带空格的追加重定向前缀的 mv state.md 被阻止（>> /tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 41: >> /tmp/x mv state.md blocked (spaced append redirection)"
@@ -1006,7 +1006,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 42: Stderr append redirection-prefixed mv state.md blocked (2>> /tmp/x mv)
+# 反向测试 42：stderr 追加重定向前缀的 mv state.md 被阻止（2>> /tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 42: 2>> /tmp/x mv state.md blocked (stderr append redirection)"
@@ -1026,7 +1026,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 43: Double-quoted redirection target blocked (>> "/tmp/x y" mv)
+# 反向测试 43：双引号重定向目标被阻止（>> "/tmp/x y" mv）
 # ========================================
 
 echo "NEGATIVE TEST 43: >> \"/tmp/x y\" mv state.md blocked (double-quoted target)"
@@ -1046,7 +1046,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 44: Single-quoted redirection target blocked (>> '/tmp/x y' mv)
+# 反向测试 44：单引号重定向目标被阻止（>> '/tmp/x y' mv）
 # ========================================
 
 echo "NEGATIVE TEST 44: >> '/tmp/x y' mv state.md blocked (single-quoted target)"
@@ -1066,7 +1066,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 45: Double-quoted &> redirection target blocked (&> "/tmp/x y" mv)
+# 反向测试 45：双引号 &> 重定向目标被阻止（&> "/tmp/x y" mv）
 # ========================================
 
 echo "NEGATIVE TEST 45: &> \"/tmp/x y\" mv state.md blocked (double-quoted &> target)"
@@ -1086,7 +1086,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 46: &>> spaced target blocked (&>> /tmp/x mv)
+# 反向测试 46：&>> 带空格目标被阻止（&>> /tmp/x mv）
 # ========================================
 
 echo "NEGATIVE TEST 46: &>> /tmp/x mv state.md blocked (&>> spaced target)"
@@ -1106,7 +1106,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 47: Escaped-space redirection target blocked (>> /tmp/x\ y mv)
+# 反向测试 47：转义空格重定向目标被阻止（>> /tmp/x\ y mv）
 # ========================================
 
 echo "NEGATIVE TEST 47: >> /tmp/x\\ y mv state.md blocked (escaped-space target)"
@@ -1126,7 +1126,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 48: &>> with escaped-space target blocked (&>> /tmp/x\ y mv)
+# 反向测试 48：带转义空格目标的 &>> 被阻止（&>> /tmp/x\ y mv）
 # ========================================
 
 echo "NEGATIVE TEST 48: &>> /tmp/x\\ y mv state.md blocked (&>> escaped-space target)"
@@ -1146,7 +1146,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 49: ANSI-C quoting redirection target blocked (>> $'/tmp/x y' mv)
+# 反向测试 49：ANSI-C 引用重定向目标被阻止（>> $'/tmp/x y' mv）
 # ========================================
 
 echo "NEGATIVE TEST 49: >> \$'/tmp/x y' mv state.md blocked (ANSI-C quoting)"
@@ -1166,7 +1166,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 50: ANSI-C quoting &> redirection target blocked (&> $'/tmp/x y' mv)
+# 反向测试 50：ANSI-C 引用 &> 重定向目标被阻止（&> $'/tmp/x y' mv）
 # ========================================
 
 echo "NEGATIVE TEST 50: &> \$'/tmp/x y' mv state.md blocked (ANSI-C quoting &>)"
@@ -1186,7 +1186,7 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 51: ANSI-C quoting &>> redirection target blocked (&>> $'/tmp/x y' mv)
+# 反向测试 51：ANSI-C 引用 &>> 重定向目标被阻止（&>> $'/tmp/x y' mv）
 # ========================================
 
 echo "NEGATIVE TEST 51: &>> \$'/tmp/x y' mv state.md blocked (ANSI-C quoting &>>)"
@@ -1206,13 +1206,13 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 52: Unrelated state.md path blocked even with signal
+# 反向测试 52：即使有信号也阻止无关的 state.md 路径
 # ========================================
 
 echo "NEGATIVE TEST 52: mv /tmp/state.md /tmp/cancel-state.md blocked (wrong directory)"
 setup_test_loop "negative-52"
 touch "$LOOP_DIR/.cancel-requested"
-# Try to move a state.md outside the active loop dir - should be blocked
+# 尝试移动活跃循环目录外的 state.md - 应该被阻止
 COMMAND="mv /tmp/state.md /tmp/cancel-state.md"
 
 set +e
@@ -1227,14 +1227,14 @@ else
 fi
 
 # ========================================
-# NEGATIVE TEST 53: No active loop (no state.md)
+# 反向测试 53：无活跃循环（无 state.md）
 # ========================================
 
 echo "NEGATIVE TEST 53: Validator allows commands when no active loop"
 rm -rf "$TEST_DIR/.humanize" 2>/dev/null || true
 LOOP_DIR="$TEST_DIR/.humanize/rlcr/2024-01-01_12-00-00"
 mkdir -p "$LOOP_DIR"
-# No state.md created - loop is not active
+# 未创建 state.md - 循环不活跃
 COMMAND="mv ${LOOP_DIR}/state.md ${LOOP_DIR}/cancel-state.md"
 
 set +e
@@ -1249,14 +1249,14 @@ else
 fi
 
 # ========================================
-# Test is_cancel_authorized helper function
+# 测试 is_cancel_authorized 辅助函数
 # ========================================
 
 echo ""
 echo "=== Test: is_cancel_authorized Helper Function ==="
 echo ""
 
-# Test helper directly
+# 直接测试辅助函数
 echo "HELPER TEST 1: is_cancel_authorized returns true with signal and correct command"
 setup_test_loop "helper-1"
 touch "$LOOP_DIR/.cancel-requested"
@@ -1271,7 +1271,7 @@ fi
 
 echo "HELPER TEST 2: is_cancel_authorized returns false without signal file"
 setup_test_loop "helper-2"
-# No signal file
+# 没有信号文件
 COMMAND_LOWER="mv ${LOOP_DIR}/state.md ${LOOP_DIR}/cancel-state.md"
 COMMAND_LOWER=$(to_lower "$COMMAND_LOWER")
 
@@ -1332,7 +1332,7 @@ fi
 echo "HELPER TEST 7: is_cancel_authorized rejects hidden variables"
 setup_test_loop "helper-7"
 touch "$LOOP_DIR/.cancel-requested"
-# Command with a sneaky ${ifs} variable
+# 带有狡猾的 ${ifs} 变量的命令
 COMMAND_LOWER="mv ${LOOP_DIR}/state.md\${ifs}extra ${LOOP_DIR}/cancel-state.md"
 COMMAND_LOWER=$(to_lower "$COMMAND_LOWER")
 
@@ -1419,7 +1419,7 @@ fi
 rm -f "$TEST_DIR/src-alias"
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 
 echo ""

@@ -1,57 +1,56 @@
 #!/usr/bin/env bash
 #
-# Methodology Analysis Phase library
+# 方法论分析阶段库
 #
-# Provides functions for the methodology improvement analysis phase that runs
-# before the RLCR loop truly exits. An independent Opus agent analyzes the
-# development records from a pure methodology perspective and optionally helps
-# the user file a GitHub issue with improvement suggestions.
+# 为在 RLCR 循环真正退出之前运行的方法论改进分析阶段提供函数。
+# 一个独立的 Opus 代理从纯方法论角度分析开发记录，
+# 并可选地帮助用户提交带有改进建议的 GitHub issue。
 #
-# This library is sourced by loop-codex-stop-hook.sh.
+# 此库由 loop-codex-stop-hook.sh 源码引入。
 #
 
-# Source guard: prevent double-sourcing
+# 源码守卫：防止重复源码引入
 [[ -n "${_METHODOLOGY_ANALYSIS_LOADED:-}" ]] && return 0 2>/dev/null || true
 _METHODOLOGY_ANALYSIS_LOADED=1
 
-# Enter the methodology analysis phase
+# 进入方法论分析阶段
 #
-# Renames the current state file to methodology-analysis-state.md, records the
-# exit reason, renders the analysis prompt, and outputs a block JSON response.
+# 将当前状态文件重命名为 methodology-analysis-state.md，记录退出原因，
+# 渲染分析提示，并输出阻止 JSON 响应。
 #
-# Arguments:
-#   $1 - exit_reason: "complete", "stop", or "maxiter"
-#   $2 - exit_reason_description: human-readable explanation of why the loop is exiting
+# 参数：
+#   $1 - exit_reason："complete"、"stop" 或 "maxiter"
+#   $2 - exit_reason_description：循环退出原因的人类可读解释
 #
-# Globals read:
-#   PRIVACY_MODE - "true" to skip analysis, "false" to proceed
-#   STATE_FILE   - path to the current active state file
-#   LOOP_DIR     - path to the loop directory
-#   CURRENT_ROUND - current round number
-#   MAX_ITERATIONS - max iterations setting
-#   TEMPLATE_DIR - template directory for prompt rendering
+# 读取的全局变量：
+#   PRIVACY_MODE - "true" 跳过分析，"false" 继续
+#   STATE_FILE   - 当前活跃状态文件的路径
+#   LOOP_DIR     - 循环目录的路径
+#   CURRENT_ROUND - 当前轮次编号
+#   MAX_ITERATIONS - 最大迭代次数设置
+#   TEMPLATE_DIR - 提示渲染的模板目录
 #
-# Returns:
-#   0 - analysis phase entered, block JSON has been output, caller should exit 0
-#   1 - analysis should be skipped (privacy on, already done, or re-entry)
+# 返回：
+#   0 - 已进入分析阶段，阻止 JSON 已输出，调用者应退出 0
+#   1 - 应跳过分析（隐私开启、已完成或重新进入）
 #
 enter_methodology_analysis_phase() {
     local exit_reason="$1"
     local exit_reason_description="$2"
 
-    # Skip if privacy mode is on
+    # 如果隐私模式开启则跳过
     if [[ "$PRIVACY_MODE" == "true" ]]; then
         echo "Methodology analysis skipped (privacy mode enabled)" >&2
         return 1
     fi
 
-    # Prevent re-entry: if methodology-analysis-state.md already exists, skip
+    # 防止重新进入：如果 methodology-analysis-state.md 已存在则跳过
     if [[ -f "$LOOP_DIR/methodology-analysis-state.md" ]]; then
         echo "Methodology analysis phase already active, skipping re-entry" >&2
         return 1
     fi
 
-    # Skip if already completed in a previous attempt
+    # 如果在先前的尝试中已完成则跳过
     if [[ -f "$LOOP_DIR/methodology-analysis-done.md" ]]; then
         local done_content
         done_content=$(cat "$LOOP_DIR/methodology-analysis-done.md" 2>/dev/null || echo "")
@@ -61,17 +60,17 @@ enter_methodology_analysis_phase() {
         fi
     fi
 
-    # Rename current state file to methodology-analysis-state.md
+    # 将当前状态文件重命名为 methodology-analysis-state.md
     mv "$STATE_FILE" "$LOOP_DIR/methodology-analysis-state.md"
     echo "State file renamed to: $LOOP_DIR/methodology-analysis-state.md" >&2
 
-    # Record the original exit reason so the completion handler can finalize
+    # 记录原始退出原因，以便完成处理器可以最终确定
     echo "$exit_reason" > "$LOOP_DIR/.methodology-exit-reason"
 
-    # Create empty placeholder for the completion artifact
+    # 为完成产物创建空占位符
     touch "$LOOP_DIR/methodology-analysis-done.md"
 
-    # Render prompt template
+    # 渲染提示模板
     local fallback="# Methodology Analysis Phase
 
 Please analyze the development records in $LOOP_DIR and provide methodology improvement suggestions.
@@ -86,7 +85,7 @@ When done, write a completion note to $LOOP_DIR/methodology-analysis-done.md."
         "CURRENT_ROUND=$CURRENT_ROUND" \
         "MAX_ITERATIONS=$MAX_ITERATIONS")
 
-    # Output block JSON with the rendered prompt
+    # 输出带有渲染提示的阻止 JSON
     jq -n \
         --arg reason "$analysis_prompt" \
         --arg msg "Loop: Methodology Analysis Phase - analyzing development methodology" \
@@ -99,37 +98,37 @@ When done, write a completion note to $LOOP_DIR/methodology-analysis-done.md."
     return 0
 }
 
-# Complete the methodology analysis phase
+# 完成方法论分析阶段
 #
-# Checks the completion artifact, reads the original exit reason, renames the
-# state file to the appropriate terminal state, and cleans up marker files.
+# 检查完成产物，读取原始退出原因，将状态文件重命名为适当的终端状态，
+# 并清理标记文件。
 #
-# Globals read:
-#   LOOP_DIR - path to the loop directory
+# 读取的全局变量：
+#   LOOP_DIR - 循环目录的路径
 #
-# Returns:
-#   0 - completion successful, caller should exit 0 (allow exit)
-#   1 - incomplete (done marker missing/empty, report missing, or exit reason invalid)
+# 返回：
+#   0 - 完成成功，调用者应退出 0（允许退出）
+#   1 - 未完成（done 标记缺失/为空、报告缺失或退出原因无效）
 #
 complete_methodology_analysis() {
     local done_file="$LOOP_DIR/methodology-analysis-done.md"
     local report_file="$LOOP_DIR/methodology-analysis-report.md"
 
-    # Check completion artifact has actual content (not just empty placeholder)
+    # 检查完成产物是否有实际内容（不仅仅是空占位符）
     if [[ ! -f "$done_file" ]]; then
         return 1
     fi
 
     local done_content
     done_content=$(cat "$done_file" 2>/dev/null || echo "")
-    # Trim whitespace to reject whitespace-only markers
+    # 修剪空白以拒绝仅空白的标记
     done_content="${done_content#"${done_content%%[![:space:]]*}"}"
     if [[ -z "$done_content" ]]; then
         return 1
     fi
 
-    # Require the analysis report to exist with content (ensures the Opus agent
-    # actually produced an analysis, not just an empty/truncated file)
+    # 要求分析报告存在且有内容（确保 Opus 代理实际产生了分析，
+    # 而不是空的/截断的文件）
     if [[ ! -f "$report_file" ]]; then
         echo "Warning: methodology-analysis-report.md missing, blocking completion" >&2
         return 1
@@ -142,7 +141,7 @@ complete_methodology_analysis() {
         return 1
     fi
 
-    # Read exit reason (fail closed: missing marker blocks completion)
+    # 读取退出原因（关闭失败：缺失标记阻止完成）
     if [[ ! -f "$LOOP_DIR/.methodology-exit-reason" ]]; then
         echo "Error: .methodology-exit-reason marker missing, cannot determine terminal state" >&2
         return 1
@@ -152,7 +151,7 @@ complete_methodology_analysis() {
     exit_reason=$(cat "$LOOP_DIR/.methodology-exit-reason" 2>/dev/null || echo "")
     exit_reason=$(echo "$exit_reason" | tr -d '[:space:]')
 
-    # Validate exit reason (fail closed on invalid values)
+    # 验证退出原因（对无效值关闭失败）
     case "$exit_reason" in
         complete|stop|maxiter)
             ;;
@@ -162,19 +161,18 @@ complete_methodology_analysis() {
             ;;
     esac
 
-    # Validation complete. The caller (stop hook) is responsible for renaming
-    # methodology-analysis-state.md to the terminal state and cleaning up
-    # .methodology-exit-reason AFTER the git-clean gate passes, so the active
-    # state file remains in place until cleanliness is confirmed.
+    # 验证完成。调用者（stop hook）负责在 git 清洁门控通过后
+    # 将 methodology-analysis-state.md 重命名为终端状态并清理
+    # .methodology-exit-reason，以便活跃状态文件在确认清洁之前保持原位。
     return 0
 }
 
-# Block exit because methodology analysis is incomplete
+# 因方法论分析未完成而阻止退出
 #
-# Outputs a block JSON instructing Claude to complete the analysis before exiting.
+# 输出阻止 JSON 指示 Claude 在退出前完成分析。
 #
-# Globals read:
-#   LOOP_DIR - path to the loop directory
+# 读取的全局变量：
+#   LOOP_DIR - 循环目录的路径
 #
 block_methodology_analysis_incomplete() {
     local done_file="$LOOP_DIR/methodology-analysis-done.md"

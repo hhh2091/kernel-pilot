@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# monitor-common.sh - Shared utilities for humanize monitor functions
+# monitor-common.sh - humanize 监控函数的共享工具
 #
-# This file contains common functions used by humanize monitor functions.
-# It should be sourced by humanize.sh rather than executed directly.
+# 此文件包含 humanize 监控函数使用的通用函数。
+# 它应该由 humanize.sh 导入，而不是直接执行。
 
 # ========================================
-# ANSI Color Constants
+# ANSI 颜色常量
 # ========================================
 
-# These are defined as functions to allow dynamic evaluation
-# (some terminals may not support all colors)
+# 这些定义为函数以允许动态求值
+# （某些终端可能不支持所有颜色）
 monitor_color_green() { echo "\033[1;32m"; }
 monitor_color_yellow() { echo "\033[1;33m"; }
 monitor_color_cyan() { echo "\033[1;36m"; }
@@ -23,20 +23,20 @@ monitor_color_dim() { echo "\033[2m"; }
 monitor_color_blue() { echo "\033[1;34m"; }
 
 # ========================================
-# File Utilities
+# 文件工具
 # ========================================
 
-# Get file size (cross-platform: Linux uses -c%s, macOS uses -f%z)
-# Usage: monitor_get_file_size "/path/to/file"
-# Returns: file size in bytes, or 0 if file doesn't exist
+# 获取文件大小（跨平台: Linux 使用 -c%s, macOS 使用 -f%z）
+# 用法: monitor_get_file_size "/path/to/file"
+# 返回: 文件大小（字节），如果文件不存在则返回 0
 monitor_get_file_size() {
     local file="$1"
     stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo 0
 }
 
-# Find latest directory by timestamp name pattern (YYYY-MM-DD_HH-MM-SS)
-# Usage: monitor_find_latest_session "/path/to/loop/dir"
-# Returns: path to latest session directory, or empty string if none found
+# 按时间戳名称模式（YYYY-MM-DD_HH-MM-SS）查找最新目录
+# 用法: monitor_find_latest_session "/path/to/loop/dir"
+# 返回: 最新会话目录的路径，如果未找到则返回空字符串
 monitor_find_latest_session() {
     local loop_dir="$1"
     local latest_session=""
@@ -46,7 +46,7 @@ monitor_find_latest_session() {
         return
     fi
 
-    # Use find instead of glob to avoid zsh "no matches found" errors
+    # 使用 find 代替 glob 以避免 zsh 的 "no matches found" 错误
     while IFS= read -r session_dir; do
         [[ -z "$session_dir" ]] && continue
         [[ ! -d "$session_dir" ]] && continue
@@ -63,50 +63,50 @@ monitor_find_latest_session() {
 }
 
 # ========================================
-# Terminal Utilities
+# 终端工具
 # ========================================
 
-# Setup terminal for split view with fixed header
-# Usage: monitor_setup_terminal <header_height>
+# 设置带有固定表头的分屏视图终端
+# 用法: monitor_setup_terminal <header_height>
 monitor_setup_terminal() {
     local header_height="$1"
 
-    # Clear screen
+    # 清屏
     clear
 
-    # Set scroll region (leave top lines for status bar)
+    # 设置滚动区域（为状态栏留出顶部行）
     printf "\033[${header_height};%dr" $(tput lines)
 
-    # Move cursor to scroll region
+    # 将光标移动到滚动区域
     tput cup "$header_height" 0
 }
 
-# Restore terminal to normal state
-# Usage: monitor_restore_terminal
+# 恢复终端到正常状态
+# 用法: monitor_restore_terminal
 monitor_restore_terminal() {
-    # Reset scroll region to full screen
+    # 重置滚动区域到全屏
     printf "\033[r"
 
-    # Move to bottom
+    # 移动到底部
     tput cup $(tput lines) 0
 }
 
 # ========================================
-# Signal Handling
+# 信号处理
 # ========================================
 
-# Setup signal handlers for clean Ctrl+C handling
-# This function should be called with the cleanup function name as argument
+# 设置信号处理器以实现干净的 Ctrl+C 处理
+# 此函数应以清理函数名作为参数调用
 #
-# Usage: monitor_setup_signal_handlers "cleanup_function_name"
+# 用法: monitor_setup_signal_handlers "cleanup_function_name"
 #
-# The cleanup function should:
-# 1. Set a cleanup_done flag to prevent multiple calls
-# 2. Set monitor_running=false to stop loops
-# 3. Kill any background processes
-# 4. Restore terminal state
+# 清理函数应该:
+# 1. 设置 cleanup_done 标志以防止多次调用
+# 2. 设置 monitor_running=false 以停止循环
+# 3. 终止任何后台进程
+# 4. 恢复终端状态
 #
-# Example cleanup function:
+# 示例清理函数:
 #   _cleanup() {
 #       [[ "$cleanup_done" == "true" ]] && return
 #       cleanup_done=true
@@ -117,16 +117,15 @@ monitor_restore_terminal() {
 #       echo "Stopped."
 #   }
 #
-# Note: This function is a documentation reference. The actual signal
-# setup should be done inline in each monitor function for proper scope
-# handling of local variables (cleanup_done, monitor_running, etc.)
+# 注意: 此函数是文档参考。实际的信号设置应在每个监控函数中内联完成，
+# 以正确处理局部变量的作用域（cleanup_done、monitor_running 等）。
 
 # ========================================
-# Status Color Helper
+# 状态颜色辅助函数
 # ========================================
 
-# Get color code for loop status
-# Usage: color=$(monitor_get_status_color "active")
+# 获取循环状态的颜色代码
+# 用法: color=$(monitor_get_status_color "active")
 monitor_get_status_color() {
     local status="$1"
     case "$status" in
@@ -141,16 +140,16 @@ monitor_get_status_color() {
 }
 
 # ========================================
-# State File Detection
+# 状态文件检测
 # ========================================
 
-# Find state file in session directory
-# Returns: state_file_path|loop_status
-# - If state.md exists: returns "path/state.md|active"
-# - If <STOP_REASON>-state.md exists: returns "path/<file>|<stop_reason>"
-# - If no state file found: returns "|unknown"
+# 在会话目录中查找状态文件
+# 返回: state_file_path|loop_status
+# - 如果 state.md 存在: 返回 "path/state.md|active"
+# - 如果 <STOP_REASON>-state.md 存在: 返回 "path/<file>|<stop_reason>"
+# - 如果未找到状态文件: 返回 "|unknown"
 #
-# Usage: monitor_find_state_file "/path/to/session"
+# 用法: monitor_find_state_file "/path/to/session"
 monitor_find_state_file() {
     local session_dir="$1"
 
@@ -159,7 +158,7 @@ monitor_find_state_file() {
         return
     fi
 
-    # Priority 1: Active state files indicate running loop
+    # 优先级 1: 活跃状态文件表示正在运行的循环
     if [[ -f "$session_dir/methodology-analysis-state.md" ]]; then
         echo "$session_dir/methodology-analysis-state.md|methodology-analysis"
         return
@@ -169,15 +168,15 @@ monitor_find_state_file() {
         return
     fi
 
-    # Priority 2: Look for <STOP_REASON>-state.md files
-    # Common stop reasons: completed, failed, cancelled, timeout, error, approve, maxiter
+    # 优先级 2: 查找 <STOP_REASON>-state.md 文件
+    # 常见的停止原因: completed, failed, cancelled, timeout, error, approve, maxiter
     local state_file=""
     local stop_reason=""
     while IFS= read -r f; do
         [[ -z "$f" ]] && continue
         if [[ -f "$f" ]]; then
             state_file="$f"
-            # Extract stop reason from filename (e.g., "completed-state.md" -> "completed")
+            # 从文件名中提取停止原因（例如 "completed-state.md" -> "completed"）
             local basename=$(basename "$f")
             stop_reason="${basename%-state.md}"
             break
@@ -192,33 +191,33 @@ monitor_find_state_file() {
 }
 
 # ========================================
-# YAML Frontmatter Parsing
+# YAML Frontmatter 解析
 # ========================================
 
-# Extract a value from YAML frontmatter
-# Usage: monitor_get_yaml_value "key" "/path/to/file.md"
-# Returns: The value, or empty string if not found
+# 从 YAML frontmatter 中提取值
+# 用法: monitor_get_yaml_value "key" "/path/to/file.md"
+# 返回: 值，如果未找到则返回空字符串
 monitor_get_yaml_value() {
     local key="$1"
     local file="$2"
 
     [[ ! -f "$file" ]] && return
 
-    # Extract frontmatter (between first and second ---)
+    # 提取 frontmatter（在第一个和第二个 --- 之间）
     local frontmatter
     frontmatter=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$file" 2>/dev/null)
 
-    # Extract value for key
+    # 提取键的值
     echo "$frontmatter" | grep -E "^${key}:" | sed "s/${key}: *//" | tr -d '"'
 }
 
 # ========================================
-# Progress Display Helpers
+# 进度显示辅助函数
 # ========================================
 
-# Format a timestamp for display
-# Converts ISO format (2026-01-18T10:00:00Z) to readable format
-# Usage: monitor_format_timestamp "2026-01-18T10:00:00Z"
+# 格式化时间戳以供显示
+# 将 ISO 格式（2026-01-18T10:00:00Z）转换为可读格式
+# 用法: monitor_format_timestamp "2026-01-18T10:00:00Z"
 monitor_format_timestamp() {
     local timestamp="$1"
 
@@ -227,13 +226,13 @@ monitor_format_timestamp() {
         return
     fi
 
-    # Convert ISO format to more readable format
+    # 将 ISO 格式转换为更可读的格式
     echo "$timestamp" | sed 's/T/ /; s/Z/ UTC/'
 }
 
-# Truncate a string for display, adding ellipsis
-# Usage: monitor_truncate_string "long string" <max_length> <direction>
-# direction: "start" (keep end) or "end" (keep start, default)
+# 截断字符串以供显示，添加省略号
+# 用法: monitor_truncate_string "long string" <max_length> <direction>
+# direction: "start"（保留末尾）或 "end"（保留开头，默认）
 monitor_truncate_string() {
     local str="$1"
     local max_len="$2"
@@ -245,23 +244,23 @@ monitor_truncate_string() {
     fi
 
     if [[ "$direction" == "start" ]]; then
-        # Keep end, truncate start
+        # 保留末尾，截断开头
         local suffix_len=$((max_len - 3))
         echo "...${str: -$suffix_len}"
     else
-        # Keep start, truncate end
+        # 保留开头，截断末尾
         local prefix_len=$((max_len - 3))
         echo "${str:0:$prefix_len}..."
     fi
 }
 
 # ========================================
-# Goal Tracker Parsing
+# 目标跟踪器解析
 # ========================================
 
-# Parse issue breakdown from goal-tracker.md
-# Returns: blocking_issues|queued_issues|open_issues
-# Usage: parse_goal_tracker_issue_counts "/path/to/goal-tracker.md"
+# 从 goal-tracker.md 解析问题分解
+# 返回: blocking_issues|queued_issues|open_issues
+# 用法: parse_goal_tracker_issue_counts "/path/to/goal-tracker.md"
 parse_goal_tracker_issue_counts() {
     local tracker_file="$1"
     if [[ ! -f "$tracker_file" ]]; then
@@ -294,9 +293,9 @@ parse_goal_tracker_issue_counts() {
     echo "${blocking_issues}|${queued_issues}|${open_issues}"
 }
 
-# Parse goal-tracker.md and return summary values
-# Returns: total_acs|completed_acs|active_tasks|completed_tasks|deferred_tasks|open_issues|goal_summary
-# Usage: parse_goal_tracker "/path/to/goal-tracker.md"
+# 解析 goal-tracker.md 并返回摘要值
+# 返回: total_acs|completed_acs|active_tasks|completed_tasks|deferred_tasks|open_issues|goal_summary
+# 用法: parse_goal_tracker "/path/to/goal-tracker.md"
 parse_goal_tracker() {
     local tracker_file="$1"
     if [[ ! -f "$tracker_file" ]]; then
@@ -304,7 +303,7 @@ parse_goal_tracker() {
         return
     fi
 
-    # Helper: count data rows in a markdown table section (total rows minus header and separator)
+    # 辅助函数：计算 markdown 表格部分的数据行数（总行数减去表头和分隔符）
     _count_table_rows() {
         local start_pattern="$1"
         local end_pattern="$2"
@@ -314,14 +313,14 @@ parse_goal_tracker() {
         echo $((row_count > 2 ? row_count - 2 : 0))
     }
 
-    # Count Acceptance Criteria (supports both table and list formats)
-    # Stop at next section header (##) to avoid counting ACs from other sections
+    # 统计验收标准（支持表格和列表格式）
+    # 在下一个章节标题（##）处停止，以避免计算其他部分的 AC
     local total_acs
     total_acs=$(sed -n '/### Acceptance Criteria/,/^##/p' "$tracker_file" \
         | grep -cE '(^\|\s*\*{0,2}[A]?[C]-?[0-9]+|^-\s*\*{0,2}[A]?[C]-?[0-9]+)' || true)
     total_acs=${total_acs:-0}
 
-    # Count Active Tasks
+    # 统计活跃任务
     local total_active_section_rows
     local completed_in_active
     local deferred_in_active
@@ -344,21 +343,21 @@ parse_goal_tracker() {
     local active_tasks=$((total_active_data_rows - completed_in_active - deferred_in_active))
     [[ "$active_tasks" -lt 0 ]] && active_tasks=0
 
-    # Count Completed tasks
+    # 统计已完成任务
     local completed_tasks
     completed_tasks=$(_count_table_rows '### Completed and Verified' '^###')
 
-    # Count verified ACs (unique AC entries in Completed section)
+    # 统计已验证的 AC（已完成部分中的唯一 AC 条目）
     local completed_acs
     completed_acs=$(sed -n '/### Completed and Verified/,/^###/p' "$tracker_file" \
         | grep -oE '^\|\s*[A]?[C]-?[0-9]+' | sort -u | wc -l | tr -d ' ')
     completed_acs=${completed_acs:-0}
 
-    # Count Deferred tasks
+    # 统计已推迟任务
     local deferred_tasks
     deferred_tasks=$(_count_table_rows '### Explicitly Deferred' '^###')
 
-    # Count Open Issues (new schema prefers Blocking/Queued Side Issues; old schema used Open Issues)
+    # 统计未关闭问题（新架构优先使用阻塞/排队的附带问题；旧架构使用 Open Issues）
     local issue_parts_raw
     local open_issues
     issue_parts_raw=$(parse_goal_tracker_issue_counts "$tracker_file")
@@ -372,7 +371,7 @@ parse_goal_tracker() {
         open_issues="${issue_parts[2]}"
     fi
 
-    # Extract Ultimate Goal summary
+    # 提取终极目标摘要
     local goal_summary
     goal_summary=$(sed -n '/### Ultimate Goal/,/^###/p' "$tracker_file" \
         | grep -v '^###' | grep -v '^$' | grep -v '^\[To be' \

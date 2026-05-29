@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
 #
-# Tests for the auth-related changes in viz/server/app.py (T11 + T10).
+# viz/server/app.py 中认证相关更改的测试 (T11 + T10)。
 #
-# These tests do NOT spin up a live Flask server (Flask may not be in
-# the system Python). Instead they assert presence and absence of the
-# code patterns required by the Round 4 contract:
-#   - main() registers --host, --port, --auth-token, --static, --project
-#   - main() exits non-zero if --host is non-localhost without a token
-#   - app.before_request enforces auth on protected endpoints when not localhost
-#   - SSE handler reads ?token= via _request_token / Authorization header
-#   - WebSocket route refuses non-localhost binds
-#   - /api/projects/{switch,add,remove} no longer mutate state (return 410)
-#   - viz-projects.json persistence helpers (_load_projects, _save_projects)
-#     are removed
-#   - app.run() uses the configurable BIND_HOST instead of hard-coded
-#     127.0.0.1
+# 这些测试不会启动实时 Flask 服务器（系统 Python 中可能没有 Flask）。
+# 相反，它们断言第 4 轮合同所需的代码模式的存在和缺失：
+#   - main() 注册 --host、--port、--auth-token、--static、--project
+#   - main() 在非 localhost 且无 token 时以非零退出
+#   - app.before_request 在非 localhost 时对受保护端点强制认证
+#   - SSE 处理器通过 _request_token / Authorization 头读取 ?token=
+#   - WebSocket 路由拒绝非 localhost 绑定
+#   - /api/projects/{switch,add,remove} 不再修改状态（返回 410）
+#   - viz-projects.json 持久化辅助函数（_load_projects、_save_projects）
+#     已移除
+#   - app.run() 使用可配置的 BIND_HOST 而非硬编码的 127.0.0.1
 
 set -euo pipefail
 
@@ -32,7 +30,7 @@ FAIL_COUNT=0
 _pass() { printf '\033[0;32mPASS\033[0m: %s\n' "$1"; PASS_COUNT=$((PASS_COUNT+1)); }
 _fail() { printf '\033[0;31mFAIL\033[0m: %s\n' "$1"; FAIL_COUNT=$((FAIL_COUNT+1)); }
 
-# Section 1: CLI flags (T8) ---------------------------------------------
+# 第 1 节：CLI 标志 (T8) ---------------------------------------------
 for flag in '--host' '--port' '--project' '--static' '--auth-token'; do
     if grep -qE "parser\.add_argument\('$flag'" "$APP_PY"; then
         _pass "main() registers $flag"
@@ -41,7 +39,7 @@ for flag in '--host' '--port' '--project' '--static' '--auth-token'; do
     fi
 done
 
-# Section 2: Remote-bind safety (T11 fail-closed) -----------------------
+# 第 2 节：远程绑定安全 (T11 失败关闭) -----------------------
 if grep -q '_is_localhost_bind' "$APP_PY" && \
    grep -q 'requires --auth-token' "$APP_PY"; then
     _pass "main() refuses non-localhost host without --auth-token"
@@ -55,7 +53,7 @@ else
     _fail "app.run() still hardcodes a host"
 fi
 
-# Section 3: Auth middleware (T11) --------------------------------------
+# 第 3 节：认证中间件 (T11) --------------------------------------
 if grep -q '@app.before_request' "$APP_PY" && grep -q '_request_authorized' "$APP_PY"; then
     _pass "app.before_request middleware references _request_authorized"
 else
@@ -74,14 +72,14 @@ else
     _fail "?token= query param fallback missing"
 fi
 
-# Section 4: WebSocket disabled in remote mode (T11 / DEC-4) ------------
+# 第 4 节：远程模式下禁用 WebSocket (T11 / DEC-4) ------------
 if grep -q "WebSocket transport disabled in remote mode" "$APP_PY"; then
     _pass "WebSocket route refuses non-localhost binds with explicit reason"
 else
     _fail "WebSocket route does not reject remote-mode connections"
 fi
 
-# Section 5: T10 backend cleanup ----------------------------------------
+# 第 5 节：T10 后端清理 ----------------------------------------
 if grep -qE "def _save_projects" "$APP_PY"; then
     _fail "_save_projects helper still present (should be removed for T10)"
 else
@@ -100,17 +98,15 @@ else
     _pass "_ensure_current_project helper removed"
 fi
 
-# Allow a single explanatory comment about the removed file (the
-# migration note tells future readers WHY the persistence is gone).
-# Reject any non-comment occurrence (would indicate the code still
-# tries to read or write the legacy projects file).
+# 允许关于已移除文件的单个解释性注释（迁移说明告诉未来的读者为什么持久化被移除）。
+# 拒绝任何非注释出现（表明代码仍在尝试读取或写入旧的项目文件）。
 if grep -nE "viz-projects\.json" "$APP_PY" | grep -vE '^[0-9]+:\s*#' >/dev/null; then
     _fail "viz-projects.json is still referenced from non-comment code"
 else
     _pass "viz-projects.json no longer used by code (only an explanatory comment may remain)"
 fi
 
-# Section 6: Project-mutation routes return 410 (T10) -------------------
+# 第 6 节：项目变更路由返回 410 (T10) -------------------
 if grep -qE "/api/projects/switch.*POST" "$APP_PY" && \
    grep -qE "/api/projects/add.*POST" "$APP_PY" && \
    grep -qE "/api/projects/remove.*POST" "$APP_PY" && \
@@ -120,7 +116,7 @@ else
     _fail "project switch/add/remove endpoints not returning 410"
 fi
 
-# Section 7: T7 session-scoped cancel ----------------------------------
+# 第 7 节：T7 会话范围取消 ----------------------------------
 if grep -q '_find_session_cancel_script' "$APP_PY" && \
    grep -q 'cancel-rlcr-session.sh' "$APP_PY"; then
     _pass "/api/sessions/<id>/cancel uses session-scoped helper"
@@ -134,7 +130,7 @@ else
     _fail "cancel endpoint does not validate session id"
 fi
 
-# Section 8: T7 portability fix (Round 5) ------------------------------
+# 第 8 节：T7 可移植性修复（第 5 轮） ------------------------------
 if grep -q 'HUMANIZE_CANCEL_SESSION_SCRIPT' "$APP_PY"; then
     _pass "_find_session_cancel_script honors HUMANIZE_CANCEL_SESSION_SCRIPT env override"
 else
@@ -154,7 +150,7 @@ else
     _fail "_find_session_cancel_script does not search marketplaces plugin location"
 fi
 
-# Section 9: T7 missing-session-id 400 case (Round 5) ------------------
+# 第 9 节：T7 缺少 session-id 的 400 情况（第 5 轮） ------------------
 if grep -qE "@app\.route\('/api/sessions/cancel'" "$APP_PY"; then
     _pass "/api/sessions/cancel route registered for missing-id 400 case"
 else
@@ -167,7 +163,7 @@ else
     _fail "missing-id handler not defined as a separate view function"
 fi
 
-# Section 10: Round 8 P1 + P2 fixes ------------------------------------
+# 第 10 节：第 8 轮 P1 + P2 修复 ------------------------------------
 if grep -q '_enforce_csrf_protection' "$APP_PY"; then
     _pass "CSRF protection function defined (P1)"
 else
@@ -199,7 +195,7 @@ else
     _fail "cancel route does not forward --force for finalizing"
 fi
 
-# Section 11: Round 9 fixes ---------------------------------------------
+# 第 11 节：第 9 轮修复 ---------------------------------------------
 if grep -q '_origin_matches_request' "$APP_PY" && grep -q '_parse_request_host_port' "$APP_PY"; then
     _pass "CSRF check is request-relative (works for --host 0.0.0.0 wildcard binds; P1 Round 9)"
 else
@@ -212,12 +208,11 @@ else
     _fail "cancel route does not forward --project; CLAUDE_PROJECT_DIR could leak"
 fi
 
-# Section 12: Round 13 P1 fix — auth predicate fails closed ------------
-# _request_authorized() must NOT treat an empty AUTH_TOKEN as "allow";
-# on a non-loopback bind without a token, return False (deny) so any
-# code path that bypasses main()'s startup guard (module import,
-# bespoke app.run wrapper, alternate entry point) cannot serve
-# protected endpoints unauthenticated.
+# 第 12 节：第 13 轮 P1 修复 — 认证谓词失败关闭 ------------
+# _request_authorized() 不得将空的 AUTH_TOKEN 视为"允许"；
+# 在无 token 的非回环绑定上，返回 False（拒绝），使得任何
+# 绕过 main() 启动守卫的代码路径（模块导入、
+# 自定义 app.run 包装器、替代入口点）无法未经认证地提供受保护端点。
 python3 - "$APP_PY" <<'PYEOF'
 import ast
 import pathlib
@@ -238,9 +233,8 @@ if func is None:
 
 body = ast.unparse(func)
 
-# The old predicate had "_is_localhost_bind() or not AUTH_TOKEN" as a
-# single allow clause. The fail-closed shape must explicitly return
-# False when AUTH_TOKEN is absent on a non-loopback bind.
+# 旧的谓词将 "_is_localhost_bind() or not AUTH_TOKEN" 作为单个允许子句。
+# 失败关闭的形式必须在非回环绑定上缺少 AUTH_TOKEN 时显式返回 False。
 has_or_not = re.search(r'_is_localhost_bind\(\)\s+or\s+not\s+AUTH_TOKEN', body)
 has_deny = 'return False' in body
 
@@ -260,18 +254,16 @@ else
     _fail "[P1 Round 13] _request_authorized does not fail closed (exit=$AUTH_PROBE_EXIT)"
 fi
 
-# Behavioural probe: import app.py, force BIND_HOST=0.0.0.0 with
-# AUTH_TOKEN='', and assert _request_authorized() returns False for a
-# simulated request. Protects against regressions that pass the
-# static grep above while behaving wrongly at runtime.
+# 行为探针：导入 app.py，强制 BIND_HOST=0.0.0.0 且
+# AUTH_TOKEN=''，并断言 _request_authorized() 对模拟请求返回 False。
+# 防止通过上述静态 grep 但在运行时行为错误的回归。
 VIZ_TEST_VENV="${VIZ_TEST_VENV:-/tmp/viz-routes-test-venv}"
 if [[ -x "$VIZ_TEST_VENV/bin/python" ]] && "$VIZ_TEST_VENV/bin/python" -c 'import flask' 2>/dev/null; then
-    # The behavioural probe imports app.py, which pulls in Flask. When
-    # the dedicated viz test venv does not have Flask installed (fresh
-    # CI runs that skipped the viz app-routes suite setup step), skip
-    # this assertion so a missing dependency does not turn into a
-    # test-script crash under `set -euo pipefail`. The preceding
-    # static grep check already covers the fail-closed contract.
+    # 行为探针导入 app.py，这会引入 Flask。当
+    # 专用的 viz 测试 venv 没有安装 Flask 时（跳过了
+    # viz app-routes 套件设置步骤的新 CI 运行），跳过
+    # 此断言，以避免缺失的依赖导致测试脚本在
+    # `set -euo pipefail` 下崩溃。前述的静态 grep 检查已经覆盖了失败关闭合同。
     PROBE_OUT="$("$VIZ_TEST_VENV/bin/python" - "$PLUGIN_ROOT" <<'PYEOF' 2>&1 || true
 import sys, os
 plugin_root = sys.argv[1]

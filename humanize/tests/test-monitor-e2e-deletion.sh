@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Monitor e2e deletion tests (parallel split 1/3)
+# 监控端到端删除测试（并行分片 1/3）
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test-monitor-e2e-real.sh"

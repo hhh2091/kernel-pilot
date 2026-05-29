@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# Tests for Code Review log file analysis behavior
+# 代码审查日志文件分析行为的测试
 #
-# Tests that detect_review_issues() correctly:
-# - Detects [P0-9] patterns in first 10 characters of each line
-# - Scans only the last 50 lines of the log file
-# - Extracts content from the first matching line to the end
-# - Returns appropriate exit codes
+# 测试 detect_review_issues() 是否正确地：
+# - 检测每行前 10 个字符中的 [P0-9] 模式
+# - 仅扫描日志文件的最后 50 行
+# - 从第一个匹配行提取内容到末尾
+# - 返回适当的退出码
 #
-# Algorithm being tested:
-# 1. Scan the last 50 lines of the log file
-# 2. Find the first line where [P?] (? is a digit) appears in the first 10 characters
-# 3. If found: extract from that line to the end and output it
-# 4. If not found: no issues, return 1
+# 被测试的算法：
+# 1. 扫描日志文件的最后 50 行
+# 2. 找到前 10 个字符中出现 [P?]（? 是数字）的第一行
+# 3. 如果找到：从该行提取到末尾并输出
+# 4. 如果未找到：无问题，返回 1
 #
 
 set -uo pipefail
@@ -20,7 +20,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Test helpers
+# 测试辅助函数
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
@@ -30,21 +30,21 @@ TESTS_FAILED=0
 pass() { echo -e "${GREEN}PASS${NC}: $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
 fail() { echo -e "${RED}FAIL${NC}: $1"; echo "  Expected: $2"; echo "  Got: $3"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
 
-# Setup test environment
+# 设置测试环境
 TEST_DIR=$(mktemp -d)
 trap "rm -rf $TEST_DIR" EXIT
 
-# Set up isolated cache directory
+# 设置隔离的缓存目录
 export XDG_CACHE_HOME="$TEST_DIR/.cache"
 mkdir -p "$XDG_CACHE_HOME"
 
-# Source the loop-common.sh which contains detect_review_issues
+# 加载包含 detect_review_issues 的 loop-common.sh
 source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
 
 echo "=== Test: Code Review Log File Analysis ==="
 echo ""
 
-# Setup test loop directory structure
+# 设置测试循环目录结构
 setup_test_env() {
     LOOP_DIR="$TEST_DIR/.humanize/rlcr/2024-01-01_12-00-00"
     CACHE_DIR="$XDG_CACHE_HOME/humanize/codex-review"
@@ -54,7 +54,7 @@ setup_test_env() {
 }
 
 # ========================================
-# Test 1: [P?] in first 10 chars - should detect
+# 测试 1：前 10 个字符中的 [P?] - 应该检测到
 # ========================================
 echo "Test 1: detect_review_issues finds [P?] in first 10 characters"
 setup_test_env
@@ -81,7 +81,7 @@ else
 fi
 
 # ========================================
-# Test 2: [P?] NOT in first 10 chars - should NOT detect
+# 测试 2：[P?] 不在前 10 个字符中 - 不应该检测到
 # ========================================
 echo "Test 2: detect_review_issues ignores [P?] not in first 10 characters"
 setup_test_env
@@ -99,7 +99,7 @@ OUTPUT=$(detect_review_issues 2 2>/dev/null)
 RESULT=$?
 set -e
 
-# [P?] is not in first 10 chars, so should return 1 (no issues found)
+# [P?] 不在前 10 个字符中，所以应该返回 1（未发现问题）
 if [[ $RESULT -eq 1 ]]; then
     pass "[P?] not in first 10 chars returns 1 (no issues)"
 else
@@ -107,7 +107,7 @@ else
 fi
 
 # ========================================
-# Test 3: No [P?] at all - should return 1
+# 测试 3：完全没有 [P?] - 应该返回 1
 # ========================================
 echo "Test 3: detect_review_issues returns 1 when no [P?] patterns"
 setup_test_env
@@ -131,7 +131,7 @@ else
 fi
 
 # ========================================
-# Test 4: Missing log file - should return 2
+# 测试 4：缺少日志文件 - 应该返回 2
 # ========================================
 echo "Test 4: detect_review_issues returns error code 2 when log file is missing"
 setup_test_env
@@ -150,7 +150,7 @@ else
 fi
 
 # ========================================
-# Test 5: Empty log file - should return 2
+# 测试 5：空日志文件 - 应该返回 2
 # ========================================
 echo "Test 5: detect_review_issues returns error code 2 when log file is empty"
 setup_test_env
@@ -169,12 +169,12 @@ else
 fi
 
 # ========================================
-# Test 6: Log file with >50 lines, [P?] late in file
+# 测试 6：超过 50 行的日志文件，[P?] 在文件末尾
 # ========================================
 echo "Test 6: detect_review_issues finds [P?] late in a long log"
 setup_test_env
 
-# Create a log file with 60 lines, [P1] at line 55
+# 创建一个 60 行的日志文件，第 55 行有 [P1]
 {
     for i in $(seq 1 54); do
         echo "Debug line $i - some processing output"
@@ -197,13 +197,13 @@ else
 fi
 
 # ========================================
-# Test 7: Log file with >50 lines, [P?] early in file - should NOT detect
+# 测试 7：超过 50 行的日志文件，[P?] 在文件开头 - 不应该检测到
 # ========================================
 echo "Test 7: detect_review_issues ignores [P?] early in a long log (outside last 50 lines)"
 setup_test_env
 
-# Create a log file with 70 lines, [P1] at line 5 (early in the file)
-# Since we only scan the last 50 lines, line 5 of 70 is outside the window
+# 创建一个 70 行的日志文件，第 5 行有 [P1]（在文件开头）
+# 由于我们只扫描最后 50 行，70 行中的第 5 行在窗口之外
 {
     for i in $(seq 1 4); do
         echo "Debug line $i"
@@ -219,7 +219,7 @@ OUTPUT=$(detect_review_issues 7 2>/dev/null)
 RESULT=$?
 set -e
 
-# [P1] is at line 5 of 70 - outside the last-50-line window, should return 1
+# [P1] 在 70 行中的第 5 行 - 在最后 50 行窗口之外，应该返回 1
 if [[ $RESULT -eq 1 ]]; then
     pass "[P?] early in file ignored (outside last 50 lines)"
 else
@@ -227,7 +227,7 @@ else
 fi
 
 # ========================================
-# Test 8: Multiple [P?] lines - first one is the start of extraction
+# 测试 8：多个 [P?] 行 - 第一个是提取的起点
 # ========================================
 echo "Test 8: detect_review_issues extracts from first [P?] line to end"
 setup_test_env
@@ -247,7 +247,7 @@ OUTPUT=$(detect_review_issues 8 2>/dev/null)
 RESULT=$?
 set -e
 
-# Should extract from [P0] line to the end, including [P2] and final line
+# 应该从 [P0] 行提取到末尾，包括 [P2] 和最后一行
 if [[ $RESULT -eq 0 ]] && echo "$OUTPUT" | grep -q '\[P0\]' && echo "$OUTPUT" | grep -q '\[P2\]' && echo "$OUTPUT" | grep -q "Final debug"; then
     pass "Extraction from first [P?] to end works"
 else
@@ -255,7 +255,7 @@ else
 fi
 
 # ========================================
-# Test 9: [P?] exactly at position 0 (first char)
+# 测试 9：[P?] 恰好在位置 0（第一个字符）
 # ========================================
 echo "Test 9: detect_review_issues finds [P?] at very start of line"
 setup_test_env
@@ -278,7 +278,7 @@ else
 fi
 
 # ========================================
-# Test 10: [P?] with dash prefix (common format)
+# 测试 10：带破折号前缀的 [P?]（常见格式）
 # ========================================
 echo "Test 10: detect_review_issues finds [P?] with dash prefix"
 setup_test_env
@@ -295,7 +295,7 @@ OUTPUT=$(detect_review_issues 10 2>/dev/null)
 RESULT=$?
 set -e
 
-# "- [P1]" - the [P1] starts at position 2, which is within first 10 chars
+# "- [P1]" - [P1] 从位置 2 开始，在前 10 个字符范围内
 if [[ $RESULT -eq 0 ]] && echo "$OUTPUT" | grep -q '\[P1\]'; then
     pass "[P?] with dash prefix detected"
 else
@@ -303,7 +303,7 @@ else
 fi
 
 # ========================================
-# Test 11: Result file is created when issues found
+# 测试 11：发现问题时创建结果文件
 # ========================================
 echo "Test 11: detect_review_issues creates result file when issues found"
 setup_test_env
@@ -314,7 +314,7 @@ Debug line
   Issue description
 EOF
 
-# Ensure result file doesn't exist
+# 确保结果文件不存在
 rm -f "$LOOP_DIR/round-11-review-result.md" 2>/dev/null || true
 
 set +e
@@ -322,7 +322,7 @@ OUTPUT=$(detect_review_issues 11 2>/dev/null)
 RESULT=$?
 set -e
 
-# Check that result file was created
+# 检查结果文件是否已创建
 if [[ $RESULT -eq 0 ]] && [[ -f "$LOOP_DIR/round-11-review-result.md" ]]; then
     pass "Result file created when issues found"
 else
@@ -330,7 +330,7 @@ else
 fi
 
 # ========================================
-# Test 12: Exactly 50 lines, [P?] on line 1
+# 测试 12：恰好 50 行，第 1 行有 [P?]
 # ========================================
 echo "Test 12: detect_review_issues handles exactly 50 lines"
 setup_test_env
@@ -354,7 +354,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================="

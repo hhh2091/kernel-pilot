@@ -1,24 +1,24 @@
-/* Main SPA — router, WebSocket, token propagation, page rendering */
+/* 主 SPA — 路由、WebSocket、令牌传播、页面渲染 */
 
 let ws = null, wsRetryDelay = 1000
 const WS_MAX_RETRY = 30000
 let _sortCol = 'session_id', _sortAsc = false
-const _liveLogPanes = new Map() // sessionId -> { eventSource, element, basename }
+const _liveLogPanes = new Map() // sessionId -> { eventSource, element, basename } 映射
 
-// ─── Auth token propagation (T11-frontend) ───
+// ─── 认证令牌传播（T11-frontend） ───
 //
-// Resolved once per page load. Order of precedence:
-//   1. ?token=<tok> on the document URL (single-use, stripped from
-//      the visible URL once consumed but kept in sessionStorage so
-//      reloads work without manual re-entry).
-//   2. #token=<tok> in the URL hash (same as above; supports clients
-//      that prefer the hash form for security on shared screens).
-//   3. sessionStorage cached token from a prior visit.
-//   4. <meta name="humanize-viz-token" content="..."> baked into the
-//      static index.html (uncommon; useful for kiosk deployments).
+// 每次页面加载时解析一次。优先级顺序：
+//   1. 文档 URL 中的 ?token=<tok>（一次性使用，消费后从
+//      可见 URL 中移除，但保留在 sessionStorage 中，以便
+//      刷新页面时无需重新输入）。
+//   2. URL hash 中的 #token=<tok>（同上；支持偏好使用 hash
+//      形式以在共享屏幕上增强安全性的客户端）。
+//   3. sessionStorage 中缓存的上次访问令牌。
+//   4. 静态 index.html 中预置的 <meta name="humanize-viz-token"
+//      content="...">（不常见；适用于 kiosk 部署场景）。
 //
-// On localhost-bound deployments the server skips auth entirely, so a
-// missing token is fine and api() will simply not attach a header.
+// 在 localhost 部署中服务器完全跳过认证，因此缺少令牌是正常的，
+// api() 将不会附加认证头。
 function _resolveAuthToken() {
     let token = ''
     try {
@@ -63,21 +63,20 @@ function _withToken(url) {
     return `${url}${sep}token=${encodeURIComponent(_authToken)}`
 }
 
-// ─── WebSocket (localhost coarse events only; remote mode is rejected
-// server-side per DEC-4) ───
+// ─── WebSocket（仅限 localhost 粗粒度事件；远程模式在服务器端
+// 按 DEC-4 拒绝） ───
 //
-// Remote mode is detected by the presence of a resolved auth token:
-// localhost-bound deployments do not set one (the server does not
-// enforce auth), so a token implies the dashboard is talking to a
-// non-loopback server where WS is rejected. In that case the home
-// page falls back to polling /api/sessions on a fixed interval to
-// surface WAITING -> live transitions and EOF transitions in the UI.
+// 通过是否存在已解析的认证令牌来检测远程模式：
+// localhost 部署不会设置令牌（服务器不强制认证），
+// 因此令牌的存在意味着仪表盘正在与拒绝 WS 的非回环服务器通信。
+// 在这种情况下，首页会回退到按固定间隔轮询 /api/sessions，
+// 以在 UI 中显示 WAITING -> 实时转换和 EOF 转换。
 const _isRemoteMode = !!_authToken
 
 function connectWebSocket() {
     if (_isRemoteMode) {
-        // No coarse session-list channel exists in remote mode (per
-        // DEC-4); the home-route polling loop handles refreshes.
+        // 远程模式下不存在粗粒度会话列表通道（按 DEC-4）；
+        // 首页路由轮询循环负责处理刷新。
         return
     }
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -88,11 +87,9 @@ function connectWebSocket() {
         try {
             const msg = JSON.parse(e.data)
             const route = parseRoute()
-            // Targeted subtree refresh per event type — avoid the
-            // whole-page rebuild that previously caused flicker on
-            // every file write. Only the affected DOM subtree is
-            // touched; the live-log <pre> (SSE) and the page
-            // skeleton are never recreated here.
+            // 按事件类型进行有针对性的子树刷新 — 避免之前每次文件
+            // 写入时全页重建导致的闪烁。仅修改受影响的 DOM 子树；
+            // 实时日志 <pre>（SSE）和页面骨架不会在此重建。
             if (route.page === 'home') {
                 _scheduleHomeRefresh()
             } else if (route.page === 'session' && route.id === msg.session_id) {
@@ -108,19 +105,17 @@ function connectWebSocket() {
     }
 }
 
-// ─── Targeted WS-push refresh ───
+// ─── 有针对性的 WS 推送刷新 ───
 //
-// Rather than polling or re-rendering the whole page on every
-// watcher broadcast, the WS onmessage path dispatches per event
-// type to the smallest subtree that changed:
-//   - home: re-build the active / completed card lists only.
-//   - session-detail: re-run renderPipeline / renderSessionSidebar /
-//     renderGoalBar as appropriate, never touching the
-//     #session-log-container or its EventSource.
+// 与轮询或在每次 watcher 广播时重新渲染整个页面不同，
+// WS onmessage 路径按事件类型分派到最小的变更子树：
+//   - 首页：仅重建活跃/已完成的卡片列表。
+//   - 会话详情：按需重新运行 renderPipeline / renderSessionSidebar /
+//     renderGoalBar，不触碰 #session-log-container 或其 EventSource。
 //
-// A ~500ms trailing-edge debounce per surface coalesces bursts
-// (state.md + goal-tracker.md + round-N-summary.md often land in the
-// same second) so the reader sees one update, not three.
+// 每个面板约 500ms 的尾部去抖合并突发事件
+// （state.md + goal-tracker.md + round-N-summary.md 通常在同一秒内到达），
+// 使读者看到一次更新而非三次。
 const _PARTIAL_DEBOUNCE_MS = 500
 
 let _homeRefreshHandle = null
@@ -135,9 +130,8 @@ function _scheduleHomeRefresh() {
 let _sessionRefreshHandle = null
 let _pendingSessionRefreshKinds = new Set()
 function _scheduleSessionPartialRefresh(sessionId, eventType) {
-    // Merge the kinds of updates we need to do so a burst that mixes
-    // round_added + session_updated fires one refresh with both
-    // subtrees updated.
+    // 合并需要执行的更新类型，使得混合 round_added + session_updated
+    // 的突发情况只触发一次刷新，同时更新两个子树。
     if (eventType) _pendingSessionRefreshKinds.add(eventType)
     if (_sessionRefreshHandle != null) return
     _sessionRefreshHandle = setTimeout(async () => {
@@ -150,14 +144,11 @@ function _scheduleSessionPartialRefresh(sessionId, eventType) {
     }, _PARTIAL_DEBOUNCE_MS)
 }
 
-// Diff-based refresh of the home sessions region. Only cards whose
-// rendered content actually changed get their outerHTML replaced;
-// unchanged cards are left entirely alone so there is no re-render,
-// no re-animation, and no observable "flashing". Section skeletons
-// (labels + list containers) are created or torn down as needed when
-// a session transitions between Active and Completed, but that
-// touches only the affected section — existing cards in the other
-// section do not move.
+// 基于差异的首页会话区域刷新。只有渲染内容实际发生变化的卡片
+// 会被替换 outerHTML；未变化的卡片完全不动，因此不会出现
+// 重新渲染、重新动画或可观察到的"闪烁"。当会话在活跃和已完成
+// 之间转换时，按需创建或拆除区域骨架（标签 + 列表容器），
+// 但只影响相关区域 — 另一区域中的现有卡片不会移动。
 async function _refreshHomeCards() {
     const wrap = document.getElementById('home-sessions')
     if (!wrap) return
@@ -165,10 +156,9 @@ async function _refreshHomeCards() {
     if (sessions == null) return
     if (parseRoute().page !== 'home') return
 
-    // Empty state transition in either direction falls back to the
-    // full rebuild (rare: at most once when the first session lands
-    // or when the last one is pruned). This never fires during a
-    // running loop.
+    // 任一方向的空状态转换都会回退到完整重建
+    // （罕见：最多在第一个会话到达或最后一个会话被移除时触发一次）。
+    // 在运行中的循环期间不会触发。
     const currentlyEmpty = wrap.querySelector('.empty') != null
     if (sessions.length === 0) {
         if (!currentlyEmpty) wrap.innerHTML = _buildHomeSessionsHtml(sessions)
@@ -186,14 +176,14 @@ async function _refreshHomeCards() {
     _applyHomeSection(wrap, 'completed', finished, t('home.completed'), 'session-grid', sessionCard)
 }
 
-// Ensure a section (label + list container) matches the given
-// session list. Cards are diff-updated by data-session-id:
-//   - stays the same (same HTML) -> untouched
-//   - content changed            -> outerHTML swap on that one card
-//   - new session in list        -> append
-//   - session dropped from list  -> remove
-// Section label + list container are created lazily when the list
-// becomes non-empty and removed when it goes back to empty.
+// 确保一个区域（标签 + 列表容器）与给定的会话列表匹配。
+// 卡片通过 data-session-id 进行差异更新：
+//   - 保持不变（相同 HTML）-> 不动
+//   - 内容已更改            -> 替换该卡片的 outerHTML
+//   - 列表中出现新会话      -> 追加
+//   - 会话从列表中移除      -> 删除
+// 区域标签 + 列表容器在列表变为非空时延迟创建，
+// 在列表回到空时移除。
 function _applyHomeSection(wrap, sectionKey, list, label, containerClass, cardFn) {
     const listSel = `[data-home-section="${sectionKey}"]`
     let container = wrap.querySelector(listSel)
@@ -207,8 +197,8 @@ function _applyHomeSection(wrap, sectionKey, list, label, containerClass, cardFn
     }
 
     if (!container) {
-        // Create label + container and place them in the right order.
-        // active section goes first; completed second.
+        // 创建标签 + 容器并按正确顺序放置。
+        // 活跃区域在前；已完成区域在后。
         const labelHtml = `<div class="eyebrow-rule${sectionKey === 'completed' ? ' completed' : ''}" data-home-section-label="${sectionKey}">${label}</div>`
         const containerHtml = `<div class="${containerClass}" data-home-section="${sectionKey}"></div>`
         if (sectionKey === 'active') {
@@ -219,7 +209,7 @@ function _applyHomeSection(wrap, sectionKey, list, label, containerClass, cardFn
         container = wrap.querySelector(listSel)
     }
 
-    // Index existing cards by session id.
+    // 按会话 id 索引现有卡片。
     const existing = new Map()
     for (const el of container.querySelectorAll('.session-card[data-session-id]')) {
         existing.set(el.dataset.sessionId, el)
@@ -232,7 +222,7 @@ function _applyHomeSection(wrap, sectionKey, list, label, containerClass, cardFn
         const html = cardFn(s).trim()
         const el = existing.get(s.id)
         if (el) {
-            // Compare rendered HTML; skip if identical.
+            // 比较渲染后的 HTML；如果相同则跳过。
             if (el.outerHTML.trim() !== html) {
                 const tmp = document.createElement('div')
                 tmp.innerHTML = html
@@ -240,7 +230,7 @@ function _applyHomeSection(wrap, sectionKey, list, label, containerClass, cardFn
             }
             cursor = container.querySelector(`.session-card[data-session-id="${CSS.escape(s.id)}"]`)
         } else {
-            // Append new card at the current position.
+            // 在当前位置追加新卡片。
             const tmp = document.createElement('div')
             tmp.innerHTML = html
             const node = tmp.firstElementChild
@@ -254,32 +244,29 @@ function _applyHomeSection(wrap, sectionKey, list, label, containerClass, cardFn
         }
     }
 
-    // Remove cards for sessions that are no longer in this section.
+    // 移除不再属于此区域的会话对应的卡片。
     for (const [id, el] of existing) {
         if (!seen.has(id)) el.remove()
     }
 }
 
-// Targeted session-detail refresh. Re-runs only the subtrees implied
-// by the set of event kinds, leaving the rest of the DOM (notably
-// the live-log <pre> and its EventSource) untouched.
+// 有针对性的会话详情刷新。仅重新运行事件类型集合所暗示的子树，
+// 其余 DOM（特别是实时日志 <pre> 及其 EventSource）保持不变。
 async function _refreshSessionPartial(sessionId, kinds) {
     const session = await api(`/api/sessions/${sessionId}`)
     if (!session) return
-    // Route-change race guard: the fetch above is async, so by the
-    // time the response lands the user may have navigated to another
-    // session or route. Checking the DOM skeleton + current route
-    // prevents us from writing stale data into the wrong page.
+    // 路由变更竞态保护：上面的 fetch 是异步的，因此在响应回来时
+    // 用户可能已导航到另一个会话或路由。检查 DOM 骨架和当前路由
+    // 可防止我们将过时数据写入错误的页面。
     const route = parseRoute()
     if (route.page !== 'session' || route.id !== sessionId) return
     const layout = document.querySelector(`.detail-layout[data-session-id="${CSS.escape(sessionId)}"]`)
     if (!layout) return
-    // Pipeline update runs for every session-scoped event kind,
-    // including session_updated: a review-result.md write flips the
-    // verdict on an existing node, which must re-paint that one
-    // node's dot / badge. The incremental updater is a no-op on
-    // rounds whose verdict and active flag are unchanged, so running
-    // it unconditionally is cheap.
+    // Pipeline 更新对每种会话范围的事件类型都会运行，
+    // 包括 session_updated：review-result.md 的写入会翻转
+    // 现有节点的裁决结果，需要重新绘制该节点的点/徽章。
+    // 增量更新器对裁决结果和活跃标志未改变的轮次是空操作，
+    // 因此无条件运行的成本很低。
     const wantPipeline = kinds.has('round_added') || kinds.has('session_updated') || kinds.has('session_finished')
     const wantSidebar  = kinds.has('round_added') || kinds.has('session_updated') || kinds.has('session_finished')
     const wantGoalBar  = kinds.has('round_added') || kinds.has('session_updated') || kinds.has('session_finished')
@@ -287,11 +274,10 @@ async function _refreshSessionPartial(sessionId, kinds) {
     if (wantPipeline) {
         const root = document.getElementById('pipeline-root')
         if (root) {
-            // Incremental update keeps the user's zoom/pan and only
-            // adds / mutates the specific nodes that changed. Full
-            // renderPipeline is still used on first entry because it
-            // also sets up the viewport + drag listeners; this
-            // targeted path assumes those already exist.
+            // 增量更新保留用户的缩放/平移状态，仅添加/修改
+            // 发生变化的特定节点。首次进入时仍使用完整的
+            // renderPipeline，因为它还需要设置视口和拖拽监听器；
+            // 此有针对性的路径假设这些已经存在。
             if (typeof window._updatePipelineIncremental === 'function') {
                 window._updatePipelineIncremental(root, session)
             } else {
@@ -301,9 +287,9 @@ async function _refreshSessionPartial(sessionId, kinds) {
     }
     if (wantSidebar) renderSessionSidebar(session)
     if (wantGoalBar) renderGoalBar(session)
-    // Keep the layout mode in sync (e.g. session finished -> hide log
-    // row) and let _ensureSessionLogPane idempotently roll forward
-    // to a newer cache-log basename when a new round starts.
+    // 保持布局模式同步（例如会话完成 -> 隐藏日志行），
+    // 并让 _ensureSessionLogPane 在新轮次开始时幂等地
+    // 推进到更新的缓存日志文件名。
     _applyDetailLayoutMode(session)
     _ensureSessionLogPane(session)
     const cancelBtn = document.getElementById('ops-cancel')
@@ -311,15 +297,13 @@ async function _refreshSessionPartial(sessionId, kinds) {
     if (cancelBtn) cancelBtn.style.display = CANCELLABLE.includes(session.status) ? '' : 'none'
 }
 
-// Remote-mode metadata polling. In localhost mode the WebSocket
-// carries watcher events, so there is no polling on top of that.
-// In remote mode WS is rejected server-side (DEC-4), so without a
-// fallback the card counters, pipeline nodes, and methodology
-// status would all freeze at page-load state. This polling uses the
-// same targeted refresh helpers (_refreshHomeCards /
-// _refreshSessionPartial) that the WS path uses, so it does NOT
-// rebuild the page — it only updates the same in-place subtrees
-// and leaves the SSE log pane alone.
+// 远程模式元数据轮询。在 localhost 模式下 WebSocket 承载
+// watcher 事件，因此无需在其之上进行轮询。在远程模式下，
+// WS 在服务器端被拒绝（DEC-4），因此如果没有回退机制，
+// 卡片计数器、Pipeline 节点和方法论状态都会冻结在页面加载时的状态。
+// 此轮询使用与 WS 路径相同的有针对性刷新辅助函数
+// （_refreshHomeCards / _refreshSessionPartial），因此它不会
+// 重建页面 — 只更新相同的就地子树，不触碰 SSE 日志面板。
 const _REMOTE_POLL_INTERVAL_MS = 10000
 let _remotePollHandle = null
 let _remotePollRoute = null
@@ -333,17 +317,17 @@ function _startRemotePolling() {
         if (route.page === 'home') {
             _refreshHomeCards()
         } else if (route.page === 'session') {
-            // Feed a synthetic "session_updated" kind so the
-            // refresh runs pipeline + sidebar + goal-bar + log pane
-            // — matching what the WS path does on catch-up.
+            // 注入一个合成的 "session_updated" 类型，使刷新
+            // 运行 pipeline + 侧边栏 + 目标栏 + 日志面板
+            // — 与 WS 路径在追赶时的行为一致。
             _scheduleSessionPartialRefresh(route.id, 'session_updated')
         }
     }, _REMOTE_POLL_INTERVAL_MS)
 }
 
-// Kept for the teardown path in renderCurrentRoute / toggleTheme.
-// Localhost mode doesn't poll so these are no-ops for the common
-// path; remote mode stops via _stopRemotePolling on route change.
+// 保留用于 renderCurrentRoute / toggleTheme 中的清理路径。
+// localhost 模式不轮询，因此这些对常见路径是空操作；
+// 远程模式通过 _stopRemotePolling 在路由变更时停止。
 function _stopHomePolling() {}
 function _stopSessionPolling() {}
 function _stopRemotePolling() {
@@ -353,7 +337,7 @@ function _stopRemotePolling() {
     }
 }
 
-// ─── Router ───
+// ─── 路由 ───
 function parseRoute() {
     const h = location.hash || '#/'
     if (h === '#/' || h === '#') return { page: 'home' }
@@ -372,18 +356,16 @@ window.renderCurrentRoute = function() {
     const main = document.getElementById('main-content')
     main.innerHTML = ''
     updateTopbar(route)
-    // Always tear down live EventSource connections on a route change.
-    // The new route's render will mount a fresh pane if it needs one
-    // (the session-detail page does for active sessions). Without
-    // this, a lingering SSE stream from a prior session page would
-    // keep hitting the server in the background.
+    // 路由变更时始终拆除实时 EventSource 连接。
+    // 新路由的渲染会在需要时挂载新的面板
+    // （会话详情页面对活跃会话就是如此）。如果没有这一步，
+    // 来自之前会话页面的残留 SSE 流会持续在后台访问服务器。
     _teardownAllLivePanes()
     if (route.page !== 'home') _stopHomePolling()
-    // Stop any active session-polling loop when leaving session/
-    // analysis routes so we do not keep re-rendering a page the
-    // user has navigated away from. The session-polling helper
-    // also self-stops if its target id no longer matches the route,
-    // but stopping here handles the route-type change case cleanly.
+    // 离开会话/分析路由时停止所有活跃的会话轮询循环，
+    // 以避免持续重新渲染用户已离开的页面。会话轮询辅助函数
+    // 也会在其目标 id 不再匹配路由时自动停止，但在此处停止
+    // 可以更干净地处理路由类型变更的情况。
     if (route.page !== 'session' && route.page !== 'analysis') {
         _stopSessionPolling()
     }
@@ -398,7 +380,7 @@ window.renderCurrentRoute = function() {
 
 window.addEventListener('hashchange', window.renderCurrentRoute)
 
-// ─── Topbar ───
+// ─── 顶部栏 ───
 function updateTopbar(route) {
     const left = document.getElementById('topbar-left')
     const titleEl = document.getElementById('topbar-title')
@@ -406,7 +388,7 @@ function updateTopbar(route) {
     const analyticsLink = document.getElementById('analytics-link')
     const opsContainer = document.getElementById('ops-dropdown-container')
 
-    // Left area: always show logo (clickable to home), plus back button on sub-pages
+    // 左侧区域：始终显示 logo（可点击回到首页），子页面上还显示返回按钮
     if (route.page === 'home') {
         left.innerHTML = `
             <a class="topbar-logo" href="#/" style="text-decoration:none">
@@ -424,16 +406,16 @@ function updateTopbar(route) {
         titleEl.textContent = route.id || ''
     }
 
-    // Right area
+    // 右侧区域
     if (analyticsLink) analyticsLink.textContent = t('nav.analytics')
     if (themeBtn) themeBtn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'
 
-    // Ops dropdown — only on session/analysis pages
+    // 操作下拉菜单 — 仅在会话/分析页面显示
     if (opsContainer) {
         opsContainer.style.display = (route.page === 'session' || route.page === 'analysis') ? '' : 'none'
     }
 
-    // Populate ops menu labels
+    // 填充操作菜单标签
     const labels = { 'ops-plan': 'ops.view_plan', 'ops-analysis': 'ops.analysis', 'ops-preview-issue': 'ops.preview_issue', 'ops-export-md': 'ops.export_md', 'ops-export-pdf': 'ops.export_pdf', 'ops-cancel': 'ops.cancel' }
     for (const [id, key] of Object.entries(labels)) {
         const el = document.getElementById(id)
@@ -441,7 +423,7 @@ function updateTopbar(route) {
     }
 }
 
-// ─── Theme ───
+// ─── 主题 ───
 function initTheme() {
     const saved = localStorage.getItem('humanize-viz-theme')
     const theme = (saved === 'dark' || saved === 'light') ? saved : 'dark'
@@ -454,19 +436,17 @@ function toggleTheme() {
     const next = cur === 'dark' ? 'light' : 'dark'
     document.documentElement.setAttribute('data-theme', next)
     localStorage.setItem('humanize-viz-theme', next)
-    // Theme variables are declared via CSS custom properties keyed
-    // on [data-theme], so switching the attribute is enough for the
-    // paint to update on every route that styles via CSS vars
-    // (home cards, session-detail pipeline + sidebar + log pane).
-    // No DOM rebuild is needed there — pipeline zoom/pan, the open
-    // flyout (if any), the live-log <pre> + EventSource, and the
-    // log-panel collapse state all survive across toggles.
+    // 主题变量通过基于 [data-theme] 的 CSS 自定义属性声明，
+    // 因此切换属性足以让所有通过 CSS 变量设置样式的路由更新绘制
+    // （首页卡片、会话详情的 pipeline + 侧边栏 + 日志面板）。
+    // 不需要重建 DOM — pipeline 缩放/平移、打开的弹出面板（如有）、
+    // 实时日志 <pre> + EventSource 以及日志面板的折叠状态
+    // 都能在切换中保留。
     const btn = document.getElementById('theme-btn')
     if (btn) btn.textContent = next === 'dark' ? '☀' : '☾'
-    // Analytics is the one exception: charts read CSS vars via
-    // getComputedStyle and bake the colors into SVG at render time,
-    // so the on-screen charts don't repaint on attribute flip.
-    // Re-render only that route; all other routes stay put.
+    // 分析页面是唯一的例外：图表通过 getComputedStyle 读取
+    // CSS 变量并在渲染时将颜色固化到 SVG 中，因此屏幕上的图表
+    // 不会在属性翻转时重新绘制。仅重新渲染该路由；其他路由保持不变。
     if (parseRoute().page === 'analytics') {
         renderAnalytics()
     }
@@ -482,9 +462,9 @@ async function api(url) {
     return r.ok ? r.json() : null
 }
 
-// Exported so actions.js fetches stay token-aware too. The main
-// difference vs api() is that this returns the raw Response so
-// callers can inspect status codes and error bodies.
+// 导出以便 actions.js 的 fetch 也能感知令牌。
+// 与 api() 的主要区别是返回原始 Response，
+// 调用者可以检查状态码和错误体。
 window.authedFetch = function(url, init) {
     init = init || {}
     init.headers = Object.assign({}, init.headers || {})
@@ -506,26 +486,24 @@ function _esc(str) {
     return d.innerHTML
 }
 
-// ─── Home ───
+// ─── 首页 ───
 async function renderHome() {
     const main = document.getElementById('main-content')
 
-    // Tear down any live-log panes from the previous render so we do
-    // not leak EventSource connections across navigations.
+    // 拆除上一次渲染中的实时日志面板，避免在导航间泄漏 EventSource 连接。
     _teardownAllLivePanes()
 
-    // Load projects, sessions, and the cross-session analytics strip
-    // in parallel. Analytics is best-effort: if the endpoint fails we
-    // still render the rest of the page and just drop the strip.
+    // 并行加载项目、会话和跨会话分析条带。分析是尽力而为的：
+    // 如果端点失败，我们仍然渲染页面的其余部分，只丢弃条带。
     const [projects, sessions, analytics] = await Promise.all([
         api('/api/projects').catch(() => []),
         api('/api/sessions').catch(() => []),
         api('/api/analytics').catch(() => null),
     ])
 
-    // Project header (read-only). The legacy project switcher and
-    // "+ Add" UI was removed in Round 5 (T10-frontend); the dashboard
-    // is now CLI-fixed to one project at startup.
+    // 项目头部（只读）。旧的项目切换器和"+ 添加"界面在
+    // 第 5 轮（T10-frontend）中被移除；仪表盘现在通过 CLI
+    // 固定为启动时的单个项目。
     const currentProject = (projects || [])[0] || {}
     const projectHeader = `
         <div class="project-bar">
@@ -541,19 +519,17 @@ async function renderHome() {
 
     const analyticsStrip = _renderHomeAnalyticsStrip(analytics)
 
-    // The sessions region lives inside a stable wrapper so WS-push
-    // refreshes can replace its innerHTML without touching
-    // .project-bar. This removes the "fall back to renderHome()
-    // when sections don't exist yet" branch that Codex flagged as a
-    // full-page rebuild.
+    // 会话区域位于一个稳定的包装器内，以便 WS 推送刷新
+    // 可以替换其 innerHTML 而不影响 .project-bar。
+    // 这移除了 Codex 标记为全页重建的"当区域尚不存在时
+    // 回退到 renderHome()"分支。
     const sessionsBody = _buildHomeSessionsHtml(sessions)
     main.innerHTML = `<div class="home">${projectHeader}${analyticsStrip}<div id="home-sessions">${sessionsBody}</div></div>`
 }
 
-// Cross-Session Analytics strip: four stat tiles (total sessions,
-// avg rounds, completion rate, and a sparkline for rounds-per-day
-// over the last 14 days). Mirrors the reference kit's home header
-// block. Best-effort: drops silently when /api/analytics is empty.
+// 跨会话分析条带：四个统计卡片（总会话数、平均轮次、完成率、
+// 以及最近 14 天的每日轮次趋势图）。镜像参考工具的首页头部块。
+// 尽力而为：当 /api/analytics 为空时静默丢弃。
 function _renderHomeAnalyticsStrip(analytics) {
     if (!analytics || !analytics.overview) return ''
     const o = analytics.overview
@@ -574,9 +550,8 @@ function _renderHomeAnalyticsStrip(analytics) {
         </div>`
 }
 
-// Compact inline SVG sparkline. Draws a filled area + polyline +
-// trailing dot. Zero-data input renders an empty but valid SVG so
-// layout stays stable.
+// 紧凑的内联 SVG 趋势图。绘制填充区域 + 折线 + 尾部圆点。
+// 零数据输入渲染一个空但有效的 SVG，保持布局稳定。
 function _renderSparkline(values) {
     const W = 180, H = 42, PAD = 2
     const n = values.length
@@ -603,16 +578,15 @@ function _renderSparkline(values) {
         </svg>`
 }
 
-// Builds the HTML body that goes inside #home-sessions. Covers all
-// three cases: empty, active-only, completed-only, both. Shared by
-// the initial renderHome() and the incremental _refreshHomeCards().
+// 构建放入 #home-sessions 内部的 HTML 主体。涵盖所有三种情况：
+// 空、仅活跃、仅已完成、两者都有。由初始 renderHome()
+// 和增量 _refreshHomeCards() 共享。
 //
-// The section label + list container elements carry the same
-// `data-home-section` / `data-home-section-label` attributes that
-// _applyHomeSection queries against. Without those attributes the
-// first WS refresh would not find the initial render's container
-// and would create a second one, showing two Active sections on
-// screen for a single running loop — the duplicate-card bug.
+// 区域标签 + 列表容器元素携带与 _applyHomeSection 查询相同的
+// `data-home-section` / `data-home-section-label` 属性。
+// 没有这些属性，第一次 WS 刷新将找不到初始渲染的容器，
+// 会创建第二个容器，导致单个运行循环在屏幕上显示两个活跃区域
+// — 即重复卡片的 bug。
 function _buildHomeSessionsHtml(sessions) {
     if (!sessions || sessions.length === 0) {
         return `<div class="empty"><div class="empty-icon">⬡</div><div class="empty-msg">${t('home.empty')}</div><div class="empty-hint">${t('home.empty.hint')}</div></div>`
@@ -620,16 +594,13 @@ function _buildHomeSessionsHtml(sessions) {
     const active = sessions.filter(s => ['active','analyzing','finalizing'].includes(s.status))
     const finished = sessions.filter(s => !['active','analyzing','finalizing'].includes(s.status))
     let html = ''
-    // Reference kit wraps each row of cards in a <section> with an
-    // uppercase "eyebrow-rule" label and a .session-grid container
-    // (auto-fit columns at a generous min-width). Both Active and
-    // Completed now use the same skin — the status badge + pulse
-    // dot inside each card carries the "running" signal instead.
-    // The inline diff-updater (_applyHomeSection) creates label +
-    // container pairs directly under #home-sessions when a section
-    // first materializes; keeping the initial render's shape the
-    // same (no <section> wrapper) avoids layout drift between the
-    // initial render and the WS-driven lazy creation.
+    // 参考工具将每行卡片包装在带有大写 "eyebrow-rule" 标签的
+    // <section> 和 .session-grid 容器中（自动适应列，慷慨的最小宽度）。
+    // 活跃和已完成现在使用相同的外观 — 卡片内的状态徽章 + 脉冲点
+    // 承载"运行中"信号。内联差异更新器（_applyHomeSection）在
+    // 区域首次具象化时直接在 #home-sessions 下创建标签 + 容器对；
+    // 保持初始渲染的形状相同（无 <section> 包装）避免了初始渲染
+    // 和 WS 驱动的延迟创建之间的布局偏移。
     if (active.length) {
         html += `<div class="eyebrow-rule" data-home-section-label="active">${t('home.active')}</div>`
         html += `<div class="session-grid" data-home-section="active">${active.map(activeSessionPane).join('')}</div>`
@@ -642,15 +613,13 @@ function _buildHomeSessionsHtml(sessions) {
 }
 
 function _latestActiveLog(session) {
-    // session.cache_logs is the deterministic list emitted by
-    // viz/server/parser.py:cache_logs_for_session — sorted by
-    // (round, tool, role) ascending. Reproduce the CLI's
-    // `humanize monitor rlcr` Log: line by picking the codex-run log
-    // for the highest round, falling back through the other
-    // tool/role combinations. Without this the naive cache_logs[-1]
-    // could land on `gemini-review` or `codex-review` for the same
-    // round, which is the wrong file — the user expects the primary
-    // implementation/review stream, not a secondary one.
+    // session.cache_logs 是 viz/server/parser.py:cache_logs_for_session
+    // 发出的确定性列表 — 按 (round, tool, role) 升序排序。
+    // 通过选择最高轮次的 codex-run 日志来复现 CLI 的
+    // `humanize monitor rlcr` Log: 行，回退到其他 tool/role 组合。
+    // 如果不这样做，简单的 cache_logs[-1] 可能会落在同一轮次的
+    // `gemini-review` 或 `codex-review` 上，这是错误的文件 —
+    // 用户期望的是主要的实现/审查流，而不是次要的。
     const logs = session.cache_logs || []
     if (logs.length === 0) return null
     let maxRound = -1
@@ -665,25 +634,22 @@ function _latestActiveLog(session) {
         const match = logs.find(l => l.round === maxRound && l.tool === tool && l.role === role)
         if (match) return match
     }
-    // No codex/gemini match at the top round — surface anything we
-    // have so the pane is not empty (defensive; real sessions always
-    // carry at least one of the above).
+    // 最高轮次没有 codex/gemini 匹配 — 显示我们拥有的任何内容，
+    // 使面板不为空（防御性措施；真实会话总是至少携带上述之一）。
     return logs.filter(l => l.round === maxRound).pop() || logs[logs.length - 1]
 }
 
-// Active pane on the home page: just the plain sessionCard — the
-// live monitor log stream lives on the session-detail page (below
-// the pipeline canvas), not here.
+// 首页上的活跃面板：只是普通的 sessionCard —
+// 实时监控日志流位于会话详情页面（pipeline 画布下方），不在这里。
 function activeSessionPane(s) {
     return sessionCard(s)
 }
 
-// ─── Live log panes (T6) ───
+// ─── 实时日志面板（T6） ───
 //
-// Each active session gets its own EventSource talking to
-// /api/sessions/<sid>/logs/<basename>. Multiple panes coexist on the
-// home page; navigating away tears them all down so we do not leak
-// open connections.
+// 每个活跃会话都有自己的 EventSource 与
+// /api/sessions/<sid>/logs/<basename> 通信。多个面板在首页上共存；
+// 导航离开时全部拆除，避免泄漏打开的连接。
 function _mountLiveLogPane(sessionId, logEntry) {
     const pane = document.getElementById(`live-log-pane-${sessionId}`)
     const status = document.getElementById(`live-log-status-${sessionId}`)
@@ -696,27 +662,24 @@ function _mountLiveLogPane(sessionId, logEntry) {
     let bytesSeen = 0
     function appendBytes(b64, { flush = false } = {}) {
         try {
-            // atob returns a Latin-1 byte-string; convert to a real
-            // byte array and decode as UTF-8 so non-ASCII log output
-            // (CJK text, emoji, smart quotes) renders correctly
-            // instead of as mojibake.
+            // atob 返回 Latin-1 字节字符串；转换为真正的字节数组
+            // 并以 UTF-8 解码，使非 ASCII 日志输出（CJK 文本、
+            // 表情符号、智能引号）正确渲染而不是乱码。
             //
-            // `{ stream: true }` keeps the decoder's internal buffer
-            // alive across calls, so a multibyte UTF-8 sequence
-            // split at the 64 KiB SSE chunk boundary is reassembled
-            // on the next event instead of being emitted as U+FFFD
-            // replacement characters. Callers pass `flush: true`
-            // when the stream is known to be complete (resync
-            // reason=truncated/rotated/recreated/overflow, eof) so
-            // the decoder's trailing buffer is finalised and not
-            // accidentally prefixed to the next snapshot.
+            // `{ stream: true }` 保持解码器的内部缓冲区在调用间存活，
+            // 使得在 64 KiB SSE 块边界处分割的多字节 UTF-8 序列
+            // 在下一个事件中重新组装，而不是作为 U+FFFD 替换字符
+            // 发出。当流已知完成时（resync reason=truncated/rotated/
+            // recreated/overflow, eof），调用者传入 `flush: true`，
+            // 使解码器的尾部缓冲区被最终化，不会意外地被添加到
+            // 下一个快照前面。
             const binStr = atob(b64)
             const bytes = new Uint8Array(binStr.length)
             for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
             const text = _utf8Decoder.decode(bytes, { stream: !flush })
             pane.textContent += text
             bytesSeen += bytes.length
-            // Cap pane size to avoid runaway memory on long sessions.
+            // 限制面板大小，避免长会话时内存失控。
             const MAX_PANE_BYTES = 256 * 1024
             if (pane.textContent.length > MAX_PANE_BYTES) {
                 pane.textContent = '... (truncated, showing tail)\n' +
@@ -755,10 +718,8 @@ function _mountLiveLogPane(sessionId, logEntry) {
             setStatus(`resync: ${data.reason}`, 'warn')
             if (data.reason === 'truncated' || data.reason === 'rotated' ||
                 data.reason === 'recreated' || data.reason === 'overflow') {
-                // Stream is discontinuous from here: finalise the
-                // decoder so any trailing buffered bytes from the
-                // previous file don't bleed into the fresh content
-                // that follows.
+                // 流从这里开始不连续：最终化解码器，使上一个文件的
+                // 任何尾部缓冲字节不会混入后续的新内容中。
                 try { _utf8Decoder.decode(new Uint8Array(0)) } catch (_) {}
                 pane.textContent = ''
                 bytesSeen = 0
@@ -770,22 +731,19 @@ function _mountLiveLogPane(sessionId, logEntry) {
         setStatus('eof', 'eof')
         es.close()
         _liveLogPanes.delete(sessionId)
-        // Flush the decoder so a trailing incomplete multibyte
-        // sequence (if any) is rendered as U+FFFD rather than
-        // silently dropped.
+        // 刷新解码器，使尾部不完整的多字节序列（如有）
+        // 以 U+FFFD 渲染而不是被静默丢弃。
         try { _utf8Decoder.decode(new Uint8Array(0)) } catch (_) {}
-        // The session just transitioned to a terminal status. The
-        // sidebar/pipeline are snapshots and will show the new status
-        // when the user navigates away and back or reloads; no
-        // auto-refresh is triggered here on purpose (avoids the whole
-        // page flashing when a session finishes).
+        // 会话刚刚转换到终端状态。侧边栏/pipeline 是快照，
+        // 用户导航离开再回来或重新加载时会显示新状态；
+        // 此处故意不触发自动刷新（避免会话完成时整页闪烁）。
     })
 
     es.onerror = () => {
         setStatus('disconnected (will retry)', 'warn')
-        // EventSource auto-reconnects with exponential backoff; we
-        // do nothing here. On real disconnect the browser sends
-        // Last-Event-Id so the server replays missed events.
+        // EventSource 自动以指数退避重连；此处不做任何操作。
+        // 真正断开时浏览器发送 Last-Event-Id，
+        // 服务器会重放错过的事件。
     }
 
     _liveLogPanes.set(sessionId, { eventSource: es, element: pane, basename: logEntry.basename })
@@ -808,9 +766,8 @@ function sessionCard(s) {
     const idShort = (s.id || '').slice(0, 19)
     const duration = fmtDuration(s.duration_minutes)
 
-    // Reference-kit skin: condensed head (round + id + status badge
-    // with pulse dot when in-flight) → 2×2 mono meta grid → AC
-    // progress bar → mono foot strip with timestamps and task count.
+    // 参考工具外观：精简头部（轮次 + id + 运行时带脉冲点的状态徽章）
+    // → 2×2 等宽元数据网格 → AC 进度条 → 带时间戳和任务计数的等宽底部条。
     return `
         <div class="session-card" data-session-id="${_esc(s.id)}" onclick="navigate('#/session/${s.id}')">
             <div class="session-head">
@@ -838,7 +795,7 @@ function sessionCard(s) {
         </div>`
 }
 
-// ─── Session Detail ───
+// ─── 会话详情 ───
 async function renderSession(sessionId) {
     const main = document.getElementById('main-content')
     const session = await api(`/api/sessions/${sessionId}`)
@@ -847,15 +804,13 @@ async function renderSession(sessionId) {
         return
     }
 
-    // Auto-refresh disabled: the SSE live-log pane at the bottom of
-    // the page streams bytes into its own <pre> without any page
-    // re-render, which is the only surface that truly needs to be
-    // live. Pipeline / sidebar / goal-bar are snapshots; to refresh
-    // them the user navigates away and back or reloads the page.
+    // 自动刷新已禁用：页面底部的 SSE 实时日志面板将字节流式传输
+    // 到自己的 <pre> 中，无需任何页面重新渲染，这是唯一真正需要
+    // 实时的界面。Pipeline / 侧边栏 / 目标栏是快照；
+    // 用户需要导航离开再回来或重新加载页面来刷新它们。
 
-    // Build the detail-layout skeleton only on first entry. On
-    // subsequent re-renders for the same session id we reuse the
-    // existing DOM so the bottom live-log pane is not destroyed.
+    // 仅在首次进入时构建详情布局骨架。对同一会话 id 的后续
+    // 重新渲染复用现有 DOM，以免销毁底部的实时日志面板。
     let layout = main.querySelector(`.detail-layout[data-session-id="${CSS.escape(sessionId)}"]`)
     if (!layout) {
         _teardownAllLivePanes()
@@ -879,21 +834,19 @@ async function renderSession(sessionId) {
     window._currentSession = session
 
     const cancelBtn = document.getElementById('ops-cancel')
-    // Mirror the backend's _CANCELLABLE_STATUSES (Round 8): the cancel
-    // helper supports active, analyzing, and finalizing sessions, so
-    // the UI must expose the button in all three phases. Round 10
-    // previously hid the button outside of 'active', which made
-    // stuck analyze/finalize sessions uncancellable from the UI.
+    // 镜像后端的 _CANCELLABLE_STATUSES（第 8 轮）：取消辅助函数
+    // 支持 active、analyzing 和 finalizing 会话，因此 UI 必须在
+    // 这三个阶段都显示按钮。第 10 轮之前在 'active' 之外隐藏按钮，
+    // 导致卡住的 analyze/finalize 会话无法从 UI 取消。
     const CANCELLABLE_STATUSES = ['active', 'analyzing', 'finalizing']
     if (cancelBtn) cancelBtn.style.display = CANCELLABLE_STATUSES.includes(session.status) ? '' : 'none'
 }
 
-// Incremental re-render used by WS pushes and the 5-second polling
-// loop. Re-fetches the session, re-populates pipeline + sidebar +
-// goal-bar, and leaves the bottom live-log pane (and its
-// EventSource) untouched so the streaming log does not reset.
-// Falls back to a full renderSession() when the layout skeleton
-// doesn't match (e.g. first entry after a route change).
+// WS 推送和 5 秒轮询循环使用的增量重新渲染。重新获取会话，
+// 重新填充 pipeline + 侧边栏 + 目标栏，底部的实时日志面板
+// （及其 EventSource）保持不变，使流式日志不会重置。
+// 当布局骨架不匹配时（例如路由变更后的首次进入），
+// 回退到完整的 renderSession()。
 async function _refreshSession(sessionId) {
     const main = document.getElementById('main-content')
     const layout = main && main.querySelector(`.detail-layout[data-session-id="${CSS.escape(sessionId)}"]`)
@@ -914,10 +867,9 @@ async function _refreshSession(sessionId) {
     if (cancelBtn) cancelBtn.style.display = CANCELLABLE.includes(session.status) ? '' : 'none'
 }
 
-// Toggles the detail-layout's "has-log" modifier so the grid grows
-// a third row for the live-log panel only for active sessions.
-// Completed / cancelled sessions keep the original two-row layout
-// (graph + goal-bar), matching the previous look.
+// 切换详情布局的 "has-log" 修饰符，使网格仅为活跃会话
+// 增长第三行用于实时日志面板。已完成/已取消的会话保持
+// 原始的两行布局（图表 + 目标栏），与之前的外观一致。
 function _applyDetailLayoutMode(session) {
     const layout = document.querySelector('.detail-layout')
     if (!layout) return
@@ -926,19 +878,18 @@ function _applyDetailLayoutMode(session) {
     layout.classList.toggle('has-log', !!hasLive)
 }
 
-// Creates the live-log pane inside #session-log-container exactly
-// once per session entry. If the session is not active or has no
-// cache log yet, the container is emptied and any existing pane is
-// torn down. Idempotent when called repeatedly with the same
-// (sessionId, basename) pair — the existing EventSource keeps
-// streaming into the same <pre>.
+// 在 #session-log-container 内创建实时日志面板，每次会话进入
+// 恰好创建一次。如果会话不活跃或尚无缓存日志，则清空容器
+// 并拆除任何现有面板。使用相同的 (sessionId, basename) 对
+// 重复调用时是幂等的 — 现有的 EventSource 继续流式传输到
+// 同一个 <pre>。
 function _ensureSessionLogPane(session) {
     const container = document.getElementById('session-log-container')
     if (!container) return
     const active = ['active', 'analyzing', 'finalizing'].includes(session.status)
     const latest = _latestActiveLog(session)
     if (!active || !latest) {
-        // No live log needed; tear down any prior pane.
+        // 不需要实时日志；拆除任何先前的面板。
         const prev = _liveLogPanes.get(session.id)
         if (prev) {
             try { prev.eventSource.close() } catch (_) {}
@@ -949,15 +900,13 @@ function _ensureSessionLogPane(session) {
     }
     const prev = _liveLogPanes.get(session.id)
     if (prev && prev.basename === latest.basename && container.contains(prev.element)) {
-        // Same log file is already streaming; nothing to do.
+        // 相同的日志文件已在流式传输；无需操作。
         return
     }
-    // Either no pane yet, or the latest cache log rolled to a newer
-    // round — rebuild only this subtree (the container), leaving
-    // the rest of the detail layout intact. Preserve the toggle
-    // state (collapsed / normal / expanded) across the basename
-    // switch so a user who expanded the log is not bounced back to
-    // the default height every time a new round starts.
+    // 尚无面板，或最新的缓存日志滚动到了更新的轮次 —
+    // 仅重建此子树（容器），保持详情布局的其余部分不变。
+    // 在 basename 切换时保留切换状态（折叠/正常/展开），
+    // 使展开日志的用户不会在每次新轮次开始时被弹回默认高度。
     const layout = document.querySelector('.detail-layout.has-log')
     const priorState = !layout
         ? 'normal'
@@ -981,25 +930,24 @@ function _ensureSessionLogPane(session) {
         </div>
         <pre class="live-log-pane" id="live-log-pane-${_esc(session.id)}"></pre>`
     _mountLiveLogPane(session.id, latest)
-    // Re-apply the prior toggle state so the active button lights up
-    // and the grid row keeps whichever height the user picked.
+    // 重新应用之前的切换状态，使活跃按钮亮起，
+    // 网格行保持用户选择的高度。
     window.toggleSessionLog(priorState)
 }
 
-// Three-state collapse/expand control for the session-detail log
-// panel. 'normal' is the default 260px row, 'collapsed' shrinks to
-// the header only (so the pipeline canvas sees more vertical space),
-// and 'expanded' grows the log to cover most of the canvas for
-// reading long bursts. The state lives as a CSS class on
-// .detail-layout so the grid-template-rows swap happens in one place.
+// 会话详情日志面板的三态折叠/展开控制。'normal' 是默认的
+// 260px 行，'collapsed' 收缩到仅头部（使 pipeline 画布获得更多
+// 垂直空间），'expanded' 增长日志以覆盖大部分画布，用于阅读
+// 长时间的突发输出。状态作为 CSS 类存在于 .detail-layout 上，
+// 使 grid-template-rows 的切换在一个地方完成。
 window.toggleSessionLog = function(state) {
     const layout = document.querySelector('.detail-layout.has-log')
     if (!layout) return
     layout.classList.remove('log-collapsed', 'log-normal', 'log-expanded')
     if (state === 'collapsed') layout.classList.add('log-collapsed')
     else if (state === 'expanded') layout.classList.add('log-expanded')
-    // 'normal' = no modifier class. Reflect the new state on the
-    // toggle buttons (hide the one matching the current state).
+    // 'normal' = 无修饰类。在切换按钮上反映新状态
+    // （隐藏与当前状态匹配的按钮）。
     const buttons = layout.querySelectorAll('.live-log-btn')
     buttons.forEach(b => { b.classList.remove('is-active') })
     const cls = state === 'collapsed' ? '.js-log-collapse'
@@ -1009,10 +957,9 @@ window.toggleSessionLog = function(state) {
     if (activeBtn) activeBtn.classList.add('is-active')
 }
 
-// Used by openFlyout/closeFlyout in pipeline.js: when the user opens
-// a node's details, auto-collapse the log so the modal (and the
-// underlying pipeline canvas) have more room. The prior state is
-// remembered and restored when the flyout is dismissed.
+// 由 pipeline.js 中的 openFlyout/closeFlyout 使用：当用户打开
+// 节点详情时，自动折叠日志，使模态框（和底层的 pipeline 画布）
+// 有更多空间。之前的状态被记住，在弹出面板关闭时恢复。
 let _savedLogState = null
 window.autoCollapseSessionLog = function() {
     const layout = document.querySelector('.detail-layout.has-log')
@@ -1131,7 +1078,7 @@ function renderGoalBar(session) {
     }).join('')
 }
 
-// ─── Analysis ───
+// ─── 分析 ───
 async function renderAnalysis(sessionId) {
     const main = document.getElementById('main-content')
     const session = await api(`/api/sessions/${sessionId}`)
@@ -1140,8 +1087,7 @@ async function renderAnalysis(sessionId) {
         return
     }
 
-    // Auto-refresh disabled per user request; reload the page to
-    // pick up a newly generated methodology report.
+    // 按用户请求禁用自动刷新；重新加载页面以获取新生成的方法论报告。
 
     const report = selectLang(session.methodology_report)
     const hasReport = !!report
@@ -1181,7 +1127,7 @@ async function renderAnalysis(sessionId) {
     window._currentSession = session
 }
 
-// ─── Analytics ───
+// ─── 分析统计 ───
 async function renderAnalytics() {
     const main = document.getElementById('main-content')
     const data = await api('/api/analytics')
@@ -1208,14 +1154,12 @@ async function renderAnalytics() {
             <div id="cmp-root"></div>
         </div>`
 
-    // Chart.js panels (rounds per session, duration, verdict
-    // distribution, P-issues, first-COMPLETE, BitLesson growth) were
-    // removed per user request — the four summary tiles + timeline +
-    // session comparison table cover the analytics needs without the
-    // extra chart stack.
+    // Chart.js 面板（每会话轮次、持续时间、裁决分布、P-issues、
+    // 首次完成、BitLesson 增长）按用户请求被移除 — 四个摘要卡片 +
+    // 时间线 + 会话比较表覆盖了分析需求，无需额外的图表栈。
     buildCmpTable(data.session_stats)
 
-    // Load timeline asynchronously (needs full session data, can be slow)
+    // 异步加载时间线（需要完整会话数据，可能较慢）
     if (data.session_stats && data.session_stats.length > 0) {
         loadTimeline(data.session_stats)
     }
@@ -1295,15 +1239,13 @@ function buildCmpTable(stats) {
 
     for (const s of sorted) {
         const vb = s.verdict_breakdown || {}
-        // Escape every attacker-reachable value before splicing into
-        // the innerHTML template. The backend filter on /api/analytics
-        // already rejects session ids outside `[A-Za-z0-9_.-]+`, so in
-        // practice the escape here is defense-in-depth: a future
-        // producer that forgets to apply the filter should still be
-        // safely rendered rather than breaking out of the inline
-        // onclick / cell HTML (the exact regression Codex Round 23
-        // flagged). `s.status` is trusted (enum from parser.py) but
-        // piped through _esc too for consistency.
+        // 在拼接到 innerHTML 模板之前转义每个攻击者可达的值。
+        // /api/analytics 上的后端过滤器已经拒绝 `[A-Za-z0-9_.-]+`
+        // 之外的会话 id，因此这里的转义实际上是纵深防御：
+        // 即使未来的生产者忘记应用过滤器，也能安全渲染，
+        // 而不会突破内联 onclick / 单元格 HTML
+        // （这正是 Codex 第 23 轮标记的回归）。`s.status` 是
+        // 可信的（来自 parser.py 的枚举），但也通过 _esc 管道处理以保持一致。
         const idEsc = _esc(s.session_id)
         html += `<tr>
             <td><a class="cmp-nav" data-session-id="${idEsc}" style="cursor:pointer">${idEsc}</a></td>
@@ -1317,12 +1259,10 @@ function buildCmpTable(stats) {
     }
     html += '</tbody></table>'
     root.innerHTML = html
-    // Bind navigation via data-attribute + delegated listener so the
-    // session id never flows through an inline JS string literal.
-    // Even if a future backend regression lets through a session id
-    // containing quote/script characters, the value only ever touches
-    // dataset (DOM-level string, never re-parsed as JS) and window
-    // navigation, neither of which evaluates markup.
+    // 通过 data-attribute + 委托监听器绑定导航，使会话 id 永远不会
+    // 流经内联 JS 字符串字面量。即使未来的后端回归让包含引号/脚本
+    // 字符的会话 id 通过，该值也只接触 dataset（DOM 级别字符串，
+    // 永远不会被重新解析为 JS）和 window 导航，两者都不会执行标记。
     root.querySelectorAll('a.cmp-nav').forEach(a => {
         a.addEventListener('click', () => navigate('#/session/' + a.dataset.sessionId))
     })
@@ -1335,14 +1275,13 @@ function sortCmp(col) {
     if (window._cmpStats) buildCmpTable(window._cmpStats)
 }
 
-// ─── Init ───
+// ─── 初始化 ───
 document.addEventListener('DOMContentLoaded', () => {
     initTheme()
     connectWebSocket()
-    // In remote mode WS is disabled server-side, so kick a slow
-    // polling loop that drives the same targeted-refresh path. In
-    // localhost mode this is a no-op because _startRemotePolling
-    // gates on _isRemoteMode.
+    // 在远程模式下 WS 在服务器端被禁用，因此启动一个慢速轮询循环
+    // 驱动相同的有针对性刷新路径。在 localhost 模式下这是空操作，
+    // 因为 _startRemotePolling 受 _isRemoteMode 限制。
     _startRemotePolling()
     window.renderCurrentRoute()
 })

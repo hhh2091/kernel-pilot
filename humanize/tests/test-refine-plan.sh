@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Test script for refine-plan command structure, validator behavior, QA template coverage,
-# and AC-7 installation wiring coverage
+# refine-plan 命令结构、验证器行为、QA 模板覆盖、
+以及 AC-7 安装接线覆盖的测试脚本
 #
-# Validates:
-# - commands/refine-plan.md frontmatter and workflow requirements
-# - validate-refine-plan-io.sh exit codes 0-7 and mode handling
-# - Comment extraction/classification requirements documented by the command
-# - Language variant and atomic write requirements
-# - AC-7 installation/documentation wiring for humanize-refine-plan
+# 验证：
+# - commands/refine-plan.md 前置数据和工作流要求
+# - validate-refine-plan-io.sh 退出码 0-7 和模式处理
+# - 命令中记录的注释提取/分类要求
+# - 语言变体和原子写入要求
+# - humanize-refine-plan 的 AC-7 安装/文档接线
 #
 
 set -euo pipefail
@@ -34,7 +34,7 @@ PLUGIN_JSON="$CLAUDE_PLUGIN_DIR/plugin.json"
 MARKETPLACE_JSON="$CLAUDE_PLUGIN_DIR/marketplace.json"
 README_FILE="$PROJECT_ROOT/README.md"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -43,7 +43,7 @@ NC='\033[0m'
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# Test helper functions
+# 测试辅助函数
 pass() {
     echo -e "${GREEN}PASS${NC}: $1"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -641,7 +641,7 @@ echo "========================================"
 echo ""
 
 # ========================================
-# Positive Tests - Command/Template Coverage
+# 正面测试 - 命令/模板覆盖
 # ========================================
 echo "========================================"
 echo "Positive Tests - Must Pass"
@@ -891,7 +891,7 @@ assert_equals "$PLUGIN_VERSION" "$MARKETPLACE_VERSION" "plugin.json and marketpl
 assert_equals "$PLUGIN_VERSION" "$README_VERSION" "plugin.json and README.md current versions match"
 
 # ========================================
-# Reference Behavior Tests - Extraction/Classification/Language
+# 参考行为测试 - 提取/分类/语言
 # ========================================
 echo ""
 echo "========================================"
@@ -1052,7 +1052,7 @@ else
 fi
 
 # ========================================
-# Script Tests - validate-refine-plan-io.sh
+# 脚本测试 - validate-refine-plan-io.sh
 # ========================================
 echo ""
 echo "========================================"
@@ -1354,7 +1354,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================"

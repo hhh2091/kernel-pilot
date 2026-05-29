@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Tests for unified codex_model/codex_effort configuration
+# 统一 codex_model/codex_effort 配置的测试
 #
-# Validates:
-# - default_config.json contains codex_model/codex_effort (not loop_reviewer_*)
-# - Config loader exposes codex keys through the 4-layer merge hierarchy
-# - loop-common.sh loads config-backed DEFAULT_CODEX_MODEL/DEFAULT_CODEX_EFFORT
-# - Stop hook uses STATE_CODEX_* -> DEFAULT_CODEX_* fallback chain
-# - Setup script does not write loop_reviewer_* fields to state.md
-# - Stale loop_reviewer_* keys in config/state are silently ignored
+# 验证：
+# - default_config.json 包含 codex_model/codex_effort（非 loop_reviewer_*）
+# - 配置加载器通过 4 层合并层次结构公开 codex 键
+# - loop-common.sh 加载配置支持的 DEFAULT_CODEX_MODEL/DEFAULT_CODEX_EFFORT
+# - 停止钩子使用 STATE_CODEX_* -> DEFAULT_CODEX_* 回退链
+# - 设置脚本不向 state.md 写入 loop_reviewer_* 字段
+# - 配置/状态中的过期 loop_reviewer_* 键被静默忽略
 #
 
 set -euo pipefail
@@ -18,8 +18,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/test-helpers.sh"
 source "$PROJECT_ROOT/scripts/portable-timeout.sh"
 
-# Helper: assert_eq DESCRIPTION EXPECTED ACTUAL
-# Calls pass/fail based on string equality
+# 辅助函数：assert_eq DESCRIPTION EXPECTED ACTUAL
+# 基于字符串相等性调用 pass/fail
 assert_eq() {
     local desc="$1" expected="$2" actual="$3"
     if [[ "$actual" == "$expected" ]]; then
@@ -29,22 +29,22 @@ assert_eq() {
     fi
 }
 
-# Helper: assert_grep DESCRIPTION PATTERN FILE
-# Passes if PATTERN is found in FILE
+# 辅助函数：assert_grep DESCRIPTION PATTERN FILE
+# 如果在 FILE 中找到 PATTERN 则通过
 assert_grep() {
     local desc="$1" pattern="$2" file="$3"
     if grep -q "$pattern" "$file"; then pass "$desc"; else fail "$desc"; fi
 }
 
-# Helper: assert_no_grep DESCRIPTION PATTERN FILE_OR_STRING
-# Passes if PATTERN is NOT found in FILE_OR_STRING
+# 辅助函数：assert_no_grep DESCRIPTION PATTERN FILE_OR_STRING
+# 如果在 FILE_OR_STRING 中未找到 PATTERN 则通过
 assert_no_grep() {
     local desc="$1" pattern="$2" file="$3"
     if grep -q "$pattern" "$file"; then fail "$desc"; else pass "$desc"; fi
 }
 
-# Helper: assert_contains DESCRIPTION PATTERN STRING
-# Passes if PATTERN is found in STRING
+# 辅助函数：assert_contains DESCRIPTION PATTERN STRING
+# 如果在 STRING 中找到 PATTERN 则通过
 assert_contains() {
     local desc="$1" pattern="$2" text="$3"
     if grep -q -- "$pattern" <<< "$text"; then pass "$desc"; else fail "$desc"; fi
@@ -56,7 +56,7 @@ echo "=========================================="
 echo ""
 
 # ========================================
-# default_config.json contains codex keys (not reviewer keys)
+# default_config.json 包含 codex 键（非 reviewer 键）
 # ========================================
 
 echo "--- default_config.json keys ---"
@@ -72,7 +72,7 @@ else
     assert_eq "default_config.json: codex_effort is high" \
         "high" "$(jq -r '.codex_effort' "$DEFAULT_CONFIG")"
 
-    # Verify reviewer keys are absent
+    # 验证 reviewer 键不存在
     assert_eq "default_config.json: loop_reviewer_model is absent" \
         "ABSENT" "$(jq -r '.loop_reviewer_model // "ABSENT"' "$DEFAULT_CONFIG")"
 
@@ -83,7 +83,7 @@ fi
 echo ""
 
 # ========================================
-# Config merge hierarchy loads codex keys
+# 配置合并层次结构加载 codex 键
 # ========================================
 
 echo "--- Config merge hierarchy ---"
@@ -94,7 +94,7 @@ if [[ ! -f "$CONFIG_LOADER" ]]; then
 else
     source "$CONFIG_LOADER"
 
-    # Test default-only (no project override)
+    # 测试仅默认值（无项目覆盖）
     setup_test_dir
     PROJECT_DIR="$TEST_DIR/empty-project"
     mkdir -p "$PROJECT_DIR"
@@ -107,7 +107,7 @@ else
     assert_eq "default-only: codex_effort defaults to high" \
         "high" "$(get_config_value "$merged" "codex_effort")"
 
-    # Test project config override
+    # 测试项目配置覆盖
     setup_test_dir
     PROJECT_DIR="$TEST_DIR/project-override"
     mkdir -p "$PROJECT_DIR/.humanize"
@@ -125,7 +125,7 @@ fi
 echo ""
 
 # ========================================
-# loop-common.sh loads config-backed defaults
+# loop-common.sh 加载配置支持的默认值
 # ========================================
 
 echo "--- loop-common.sh config-backed defaults ---"
@@ -135,7 +135,7 @@ LOOP_COMMON="$PROJECT_ROOT/hooks/lib/loop-common.sh"
 if [[ ! -f "$LOOP_COMMON" ]]; then
     skip "loop-common.sh tests require loop-common.sh" "file not found"
 else
-    # Test default values load correctly
+    # 测试默认值正确加载
     result=$(bash -c "
         source '$LOOP_COMMON' 2>/dev/null
         echo \"\$DEFAULT_CODEX_MODEL|\$DEFAULT_CODEX_EFFORT\"
@@ -147,7 +147,7 @@ else
     assert_eq "loop-common.sh: DEFAULT_CODEX_EFFORT is set" \
         "high" "$(echo "$result" | cut -d'|' -f2)"
 
-    # Verify no reviewer constants or defaults exist
+    # 验证不存在 reviewer 常量或默认值
     result=$(bash -c "
         source '$LOOP_COMMON' 2>/dev/null
         echo \"\${FIELD_LOOP_REVIEWER_MODEL:-ABSENT}|\${DEFAULT_LOOP_REVIEWER_MODEL:-ABSENT}\"
@@ -159,7 +159,7 @@ else
     assert_eq "loop-common.sh: DEFAULT_LOOP_REVIEWER_MODEL absent" \
         "ABSENT" "$(echo "$result" | cut -d'|' -f2)"
 
-    # Test config override feeds into DEFAULT_CODEX_MODEL
+    # 测试配置覆盖输入到 DEFAULT_CODEX_MODEL
     setup_test_dir
     OVERRIDE_PROJECT="$TEST_DIR/override-project"
     mkdir -p "$OVERRIDE_PROJECT/.humanize"
@@ -178,7 +178,7 @@ else
     assert_eq "config merge: project override feeds into DEFAULT_CODEX_EFFORT" \
         "low" "$(echo "$result" | cut -d'|' -f2)"
 
-    # Caller-provided defaults must continue to override config values
+    # 调用者提供的默认值必须继续覆盖配置值
     result=$(bash -c "
         export DEFAULT_CODEX_MODEL='preset-model'
         export DEFAULT_CODEX_EFFORT='medium'
@@ -194,7 +194,7 @@ else
     assert_eq "caller preset: DEFAULT_CODEX_EFFORT wins over config" \
         "medium" "$(echo "$result" | cut -d'|' -f2)"
 
-    # Invalid config values should warn and fall back to hardcoded defaults
+    # 无效配置值应警告并回退到硬编码默认值
     setup_test_dir
     INVALID_PROJECT="$TEST_DIR/invalid-project"
     mkdir -p "$INVALID_PROJECT/.humanize"
@@ -221,7 +221,7 @@ else
     assert_contains "invalid config: warns on invalid codex_effort" \
         "Warning: Invalid codex_effort in merged config: superhigh" "$result"
 
-    # Shell-safe but non-Codex models should also warn and fall back
+    # Shell 安全但非 Codex 模型也应警告并回退
     for invalid_model in haiku false claude-3; do
         setup_test_dir
         INVALID_PROJECT="$TEST_DIR/invalid-model-project"
@@ -251,7 +251,7 @@ fi
 echo ""
 
 # ========================================
-# Stop hook fallback chain: STATE_CODEX_* -> DEFAULT_CODEX_*
+# 停止钩子回退链：STATE_CODEX_* -> DEFAULT_CODEX_*
 # ========================================
 
 echo "--- Stop hook fallback chain ---"
@@ -259,7 +259,7 @@ echo "--- Stop hook fallback chain ---"
 if [[ ! -f "$LOOP_COMMON" ]]; then
     skip "stop hook fallback tests require loop-common.sh" "file not found"
 else
-    # State with codex fields - should use them directly
+    # 包含 codex 字段的状态 - 应直接使用它们
     setup_test_dir
     cat > "$TEST_DIR/codex-state.md" << 'STATE_EOF'
 ---
@@ -296,7 +296,7 @@ STATE_EOF
     assert_eq "stop hook: codex effort from state (xhigh)" \
         "xhigh" "$(echo "$result" | cut -d'|' -f2)"
 
-    # Bare state (no codex fields) - should fall back to defaults
+    # 裸状态（无 codex 字段）- 应回退到默认值
     setup_test_dir
     cat > "$TEST_DIR/bare-state.md" << 'BARE_EOF'
 ---
@@ -331,7 +331,7 @@ BARE_EOF
     assert_eq "bare state: falls back to DEFAULT_CODEX_EFFORT (high)" \
         "high" "$(echo "$result" | cut -d'|' -f2)"
 
-    # Config override + bare state: config-backed defaults used
+    # 配置覆盖 + 裸状态：使用配置支持的默认值
     setup_test_dir
     OVERRIDE_PROJECT="$TEST_DIR/codex-override"
     mkdir -p "$OVERRIDE_PROJECT/.humanize"
@@ -376,7 +376,7 @@ fi
 echo ""
 
 # ========================================
-# Setup script does not write reviewer fields
+# 设置脚本不写入 reviewer 字段
 # ========================================
 
 echo "--- Setup script state.md template ---"
@@ -390,7 +390,7 @@ assert_grep "setup script: state.md template includes codex_effort" 'codex_effor
 echo ""
 
 # ========================================
-# Stale loop_reviewer_* keys in config are silently ignored
+# 配置中的过期 loop_reviewer_* 键被静默忽略
 # ========================================
 
 echo "--- Stale config key handling ---"
@@ -398,7 +398,7 @@ echo "--- Stale config key handling ---"
 if [[ ! -f "$LOOP_COMMON" ]]; then
     skip "stale key tests require loop-common.sh" "file not found"
 else
-    # Project config with stale reviewer keys should not affect defaults
+    # 包含过期 reviewer 键的项目配置不应影响默认值
     setup_test_dir
     STALE_PROJECT="$TEST_DIR/stale-project"
     mkdir -p "$STALE_PROJECT/.humanize"
@@ -417,7 +417,7 @@ else
     assert_eq "stale config: codex_effort from hardcoded fallback (high), reviewer keys ignored" \
         "high" "$(echo "$result" | cut -d'|' -f2)"
 
-    # State file with stale reviewer fields - parser should not set STATE_LOOP_REVIEWER_*
+    # 包含过期 reviewer 字段的状态文件 - 解析器不应设置 STATE_LOOP_REVIEWER_*
     setup_test_dir
     cat > "$TEST_DIR/stale-state.md" << 'STALE_EOF'
 ---
@@ -454,7 +454,7 @@ STALE_EOF
     assert_eq "stale state: STATE_LOOP_REVIEWER_EFFORT not parsed (ABSENT)" \
         "ABSENT" "$(echo "$result" | cut -d'|' -f2)"
 
-    # Verify codex fields are still parsed correctly from the stale state
+    # 验证 codex 字段仍从过期状态正确解析
     result=$(bash -c "
         source '$LOOP_COMMON' 2>/dev/null
         parse_state_file '$TEST_DIR/stale-state.md'
@@ -471,7 +471,7 @@ fi
 echo ""
 
 # ========================================
-# Stop-hook effort validation
+# 停止钩子 effort 验证
 # ========================================
 
 echo "--- Stop-hook effort validation ---"
@@ -487,7 +487,7 @@ else
     HOOK_PROJECT="$TEST_DIR/hook-project"
     mkdir -p "$HOOK_PROJECT/.humanize/rlcr/2099-01-01_00-00-00"
 
-    # Create state.md with invalid codex effort
+    # 创建包含无效 codex effort 的 state.md
     cat > "$HOOK_PROJECT/.humanize/rlcr/2099-01-01_00-00-00/state.md" << 'HOOK_STATE_EOF'
 ---
 current_round: 1
@@ -509,7 +509,7 @@ agent_teams: false
 ---
 HOOK_STATE_EOF
 
-    # Create a stub codex that records invocations (should never be called)
+    # 创建记录调用的存根 codex（应永远不会被调用）
     STUB_BIN="$TEST_DIR/stub-bin"
     mkdir -p "$STUB_BIN"
     cat > "$STUB_BIN/codex" << 'STUB_EOF'
@@ -521,21 +521,21 @@ STUB_EOF
 
     CODEX_LOG="$TEST_DIR/codex-invocations.log"
 
-    # Run the stop hook with the invalid state
+    # 使用无效状态运行停止钩子
     hook_stderr=$(echo '{"session_id":"hook-test"}' | \
         CLAUDE_PROJECT_DIR="$HOOK_PROJECT" \
         CODEX_INVOCATION_LOG="$CODEX_LOG" \
         PATH="$STUB_BIN:$PATH" \
         bash "$STOP_HOOK" 2>&1 >/dev/null) || true
 
-    # Assert: hook reported the invalid effort error (now "codex effort" not "reviewer effort")
+    # 断言：钩子报告了无效 effort 错误（现在是 "codex effort" 而非 "reviewer effort"）
     if echo "$hook_stderr" | grep -q "Invalid codex effort"; then
         pass "stop-hook behavioral: rejects 'superhigh' effort with error message"
     else
         fail "stop-hook behavioral: rejects 'superhigh' effort with error message" "contains 'Invalid codex effort'" "$hook_stderr"
     fi
 
-    # Assert: codex stub was never invoked
+    # 断言：codex 存根从未被调用
     if [[ ! -f "$CODEX_LOG" ]]; then
         pass "stop-hook behavioral: codex was not invoked for invalid effort"
     else
@@ -546,7 +546,7 @@ fi
 echo ""
 
 # ========================================
-# Setup script execution test
+# 设置脚本执行测试
 # ========================================
 
 echo "--- Setup script execution test ---"
@@ -559,15 +559,15 @@ else
     setup_test_dir
     EXEC_PROJECT="$TEST_DIR/exec-project"
     init_test_git_repo "$EXEC_PROJECT"
-    # Ensure a 'master' branch exists so --base-branch master is valid
-    # (init_test_git_repo may create 'main' depending on git config)
+    # 确保存在 'master' 分支，使 --base-branch master 有效
+    # （init_test_git_repo 可能根据 git 配置创建 'main'）
     (cd "$EXEC_PROJECT" && git branch master 2>/dev/null || true)
 
-    # Create project config with codex overrides
+    # 创建包含 codex 覆盖的项目配置
     mkdir -p "$EXEC_PROJECT/.humanize"
     printf '{"codex_model": "gpt-5.2", "codex_effort": "low"}' > "$EXEC_PROJECT/.humanize/config.json"
 
-    # Create a plan file with enough lines (minimum 5 required) and commit it
+    # 创建包含足够行数（最少 5 行）的计划文件并提交
     cat > "$EXEC_PROJECT/plan.md" << 'PLAN_EOF'
 # Test Plan
 ## Goal
@@ -578,19 +578,19 @@ Test unified codex config
 PLAN_EOF
     (cd "$EXEC_PROJECT" && git add plan.md && git commit -q -m "Add plan")
 
-    # Create a local bare remote to prevent network calls
+    # 创建本地裸远程以防止网络调用
     BARE_REMOTE="$TEST_DIR/remote.git"
     git clone --bare "$EXEC_PROJECT" "$BARE_REMOTE" -q 2>/dev/null
     (cd "$EXEC_PROJECT" && git remote remove origin 2>/dev/null; git remote add origin "$BARE_REMOTE") 2>/dev/null || true
 
-    # Run setup-rlcr-loop.sh with --codex-model override
+    # 使用 --codex-model 覆盖运行 setup-rlcr-loop.sh
     setup_exit=0
     output=$(cd "$EXEC_PROJECT" && CLAUDE_PROJECT_DIR="$EXEC_PROJECT" run_with_timeout 30 bash "$SETUP_SCRIPT" --codex-model gpt-5.3:xhigh --base-branch master --track-plan-file plan.md 2>&1) || setup_exit=$?
 
     assert_eq "setup execution: setup-rlcr-loop.sh exited successfully" \
         "0" "$setup_exit"
 
-    # Find the generated state.md
+    # 查找生成的 state.md
     STATE_FILE=$(find "$EXEC_PROJECT/.humanize/rlcr" -name "state.md" 2>/dev/null | head -1 || true)
     if [[ -z "$STATE_FILE" ]]; then
         fail "setup execution: state.md was created" "non-empty path" "empty"
@@ -613,7 +613,7 @@ PLAN_EOF
                 "not found"
         fi
 
-        # Verify codex_model from --codex-model flag
+        # 验证来自 --codex-model 标志的 codex_model
         assert_eq "setup execution: --codex-model set codex_model (gpt-5.3)" \
             "gpt-5.3" "$(grep '^codex_model:' "$STATE_FILE" | sed 's/codex_model: *//')"
 
@@ -624,7 +624,7 @@ PLAN_EOF
             'loop_reviewer' "$STATE_FILE"
     fi
 
-    # Verify output does NOT mention "Reviewer Model" or "Reviewer Effort"
+    # 验证输出不提及 "Reviewer Model" 或 "Reviewer Effort"
     if echo "$output" | grep -q 'Reviewer Model\|Reviewer Effort'; then
         fail "setup execution: output does not mention Reviewer Model/Effort"
     else
@@ -635,12 +635,12 @@ fi
 echo ""
 
 # ========================================
-# Input validation still works
+# 输入验证仍然有效
 # ========================================
 
 echo "--- Input validation ---"
 
-# Test invalid model name (has spaces) - test the validation regex directly
+# 测试无效模型名（包含空格）- 直接测试验证正则表达式
 model_with_spaces="gpt 5.5 bad"
 if [[ ! "$model_with_spaces" =~ ^[a-zA-Z0-9._-]+$ ]]; then
     pass "validation: model with spaces is rejected by regex"
@@ -655,7 +655,7 @@ else
     fail "validation: model with shell metacharacters is rejected"
 fi
 
-# Test invalid effort value
+# 测试无效 effort 值
 invalid_effort="superhigh"
 if [[ ! "$invalid_effort" =~ ^(xhigh|high|medium|low)$ ]]; then
     pass "validation: invalid effort value is rejected by regex"
@@ -663,7 +663,7 @@ else
     fail "validation: invalid effort value is rejected by regex"
 fi
 
-# Test valid effort values
+# 测试有效 effort 值
 for effort in xhigh high medium low; do
     if [[ "$effort" =~ ^(xhigh|high|medium|low)$ ]]; then
         pass "validation: effort '$effort' is accepted"
@@ -675,7 +675,7 @@ done
 echo ""
 
 # ========================================
-# ask-codex respects config-backed defaults (AC-5)
+# ask-codex 遵循配置支持的默认值（AC-5）
 # ========================================
 
 echo "--- ask-codex config-backed defaults ---"
@@ -685,21 +685,21 @@ ASK_CODEX="$PROJECT_ROOT/scripts/ask-codex.sh"
 if [[ ! -f "$ASK_CODEX" ]]; then
     skip "ask-codex config tests require ask-codex.sh" "file not found"
 else
-    # ask-codex does NOT pre-set DEFAULT_CODEX_MODEL or DEFAULT_CODEX_EFFORT
+    # ask-codex 不预设 DEFAULT_CODEX_MODEL 或 DEFAULT_CODEX_EFFORT
     assert_no_grep "ask-codex.sh: does not pre-set DEFAULT_CODEX_MODEL" \
         'DEFAULT_CODEX_MODEL=' "$ASK_CODEX"
 
     assert_no_grep "ask-codex.sh: does not pre-set DEFAULT_CODEX_EFFORT" \
         'DEFAULT_CODEX_EFFORT=' "$ASK_CODEX"
 
-    # ask-codex uses DEFAULT_CODEX_MODEL from loop-common.sh (config-backed)
+    # ask-codex 使用来自 loop-common.sh 的 DEFAULT_CODEX_MODEL（配置支持）
     assert_grep "ask-codex.sh: assigns CODEX_MODEL from DEFAULT_CODEX_MODEL" \
         'CODEX_MODEL="\$DEFAULT_CODEX_MODEL"' "$ASK_CODEX"
 
     assert_grep "ask-codex.sh: assigns CODEX_EFFORT from DEFAULT_CODEX_EFFORT" \
         'CODEX_EFFORT="\$DEFAULT_CODEX_EFFORT"' "$ASK_CODEX"
 
-    # Help text mentions config-backed defaults
+    # 帮助文本提及配置支持的默认值
     assert_grep "ask-codex.sh: help text mentions config-backed default" \
         'default from config' "$ASK_CODEX"
 fi
@@ -707,7 +707,7 @@ fi
 echo ""
 
 # ========================================
-# ask-codex runtime behavioral test
+# ask-codex 运行时行为测试
 # ========================================
 
 echo "--- ask-codex runtime behavioral ---"
@@ -721,7 +721,7 @@ else
     mkdir -p "$ASK_CFG_PROJECT/.humanize"
     printf '{"codex_model": "o3-mini", "codex_effort": "low"}' > "$ASK_CFG_PROJECT/.humanize/config.json"
 
-    # Create a mock codex that outputs a fixed response
+    # 创建输出固定响应的模拟 codex
     MOCK_BIN="$TEST_DIR/mock-bin"
     mkdir -p "$MOCK_BIN"
     cat > "$MOCK_BIN/codex" << 'MOCK_EOF'
@@ -731,14 +731,14 @@ exit 0
 MOCK_EOF
     chmod +x "$MOCK_BIN/codex"
 
-    # Run ask-codex with config-backed defaults (no --codex-model flag)
+    # 使用配置支持的默认值（无 --codex-model 标志）运行 ask-codex
     ask_stderr=$(cd "$ASK_CFG_PROJECT" && \
         CLAUDE_PROJECT_DIR="$ASK_CFG_PROJECT" \
         XDG_CONFIG_HOME="$TEST_DIR/no-user-config" \
         PATH="$MOCK_BIN:$PATH" \
         run_with_timeout 30 bash "$ASK_CODEX" "test question" 2>&1 >/dev/null) || true
 
-    # Stderr should report config-backed model and effort
+    # Stderr 应报告配置支持的模型和 effort
     if echo "$ask_stderr" | grep -q 'model=o3-mini'; then
         pass "ask-codex runtime: config-backed model reported in stderr (o3-mini)"
     else
@@ -751,7 +751,7 @@ MOCK_EOF
         fail "ask-codex runtime: config-backed effort reported in stderr (low)" "contains 'effort=low'" "$ask_stderr"
     fi
 
-    # Run ask-codex with --codex-model override
+    # 使用 --codex-model 覆盖运行 ask-codex
     override_stderr=$(cd "$ASK_CFG_PROJECT" && \
         CLAUDE_PROJECT_DIR="$ASK_CFG_PROJECT" \
         XDG_CONFIG_HOME="$TEST_DIR/no-user-config" \
@@ -774,7 +774,7 @@ fi
 echo ""
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 
 print_test_summary "Unified Codex Config Test Summary"

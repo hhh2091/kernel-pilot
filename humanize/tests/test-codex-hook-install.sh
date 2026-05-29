@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Tests for Codex-native hook installation and merge behavior.
+# Codex 原生钩子安装和合并行为的测试。
 #
 
 set -euo pipefail
@@ -424,11 +424,10 @@ else
         "$(cat "$TEST_DIR/install-unsupported.log")"
 fi
 
-# --- Codex with hooks but without --disable must be rejected ---
-# Regression: a Codex build that exposes hooks but lacks --disable cannot
-# be safely installed because the stop hook's recursive-invocation guard relies on
-# `--disable hooks`. The installer must catch this configuration before
-# writing any files.
+# --- 带有 hooks 但没有 --disable 的 Codex 必须被拒绝 ---
+# 回归测试：暴露 hooks 但缺少 --disable 的 Codex 构建无法安全安装，
+# 因为 stop hook 的递归调用保护依赖于 `--disable hooks`。
+# 安装程序必须在写入任何文件之前捕获此配置。
 
 NO_DISABLE_BIN="$TEST_DIR/bin-no-disable"
 NO_DISABLE_HOME="$TEST_DIR/codex-home-no-disable"
@@ -481,10 +480,10 @@ else
         "$(cat "$TEST_DIR/install-no-disable.log")"
 fi
 
-# --- Kimi RLCR skill gate test ---
-# Regression: after the native-hook SKILL.md was introduced, Kimi installs
-# received the same "stop or exit normally / native hook" instructions.
-# overwrite_kimi_rlcr_skill() must replace that with the gate-based SKILL.md.
+# --- Kimi RLCR 技能门控测试 ---
+# 回归测试：在引入原生钩子 SKILL.md 后，Kimi 安装收到了相同的
+# "stop or exit normally / native hook" 指令。
+# overwrite_kimi_rlcr_skill() 必须用基于门控的 SKILL.md 替换它。
 
 KIMI_HOME_DIR="$TEST_DIR/kimi-home"
 KIMI_SKILLS_DIR="$KIMI_HOME_DIR/skills"
@@ -529,10 +528,10 @@ else
         "$(grep -n "gpt-5\\.[45]:high" "$KIMI_RLCR_SKILL" 2>/dev/null || echo MISSING)"
 fi
 
-# --- --target both provider_mode test ---
-# Regression: install_codex_target() was passing $TARGET ("both") to
-# install_codex_user_config(), so provider_mode: "codex-only" was never written
-# for mixed Codex+Kimi installs.
+# --- --target both provider_mode 测试 ---
+# 回归测试：install_codex_target() 将 $TARGET ("both") 传递给
+# install_codex_user_config()，因此混合 Codex+Kimi 安装时
+# provider_mode: "codex-only" 从未被写入。
 
 BOTH_CODEX_HOME="$TEST_DIR/both-codex-home"
 BOTH_KIMI_SKILLS="$TEST_DIR/both-kimi-skills"
@@ -558,10 +557,10 @@ else
         "codex-only" "$(jq -c '.' "$BOTH_USER_CONFIG" 2>/dev/null || echo MISSING)"
 fi
 
-# --- --target both with shared skills dir must be rejected ---
-# Regression: when KIMI_SKILLS_DIR == CODEX_SKILLS_DIR, install_codex_target
-# overwrites the Kimi-specific humanize-rlcr/SKILL.md. The installer must
-# reject this configuration before any install work happens.
+# --- 使用共享 skills 目录的 --target both 必须被拒绝 ---
+# 回归测试：当 KIMI_SKILLS_DIR == CODEX_SKILLS_DIR 时，install_codex_target
+# 会覆盖 Kimi 特定的 humanize-rlcr/SKILL.md。安装程序必须在任何安装工作
+# 发生之前拒绝此配置。
 
 SHARED_DIR="$TEST_DIR/shared-skills"
 mkdir -p "$SHARED_DIR"
@@ -596,8 +595,8 @@ else
         "conflict message" "$(cat "$TEST_DIR/install-shared.log")"
 fi
 
-# Equivalent non-existent paths must also be rejected. Regression: failed
-# realpath calls used raw strings, so a/../shared and shared compared different.
+# 等效的不存在路径也必须被拒绝。回归测试：失败的 realpath 调用使用了原始字符串，
+# 因此 a/../shared 和 shared 被比较为不同。
 mkdir -p "$TEST_DIR/path-normalization-missing" "$TEST_DIR/path-normalization-codex-home"
 NORMALIZED_SHARED_A="$TEST_DIR/path-normalization-missing/a/../shared"
 NORMALIZED_SHARED_B="$TEST_DIR/path-normalization-missing/shared"

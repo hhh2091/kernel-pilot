@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Tests for validate-explore-idea-io.sh — explore-idea input validation.
+# validate-explore-idea-io.sh 的测试 —— explore-idea 输入验证。
 #
-# Covers:
-#   - Exit codes 1-9 for all error conditions
-#   - Success: emits VALIDATION_SUCCESS + structured key-value output
-#   - Direction selection: default, --directions by id, --directions by source_index
-#   - Cap enforcement: concurrency, iterations, timeouts
-#   - Git checkout state hard-fail
+# 覆盖：
+#   - 所有错误条件的退出码 1-9
+#   - 成功：发出 VALIDATION_SUCCESS + 结构化键值输出
+#   - 方向选择：默认、按 id 的 --directions、按 source_index 的 --directions
+#   - 上限执行：并发、迭代、超时
+#   - Git checkout 状态硬失败
 #
 
 set -euo pipefail
@@ -32,18 +32,18 @@ fi
 
 setup_test_dir
 
-# Create a mock git repo (clean state)
+# 创建模拟 Git 仓库（干净状态）
 MOCK_REPO="$TEST_DIR/repo"
 init_test_git_repo "$MOCK_REPO"
 
-# Copy valid fixture into the mock repo and commit it
+# 将有效夹具复制到模拟仓库并提交
 cp "$VALID_FIXTURE" "$MOCK_REPO/valid.directions.json"
 (cd "$MOCK_REPO" && git add valid.directions.json && git commit -q -m "add directions")
 
-# Create a draft .md alongside the companion
+# 在伴随文件旁创建草稿 .md
 (cd "$MOCK_REPO" && echo "draft content" > draft.md && cp valid.directions.json draft.directions.json && git add draft.md draft.directions.json && git commit -q -m "add draft")
 
-# Set up plugin root with required templates
+# 设置包含所需模板的插件根目录
 PLUGIN_ROOT="$TEST_DIR/plugin"
 mkdir -p "$PLUGIN_ROOT/scripts"
 mkdir -p "$PLUGIN_ROOT/prompt-template/explore"
@@ -52,19 +52,19 @@ touch "$PLUGIN_ROOT/prompt-template/explore/worker-prompt.md"
 touch "$PLUGIN_ROOT/prompt-template/explore/report-template.md"
 touch "$PLUGIN_ROOT/prompt-template/explore/final-idea-template.md"
 
-# Helper: run validation inside the mock repo (clean state)
+# 辅助函数：在模拟仓库内运行验证（干净状态）
 run_validate() {
     (cd "$MOCK_REPO" && CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash "$VALIDATE_SCRIPT" "$@")
 }
 
 # ----------------------------------------
-# Negative Tests: error exit codes
+# 反面测试：错误退出码
 # ----------------------------------------
 
 echo "--- Negative Tests: error exit codes ---"
 echo ""
 
-# Exit 1: missing input
+# 退出 1：缺少输入
 EXIT_CODE=0
 run_validate 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 1 ]]; then
@@ -73,7 +73,7 @@ else
     fail "exit 1 when no input path provided" "exit 1" "exit=$EXIT_CODE"
 fi
 
-# Exit 2: file not found (.directions.json)
+# 退出 2：文件未找到（.directions.json）
 EXIT_CODE=0
 run_validate "$MOCK_REPO/nonexistent.directions.json" 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 2 ]]; then
@@ -82,7 +82,7 @@ else
     fail "exit 2 when .directions.json not found" "exit 2" "exit=$EXIT_CODE"
 fi
 
-# Exit 2: draft .md not found
+# 退出 2：草稿 .md 未找到
 EXIT_CODE=0
 run_validate "$MOCK_REPO/missing.md" 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 2 ]]; then
@@ -91,7 +91,7 @@ else
     fail "exit 2 when draft .md not found" "exit 2" "exit=$EXIT_CODE"
 fi
 
-# Exit 3: .md exists but companion .directions.json missing
+# 退出 3：.md 存在但伴随 .directions.json 缺失
 ORPHAN_MD="$MOCK_REPO/orphan.md"
 echo "no companion" > "$ORPHAN_MD"
 (cd "$MOCK_REPO" && git add orphan.md && git commit -q -m "add orphan")
@@ -103,7 +103,7 @@ else
     fail "exit 3 when companion .directions.json missing" "exit 3" "exit=$EXIT_CODE"
 fi
 
-# Exit 4: unsupported extension
+# 退出 4：不支持的扩展名
 JUNK_FILE="$MOCK_REPO/idea.txt"
 echo "txt" > "$JUNK_FILE"
 (cd "$MOCK_REPO" && git add idea.txt && git commit -q -m "add txt")
@@ -115,7 +115,7 @@ else
     fail "exit 4 for unsupported extension" "exit 4" "exit=$EXIT_CODE"
 fi
 
-# Exit 5: invalid JSON schema
+# 退出 5：无效 JSON 模式
 BAD_JSON_FILE="$TEST_DIR/bad.directions.json"
 echo '{"schema_version": 99, "directions": []}' > "$BAD_JSON_FILE"
 EXIT_CODE=0
@@ -126,7 +126,7 @@ else
     fail "exit 5 for invalid schema" "exit 5" "exit=$EXIT_CODE"
 fi
 
-# Exit 6: --concurrency above cap
+# 退出 6：--concurrency 超过上限
 EXIT_CODE=0
 run_validate "$MOCK_REPO/valid.directions.json" --concurrency 11 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 6 ]]; then
@@ -135,7 +135,7 @@ else
     fail "exit 6 when concurrency exceeds cap" "exit 6" "exit=$EXIT_CODE"
 fi
 
-# Exit 6: --max-worker-iterations above cap
+# 退出 6：--max-worker-iterations 超过上限
 EXIT_CODE=0
 run_validate "$MOCK_REPO/valid.directions.json" --max-worker-iterations 4 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 6 ]]; then
@@ -144,7 +144,7 @@ else
     fail "exit 6 when max-worker-iterations exceeds cap" "exit 6" "exit=$EXIT_CODE"
 fi
 
-# Exit 6: unknown --directions selector
+# 退出 6：未知 --directions 选择器
 EXIT_CODE=0
 run_validate "$MOCK_REPO/valid.directions.json" --directions "dir-99-nonexistent" 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 6 ]]; then
@@ -153,7 +153,7 @@ else
     fail "exit 6 for unknown direction selector" "exit 6" "exit=$EXIT_CODE"
 fi
 
-# Exit 6: mixed selector forms that resolve to the same direction_id (regression for post-resolution dedup)
+# 退出 6：解析为相同 direction_id 的混合选择器形式（解析后去重的回归）
 EXIT_CODE=0
 run_validate "$MOCK_REPO/valid.directions.json" --directions "1,dir-01-event-sourcing" 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 6 ]]; then
@@ -162,7 +162,7 @@ else
     fail "exit 6 for mixed-form duplicate resolved direction_ids" "exit 6" "exit=$EXIT_CODE"
 fi
 
-# Exit 6: unknown option
+# 退出 6：未知选项
 EXIT_CODE=0
 run_validate "$MOCK_REPO/valid.directions.json" --bad-option 2>/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 6 ]]; then
@@ -187,7 +187,7 @@ else
     fail "exit 7 for dirty checkout" "exit 7" "exit=$EXIT_CODE"
 fi
 
-# Exit 7: dirty checkout with enough files to catch git|grep SIGPIPE regressions
+# 退出 7：包含足够文件以捕获 git|grep SIGPIPE 回归的脏 checkout
 DIRTY_MANY_REPO="$TEST_DIR/dirty-many-repo"
 init_test_git_repo "$DIRTY_MANY_REPO"
 cp "$VALID_FIXTURE" "$DIRTY_MANY_REPO/valid.directions.json"
@@ -218,7 +218,7 @@ else
         "exit=$EXIT_CODE output=$DIRTY_OUTPUT"
 fi
 
-# Exit 7: non-git checkout cannot provide BASE_COMMIT for worker anchoring
+# 退出 7：非 git checkout 无法为 worker 锚定提供 BASE_COMMIT
 NON_GIT_DIR="$TEST_DIR/non-git"
 mkdir -p "$NON_GIT_DIR"
 cp "$VALID_FIXTURE" "$NON_GIT_DIR/valid.directions.json"
@@ -235,7 +235,7 @@ else
         "exit=$EXIT_CODE output=$NON_GIT_OUTPUT"
 fi
 
-# Exit 7: unborn git checkout has no HEAD commit to anchor workers
+# 退出 7：未诞生的 git checkout 没有 HEAD 提交来锚定 worker
 UNBORN_REPO="$TEST_DIR/unborn-repo"
 mkdir -p "$UNBORN_REPO"
 (cd "$UNBORN_REPO" && git init -q)
@@ -253,7 +253,7 @@ else
         "exit=$EXIT_CODE output=$UNBORN_OUTPUT"
 fi
 
-# Exit 9: missing worker prompt template
+# 退出 9：缺少 worker 提示模板
 NO_TMPL_PLUGIN="$TEST_DIR/plugin-no-tmpl"
 mkdir -p "$NO_TMPL_PLUGIN/scripts"
 mkdir -p "$NO_TMPL_PLUGIN/prompt-template/explore"
@@ -267,7 +267,7 @@ else
     fail "exit 9 when templates missing" "exit 9" "exit=$EXIT_CODE"
 fi
 
-# Exit 9: missing final idea template
+# 退出 9：缺少最终 idea 模板
 NO_FINAL_TMPL_PLUGIN="$TEST_DIR/plugin-no-final-tmpl"
 mkdir -p "$NO_FINAL_TMPL_PLUGIN/scripts"
 mkdir -p "$NO_FINAL_TMPL_PLUGIN/prompt-template/explore"
@@ -283,14 +283,14 @@ else
 fi
 
 # ----------------------------------------
-# Positive Tests: success output
+# 正面测试：成功输出
 # ----------------------------------------
 
 echo ""
 echo "--- Positive Tests: success output ---"
 echo ""
 
-# Success: VALIDATION_SUCCESS emitted
+# 成功：发出 VALIDATION_SUCCESS
 EXIT_CODE=0
 OUTPUT=$(run_validate "$MOCK_REPO/valid.directions.json" 2>/dev/null) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]] && echo "$OUTPUT" | grep -q "VALIDATION_SUCCESS"; then
@@ -299,7 +299,7 @@ else
     fail "exits 0 with VALIDATION_SUCCESS" "exit 0 + VALIDATION_SUCCESS" "exit=$EXIT_CODE"
 fi
 
-# Success: all required keys present in output
+# 成功：输出中包含所有必需键
 REQUIRED_KEYS=(
     "DIRECTIONS_JSON_FILE:"
     "DRAFT_PATH:"
@@ -334,7 +334,7 @@ if [[ "$ALL_KEYS_PRESENT" == "true" ]]; then
     pass "success output contains all required key-value pairs"
 fi
 
-# Success: .md draft input resolves companion
+# 成功：.md 草稿输入解析伴随文件
 EXIT_CODE=0
 OUTPUT_MD=$(run_validate "$MOCK_REPO/draft.md" 2>/dev/null) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]] && echo "$OUTPUT_MD" | grep -q "VALIDATION_SUCCESS"; then
@@ -343,7 +343,7 @@ else
     fail "exits 0 for .md input" "exit 0 + VALIDATION_SUCCESS" "exit=$EXIT_CODE"
 fi
 
-# Direction selection by direction_id
+# 按 direction_id 选择方向
 EXIT_CODE=0
 OUTPUT_DIR=$(run_validate "$MOCK_REPO/valid.directions.json" --directions "dir-00-command-history" 2>/dev/null) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]] && echo "$OUTPUT_DIR" | grep -q "dir-00-command-history"; then
@@ -352,7 +352,7 @@ else
     fail "--directions by direction_id" "dir-00-command-history in SELECTED" "exit=$EXIT_CODE"
 fi
 
-# Direction selection by source_index
+# 按 source_index 选择方向
 EXIT_CODE=0
 OUTPUT_IDX=$(run_validate "$MOCK_REPO/valid.directions.json" --directions "1" 2>/dev/null) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]] && echo "$OUTPUT_IDX" | grep -q "dir-01-event-sourcing"; then
@@ -369,7 +369,7 @@ else
     fail "EFFECTIVE_CONCURRENCY capped to direction count" "1" "$EFFECTIVE"
 fi
 
-# Run ID should be explanatory and collision-safe: <slug>-<timestamp>Z-<6hex>
+# 运行 ID 应具有说明性且防冲突：<slug>-<timestamp>Z-<6hex>
 RUN_ID_VALUE=$(echo "$OUTPUT" | grep "^RUN_ID:" | sed 's/RUN_ID: //')
 RUN_SLUG_VALUE=$(echo "$OUTPUT" | grep "^RUN_SLUG:" | sed 's/RUN_SLUG: //')
 RUN_DIR_VALUE=$(echo "$OUTPUT" | grep "^RUN_DIR:" | sed 's/RUN_DIR: //')
@@ -383,7 +383,7 @@ else
         "RUN_ID=$RUN_ID_VALUE RUN_SLUG=$RUN_SLUG_VALUE RUN_DIR=$RUN_DIR_VALUE"
 fi
 
-# Draft input should derive the run slug from the draft basename.
+# 草稿输入应从草稿基名派生运行 slug。
 DRAFT_RUN_ID=$(echo "$OUTPUT_MD" | grep "^RUN_ID:" | sed 's/RUN_ID: //')
 DRAFT_RUN_SLUG=$(echo "$OUTPUT_MD" | grep "^RUN_SLUG:" | sed 's/RUN_SLUG: //')
 if [[ "$DRAFT_RUN_ID" =~ ^draft-[0-9]{8}-[0-9]{6}Z-[a-f0-9]{6}$ ]] \

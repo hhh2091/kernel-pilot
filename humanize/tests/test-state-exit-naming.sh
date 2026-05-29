@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Tests for state.md rename on exit
+# 退出时 state.md 重命名的测试
 #
-# Tests:
-# - complete-state.md on COMPLETE
-# - stop-state.md on STOP
-# - maxiter-state.md on max iterations
-# - cancel-state.md on cancel
-# - unexpected-state.md on schema error
+# 测试项：
+# - COMPLETE 时生成 complete-state.md
+# - STOP 时生成 stop-state.md
+# - 达到最大迭代次数时生成 maxiter-state.md
+# - 取消时生成 cancel-state.md
+# - 模式错误时生成 unexpected-state.md
 #
 
 set -uo pipefail
@@ -15,7 +15,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Test helpers
+# 测试辅助函数
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
@@ -28,14 +28,14 @@ pass() { echo -e "${GREEN}PASS${NC}: $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
 fail() { echo -e "${RED}FAIL${NC}: $1"; echo "  Expected: $2"; echo "  Got: $3"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
 skip() { echo -e "${YELLOW}SKIP${NC}: $1 - $2"; TESTS_SKIPPED=$((TESTS_SKIPPED + 1)); }
 
-# Setup test environment
+# 设置测试环境
 TEST_DIR=$(mktemp -d)
 trap "rm -rf $TEST_DIR" EXIT
 
 echo "=== Test: State Exit Naming Conventions ==="
 echo ""
 
-# Test 1: Only state.md indicates active loop
+# 测试 1：只有 state.md 表示活跃循环
 echo "Test 1: Only state.md indicates active loop"
 cd "$TEST_DIR"
 git init -q
@@ -48,7 +48,7 @@ git -c commit.gpgsign=false commit -q -m "Initial"
 LOOP_DIR="$TEST_DIR/.humanize/rlcr/2024-01-01_12-00-00"
 mkdir -p "$LOOP_DIR"
 
-# Create completed state (should not be detected as active)
+# 创建已完成状态（不应被检测为活跃）
 cat > "$LOOP_DIR/complete-state.md" << 'EOF'
 ---
 current_round: 5
@@ -63,7 +63,7 @@ EOF
 
 export CLAUDE_PROJECT_DIR="$TEST_DIR"
 
-# Source the loop-common.sh to get find_active_loop
+# 加载 loop-common.sh 以获取 find_active_loop
 source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
 
 ACTIVE_LOOP=$(find_active_loop "$TEST_DIR/.humanize/rlcr")
@@ -73,7 +73,7 @@ else
     fail "complete-state.md detection" "no active loop" "$ACTIVE_LOOP"
 fi
 
-# Test 2: state.md IS detected as active loop
+# 测试 2：state.md 被检测为活跃循环
 echo "Test 2: state.md is detected as active loop"
 cat > "$LOOP_DIR/state.md" << 'EOF'
 ---
@@ -94,7 +94,7 @@ else
     fail "state.md detection" "active loop found" "no active loop"
 fi
 
-# Test 3: cancel-state.md not detected as active
+# 测试 3：cancel-state.md 不被检测为活跃
 echo "Test 3: cancel-state.md not detected as active loop"
 rm -f "$LOOP_DIR/state.md"
 cat > "$LOOP_DIR/cancel-state.md" << 'EOF'
@@ -111,7 +111,7 @@ else
     fail "cancel-state.md detection" "no active loop" "$ACTIVE_LOOP"
 fi
 
-# Test 4: unexpected-state.md not detected as active
+# 测试 4：unexpected-state.md 不被检测为活跃
 echo "Test 4: unexpected-state.md not detected as active loop"
 cat > "$LOOP_DIR/unexpected-state.md" << 'EOF'
 ---
@@ -126,7 +126,7 @@ else
     fail "unexpected-state.md detection" "no active loop" "$ACTIVE_LOOP"
 fi
 
-# Test 5: maxiter-state.md not detected as active
+# 测试 5：maxiter-state.md 不被检测为活跃
 echo "Test 5: maxiter-state.md not detected as active loop"
 cat > "$LOOP_DIR/maxiter-state.md" << 'EOF'
 ---
@@ -142,7 +142,7 @@ else
     fail "maxiter-state.md detection" "no active loop" "$ACTIVE_LOOP"
 fi
 
-# Test 6: stop-state.md not detected as active
+# 测试 6：stop-state.md 不被检测为活跃
 echo "Test 6: stop-state.md not detected as active loop"
 cat > "$LOOP_DIR/stop-state.md" << 'EOF'
 ---
@@ -158,7 +158,7 @@ else
     fail "stop-state.md detection" "no active loop" "$ACTIVE_LOOP"
 fi
 
-# Test 7: Newer directory with state.md takes precedence
+# 测试 7：包含 state.md 的较新目录优先
 echo "Test 7: Newer directory with state.md takes precedence"
 NEWER_LOOP_DIR="$TEST_DIR/.humanize/rlcr/2024-01-02_12-00-00"
 mkdir -p "$NEWER_LOOP_DIR"
@@ -183,7 +183,7 @@ echo ""
 echo "=== Test: end_loop() Function ==="
 echo ""
 
-# Test 8: end_loop rejects invalid reason
+# 测试 8：end_loop 拒绝无效原因
 echo "Test 8: end_loop rejects invalid reason"
 END_LOOP_TEST_DIR="$TEST_DIR/.humanize/rlcr/2024-01-03_12-00-00"
 mkdir -p "$END_LOOP_TEST_DIR"
@@ -203,7 +203,7 @@ else
     fail "end_loop invalid reason" "exit 1 with invalid reason error" "exit $EXIT_CODE: $RESULT"
 fi
 
-# Test 9: end_loop creates correct file for each valid reason
+# 测试 9：end_loop 为每个有效原因创建正确的文件
 echo "Test 9: end_loop creates correct files for valid reasons"
 REASONS_PASS=true
 for reason in complete cancel maxiter stop unexpected; do
@@ -229,7 +229,7 @@ if [[ "$REASONS_PASS" == "true" ]]; then
     pass "end_loop creates correct files for all valid reasons"
 fi
 
-# Test 10: end_loop handles missing state file
+# 测试 10：end_loop 处理缺失的状态文件
 echo "Test 10: end_loop handles missing state file gracefully"
 rm -f "$END_LOOP_TEST_DIR/state.md"
 set +e
@@ -246,7 +246,7 @@ echo ""
 echo "=== Test: Path Detection (New vs Legacy) ==="
 echo ""
 
-# Test 11: is_in_humanize_loop_dir correctly identifies NEW path
+# 测试 11：is_in_humanize_loop_dir 正确识别新路径
 echo "Test 11: is_in_humanize_loop_dir detects .humanize/rlcr path"
 NEW_PATH="/some/project/.humanize/rlcr/2024-01-01_12-00-00/state.md"
 if is_in_humanize_loop_dir "$NEW_PATH"; then
@@ -255,7 +255,7 @@ else
     fail "is_in_humanize_loop_dir new path" "returns true" "returns false"
 fi
 
-# Test 12: is_in_humanize_loop_dir does NOT match legacy path (NEGATIVE TEST)
+# 测试 12：is_in_humanize_loop_dir 不匹配旧路径（反向测试）
 echo "Test 12: is_in_humanize_loop_dir does NOT detect legacy .humanize-loop.local path"
 LEGACY_PATH="/some/project/.humanize-loop.local/2024-01-01_12-00-00/state.md"
 if is_in_humanize_loop_dir "$LEGACY_PATH"; then
@@ -264,11 +264,11 @@ else
     pass "is_in_humanize_loop_dir does NOT detect legacy .humanize-loop.local path"
 fi
 
-# Test 13: The code only looks in .humanize/rlcr, not legacy paths
-# This test verifies that even with a legacy directory present, the main search
-# path is .humanize/rlcr, so legacy directories won't accidentally be used
+# 测试 13：代码只在 .humanize/rlcr 中查找，不在旧路径中查找
+# 此测试验证即使存在旧目录，主搜索路径仍是 .humanize/rlcr，
+# 因此旧目录不会被意外使用
 echo "Test 13: Legacy directory not searched when using new base path"
-# Create legacy directory with a state file
+# 创建包含状态文件的旧目录
 LEGACY_LOOP_DIR="$TEST_DIR/.humanize-loop.local/2024-01-01_12-00-00"
 mkdir -p "$LEGACY_LOOP_DIR"
 cat > "$LEGACY_LOOP_DIR/state.md" << 'EOF'
@@ -280,9 +280,9 @@ plan_tracked: false
 start_branch: main
 ---
 EOF
-# Remove the new path state.md so only legacy exists
+# 删除新路径的 state.md，只保留旧路径
 rm -f "$TEST_DIR/.humanize/rlcr/"*/state.md 2>/dev/null || true
-# Search in the NEW base path - should find nothing because we removed state.md
+# 在新基础路径中搜索 - 应该找不到任何内容，因为我们删除了 state.md
 ACTIVE_LOOP=$(find_active_loop "$TEST_DIR/.humanize/rlcr")
 if [[ -z "$ACTIVE_LOOP" ]]; then
     pass "Legacy directory not searched when using new base path"

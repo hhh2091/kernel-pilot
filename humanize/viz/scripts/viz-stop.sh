@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Stop the Humanize Viz dashboard server for one project.
+# 停止某个项目的 Humanize Viz 仪表盘服务器。
 #
-# Per-project tmux session names (T9) mean stopping one project's
-# dashboard never touches another project's running server.
+# 基于项目的 tmux 会话名称（T9）确保停止一个项目的仪表盘
+# 不会影响另一个项目正在运行的服务器。
 #
-# Usage:
-#   viz-stop.sh <project_dir>           # legacy positional
-#   viz-stop.sh --project <path>        # current named flag
+# 用法：
+#   viz-stop.sh <project_dir>           # 旧式位置参数
+#   viz-stop.sh --project <path>        # 当前命名标志
 
 set -euo pipefail
 
@@ -28,9 +28,8 @@ PORT_FILE="$HUMANIZE_DIR/viz.port"
 URL_FILE="$HUMANIZE_DIR/viz.url"
 TMUX_SESSION="$(viz_tmux_session_name "$PROJECT_DIR")"
 
-# `=$TMUX_SESSION` forces exact match so prefix collisions (or the
-# generic "humanize-viz" fallback name) cannot cause an unrelated
-# session to be killed.
+# `=$TMUX_SESSION` 强制精确匹配，确保前缀冲突（或通用的
+# "humanize-viz" 回退名称）不会导致无关会话被误杀。
 if tmux has-session -t "=$TMUX_SESSION" 2>/dev/null; then
     tmux kill-session -t "=$TMUX_SESSION"
     rm -f "$PORT_FILE" "$URL_FILE"

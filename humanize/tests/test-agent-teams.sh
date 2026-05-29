@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# Tests for --agent-teams feature in RLCR loop
+# --agent-teams 功能在 RLCR 循环中的测试
 #
-# Tests cover:
-# - --agent-teams CLI option validation
-# - CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env var check
-# - agent_teams field in state.md
-# - parse_state_file reads agent_teams
-# - Initial prompt includes team leader instructions
-# - Next-round prompt includes team usage in implementation phase
-# - Next-round prompt excludes team usage in review phase
+# 测试覆盖：
+# - --agent-teams CLI 选项验证
+# - CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 环境变量检查
+# - state.md 中的 agent_teams 字段
+# - parse_state_file 读取 agent_teams
+# - 初始提示包含团队负责人指令
+# - 下一轮提示在实现阶段包含团队用法
+# - 下一轮提示在评审阶段不包含团队用法
 #
 
 set -euo pipefail
@@ -17,7 +17,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 source "$SCRIPT_DIR/test-helpers.sh"
 
-# Source shared loop library
+# 引入共享循环库
 HOOKS_LIB_DIR="$(cd "$SCRIPT_DIR/../hooks/lib" && pwd)"
 source "$HOOKS_LIB_DIR/loop-common.sh"
 
@@ -29,13 +29,13 @@ echo ""
 SETUP_SCRIPT="$SCRIPT_DIR/../scripts/setup-rlcr-loop.sh"
 
 # ========================================
-# Test: --agent-teams fails without CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+# 测试：缺少 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 时 --agent-teams 失败
 # ========================================
 
 setup_test_dir
 init_test_git_repo "$TEST_DIR/project"
 
-# Create a valid plan file (gitignored)
+# 创建一个有效的计划文件（被 gitignore）
 mkdir -p "$TEST_DIR/project/temp"
 cat > "$TEST_DIR/project/temp/plan.md" << 'EOF'
 # Test Plan
@@ -51,7 +51,7 @@ cd "$TEST_DIR/project"
 git add .gitignore
 git commit -q -m "Add gitignore"
 
-# Run setup with --agent-teams but WITHOUT env var
+# 运行 setup，带 --agent-teams 但不设置环境变量
 cd "$TEST_DIR/project"
 SETUP_OUTPUT=$(CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="" CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$SETUP_SCRIPT" --agent-teams temp/plan.md 2>&1) || SETUP_EXIT=$?
 
@@ -61,14 +61,14 @@ else
     fail "setup with --agent-teams fails without env var" "non-zero exit" "exit 0"
 fi
 
-# Check error message mentions CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
+# 检查错误消息是否提及 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
 if echo "$SETUP_OUTPUT" | grep -qi "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"; then
     pass "error message mentions CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env var"
 else
     fail "error message mentions CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env var" "env var name in output" "$SETUP_OUTPUT"
 fi
 
-# Test: --agent-teams rejects non-"1" values like "0" and "false"
+# 测试：--agent-teams 拒绝非"1"的值，如"0"和"false"
 for BAD_VALUE in "0" "false" "yes" "true"; do
     SETUP_OUTPUT=$(CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="$BAD_VALUE" CLAUDE_PROJECT_DIR="$TEST_DIR/project" bash "$SETUP_SCRIPT" --agent-teams temp/plan.md 2>&1) || SETUP_EXIT=$?
     if [[ "${SETUP_EXIT:-0}" -ne 0 ]]; then
@@ -79,7 +79,7 @@ for BAD_VALUE in "0" "false" "yes" "true"; do
 done
 
 # ========================================
-# Test: --agent-teams succeeds with env var set
+# 测试：设置环境变量后 --agent-teams 成功
 # ========================================
 
 setup_test_dir
@@ -111,7 +111,7 @@ else
 fi
 
 # ========================================
-# Test: agent_teams: true is recorded in state.md
+# 测试：agent_teams: true 被记录到 state.md
 # ========================================
 
 if [[ -n "$STATE_FILE" ]] && grep -q "^agent_teams: true" "$STATE_FILE"; then
@@ -121,7 +121,7 @@ else
 fi
 
 # ========================================
-# Test: agent_teams: false by default (without --agent-teams)
+# 测试：默认情况下 agent_teams: false（不带 --agent-teams）
 # ========================================
 
 setup_test_dir
@@ -153,7 +153,7 @@ else
 fi
 
 # ========================================
-# Test: project config can enable agent_teams without CLI flag
+# 测试：项目配置可以在不带 CLI 标志的情况下启用 agent_teams
 # ========================================
 
 setup_test_dir
@@ -186,7 +186,7 @@ else
 fi
 
 # ========================================
-# Test: parse_state_file reads agent_teams field
+# 测试：parse_state_file 读取 agent_teams 字段
 # ========================================
 
 setup_test_dir
@@ -215,7 +215,7 @@ else
 fi
 
 # ========================================
-# Test: parse_state_file defaults agent_teams to false
+# 测试：parse_state_file 默认将 agent_teams 设为 false
 # ========================================
 
 setup_test_dir
@@ -242,7 +242,7 @@ else
 fi
 
 # ========================================
-# Test: Initial prompt includes team leader instructions with --agent-teams
+# 测试：使用 --agent-teams 时初始提示包含团队负责人指令
 # ========================================
 
 setup_test_dir
@@ -269,7 +269,7 @@ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_PROJECT_DIR="$TEST_DIR/project" ba
 PROMPT_FILE=$(find "$TEST_DIR/project/.humanize/rlcr" -name "round-0-prompt.md" -type f 2>/dev/null | head -1)
 
 if [[ -n "$PROMPT_FILE" ]]; then
-    # Check for team leader keywords
+    # 检查团队负责人关键词
     TEAM_INSTRUCTIONS_FOUND=0
     if grep -qi "team leader" "$PROMPT_FILE"; then
         TEAM_INSTRUCTIONS_FOUND=$((TEAM_INSTRUCTIONS_FOUND + 1))
@@ -291,7 +291,7 @@ else
 fi
 
 # ========================================
-# Test: Initial prompt WITHOUT --agent-teams has no team instructions
+# 测试：不带 --agent-teams 时初始提示不包含团队指令
 # ========================================
 
 setup_test_dir
@@ -328,7 +328,7 @@ else
 fi
 
 # ========================================
-# Test: agent-teams prompt template files exist
+# 测试：agent-teams 提示模板文件存在
 # ========================================
 
 TEMPLATE_FILE="$SCRIPT_DIR/../prompt-template/claude/agent-teams-instructions.md"
@@ -344,7 +344,7 @@ else
 fi
 
 # ========================================
-# Test: agent-teams core template file exists (shared guidelines)
+# 测试：agent-teams 核心模板文件存在（共享指南）
 # ========================================
 
 CORE_TEMPLATE="$SCRIPT_DIR/../prompt-template/claude/agent-teams-core.md"
@@ -355,7 +355,7 @@ if [[ -f "$CORE_TEMPLATE" ]]; then
     else
         fail "agent-teams-core.md template exists with content" ">=500 bytes" "$FILE_SIZE bytes"
     fi
-    # Verify core contains essential team leader guidance
+    # 验证核心模板包含必要的团队负责人指南
     if grep -q "Your Role" "$CORE_TEMPLATE" && grep -q "Guidelines" "$CORE_TEMPLATE" && grep -q "Important" "$CORE_TEMPLATE"; then
         pass "agent-teams-core.md contains role, guidelines, and important sections"
     else
@@ -366,7 +366,7 @@ else
 fi
 
 # ========================================
-# Test: agent-teams continue prompt template file exists
+# 测试：agent-teams 继续提示模板文件存在
 # ========================================
 
 CONTINUE_TEMPLATE="$SCRIPT_DIR/../prompt-template/claude/agent-teams-continue.md"
@@ -377,7 +377,7 @@ if [[ -f "$CONTINUE_TEMPLATE" ]]; then
     else
         fail "agent-teams-continue.md template exists with content" ">=200 bytes" "$FILE_SIZE bytes"
     fi
-    # Verify continuation template has continuation-specific context
+    # 验证继续模板包含继续特定的上下文
     if grep -q "Continuation Context" "$CONTINUE_TEMPLATE"; then
         pass "agent-teams-continue.md contains continuation-specific guidance"
     else
@@ -388,7 +388,7 @@ else
 fi
 
 # ========================================
-# Test: find_active_loop with agent_teams in state.md
+# 测试：在 state.md 中包含 agent_teams 时 find_active_loop
 # ========================================
 
 setup_test_dir
@@ -414,11 +414,11 @@ else
 fi
 
 # ========================================
-# Stop Hook Tests: Agent-Teams Continuation in Next-Round Prompt
+# 停止钩子测试：下一轮提示中的 Agent-Teams 继续
 # ========================================
-# These tests exercise the actual stop hook (loop-codex-stop-hook.sh) to verify
-# that agent-teams continuation instructions appear in implementation phase
-# prompts but NOT in review phase prompts.
+# 这些测试执行实际的停止钩子（loop-codex-stop-hook.sh），验证
+# agent-teams 继续指令出现在实现阶段的提示中，
+# 但不出现在评审阶段的提示中。
 
 echo ""
 echo "--- Stop Hook Agent-Teams Continuation Tests ---"
@@ -427,7 +427,7 @@ echo ""
 PROJECT_ROOT="$SCRIPT_DIR/.."
 STOP_HOOK="$SCRIPT_DIR/../hooks/loop-codex-stop-hook.sh"
 
-# Helper: set up a test repo and loop dir for stop hook testing
+# 辅助函数：为停止钩子测试设置测试仓库和循环目录
 setup_stophook_test() {
     local round="$1"
     local agent_teams="$2"
@@ -443,7 +443,7 @@ setup_stophook_test() {
     git add init.txt
     git -c commit.gpgsign=false commit -q -m "Initial"
 
-    # Create plan file
+    # 创建计划文件
     mkdir -p plans
     cat > plans/test-plan.md << 'PLAN_EOF'
 # Test Plan
@@ -453,7 +453,7 @@ Test agent teams continuation
 - Requirement 1
 PLAN_EOF
 
-    # Gitignore for test artifacts
+    # 测试产物的 gitignore
     cat > .gitignore << 'GI_EOF'
 plans/
 .humanize/
@@ -463,7 +463,7 @@ GI_EOF
     git add .gitignore
     git -c commit.gpgsign=false commit -q -m "Add gitignore"
 
-    # Create loop directory
+    # 创建循环目录
     LOOP_DIR="$TEST_DIR/.humanize/rlcr/2024-01-01_12-00-00"
     mkdir -p "$LOOP_DIR"
 
@@ -494,7 +494,7 @@ drift_status: normal
 ---
 STATE_EOF
 
-    # Create plan backup and goal tracker
+    # 创建计划备份和目标跟踪器
     cp plans/test-plan.md "$LOOP_DIR/plan.md"
     cat > "$LOOP_DIR/goal-tracker.md" << 'GT_EOF'
 # Goal Tracker
@@ -513,7 +513,7 @@ Test agent teams continuation
 | Test | AC-1 | completed |
 GT_EOF
 
-    # Create summary for current round
+    # 创建当前轮次的摘要
     cat > "$LOOP_DIR/round-${round}-summary.md" << 'SUM_EOF'
 # Round Summary
 Implemented features as requested.
@@ -529,17 +529,17 @@ SUM_EOF
 - Success Criteria: advance the mainline objective without drift
 CONTRACT_EOF
 
-    # Set up isolated cache directory
+    # 设置隔离的缓存目录
     export XDG_CACHE_HOME="$TEST_DIR/.cache"
     mkdir -p "$XDG_CACHE_HOME"
 
-    # If review_started, create the marker file
+    # 如果 review_started，创建标记文件
     if [[ "$review_started" == "true" ]]; then
         echo "build_finish_round=$round" > "$LOOP_DIR/.review-phase-started"
     fi
 }
 
-# Helper: set up mock codex for implementation phase (codex exec outputs feedback)
+# 辅助函数：为实现阶段设置模拟 codex（codex exec 输出反馈）
 setup_mock_codex_impl_feedback() {
     local feedback="$1"
     mkdir -p "$TEST_DIR/bin"
@@ -564,7 +564,7 @@ MOCK_EOF
     export PATH="$TEST_DIR/bin:$PATH"
 }
 
-# Helper: set up mock codex for review phase (codex review outputs issues)
+# 辅助函数：为评审阶段设置模拟 codex（codex review 输出问题）
 setup_mock_codex_review_issues() {
     local review_output="$1"
     mkdir -p "$TEST_DIR/bin"
@@ -590,7 +590,7 @@ MOCK_EOF
 }
 
 # ========================================
-# Test: Implementation phase with agent_teams=true includes continuation
+# 测试：实现阶段 agent_teams=true 时包含继续指令
 # ========================================
 
 setup_stophook_test 3 "true" "false"
@@ -611,7 +611,7 @@ RESULT=$(echo "$HOOK_INPUT" | CLAUDE_PROJECT_DIR="$TEST_DIR" bash "$STOP_HOOK" 2
 HOOK_EXIT=$?
 set -e
 
-# The hook should block exit and generate a next-round prompt
+# 钩子应该阻止退出并生成下一轮提示
 NEXT_PROMPT="$LOOP_DIR/round-4-prompt.md"
 if [[ -f "$NEXT_PROMPT" ]]; then
     if grep -qi "Agent Teams" "$NEXT_PROMPT"; then
@@ -629,7 +629,7 @@ else
 fi
 
 # ========================================
-# Test: Drift recovery prompt still preserves agent-teams continuation
+# 测试：漂移恢复提示仍然保留 agent-teams 继续指令
 # ========================================
 
 setup_stophook_test 3 "true" "false"
@@ -669,7 +669,7 @@ else
 fi
 
 # ========================================
-# Test: Implementation phase with agent_teams=false has no continuation
+# 测试：实现阶段 agent_teams=false 时没有继续指令
 # ========================================
 
 setup_stophook_test 3 "false" "false"
@@ -701,7 +701,7 @@ else
 fi
 
 # ========================================
-# Test: Review phase with agent_teams=true has NO continuation
+# 测试：评审阶段 agent_teams=true 时没有继续指令
 # ========================================
 
 setup_stophook_test 5 "true" "true"
@@ -714,8 +714,8 @@ set +e
 RESULT=$(echo "$HOOK_INPUT" | CLAUDE_PROJECT_DIR="$TEST_DIR" bash "$STOP_HOOK" 2>/dev/null)
 set -e
 
-# In review phase, the prompt is generated by continue_review_loop_with_issues()
-# which uses review-phase-prompt.md template - should NOT include agent-teams
+# 在评审阶段，提示由 continue_review_loop_with_issues() 生成，
+# 使用 review-phase-prompt.md 模板 - 不应包含 agent-teams
 NEXT_PROMPT="$LOOP_DIR/round-6-prompt.md"
 if [[ -f "$NEXT_PROMPT" ]]; then
     if ! grep -qi "Agent Teams" "$NEXT_PROMPT"; then
@@ -723,7 +723,7 @@ if [[ -f "$NEXT_PROMPT" ]]; then
     else
         fail "review phase with agent_teams=true: no agent-teams continuation in prompt" "no agent-teams text" "found agent-teams text"
     fi
-    # Verify it IS a review-phase prompt (should mention P1 issues)
+    # 验证这是评审阶段的提示（应提及 P1 问题）
     if grep -q "P1" "$NEXT_PROMPT"; then
         pass "review phase prompt contains code review issues"
     else
@@ -734,7 +734,7 @@ else
 fi
 
 # ========================================
-# Print Summary
+# 打印摘要
 # ========================================
 
 print_test_summary "Agent Teams Feature Tests"

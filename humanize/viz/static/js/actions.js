@@ -1,4 +1,4 @@
-/* Action handlers — cancel, export, GitHub issue, plan viewer */
+/* 操作处理器 — 取消、导出、GitHub issue、计划查看器 */
 
 function toggleOpsMenu() {
     const menu = document.getElementById('ops-dropdown')
@@ -10,7 +10,7 @@ document.addEventListener('click', (e) => {
         document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'))
 })
 
-// ─── Cancel ───
+// ─── 取消 ───
 function showCancelModal(sessionId) {
     const modal = document.getElementById('modal-content')
     modal.innerHTML = `
@@ -34,7 +34,7 @@ function closeModal() {
     document.getElementById('modal-overlay').classList.remove('visible')
 }
 
-// ─── Export ───
+// ─── 导出 ───
 async function exportMarkdown(sessionId) {
     const res = await window.authedFetch(`/api/sessions/${sessionId}/export`, { method: 'POST' })
     if (!res.ok) return
@@ -50,7 +50,7 @@ async function exportMarkdown(sessionId) {
 
 function exportPdf() { window.print() }
 
-// ─── GitHub Issue (sanitized) ───
+// ─── GitHub Issue（脱敏处理） ───
 async function previewGitHubIssue(sessionId) {
     const res = await window.authedFetch(`/api/sessions/${sessionId}/sanitized-issue`)
     if (!res.ok) return
@@ -110,11 +110,11 @@ function copyToClipboard(text) {
     })
 }
 
-// ─── Generate Report (calls local Claude CLI) ───
+// ─── 生成报告（调用本地 Claude CLI） ───
 async function ensureReport(sessionId) {
     const resultEl = document.getElementById('sidebar-gh-result')
 
-    // Try sanitized-issue first — if it works, report exists
+    // 先尝试获取已脱敏的 issue — 如果成功，说明报告已存在
     const check = await window.authedFetch(`/api/sessions/${sessionId}/sanitized-issue`)
     if (check.ok) {
         const data = await check.json()
@@ -123,7 +123,7 @@ async function ensureReport(sessionId) {
         }
     }
 
-    // No report — generate one via Claude CLI
+    // 没有报告 — 通过 Claude CLI 生成一份
     if (resultEl) resultEl.innerHTML = `
         <div style="padding:var(--space-3);background:var(--bg-3);border-radius:var(--radius-sm);font-size:0.8rem">
             <div style="display:flex;align-items:center;gap:var(--space-2);color:var(--accent)">
@@ -171,7 +171,7 @@ async function sidebarGenerateAndSend(sessionId) {
     if (ok) await sidebarSendIssue(sessionId)
 }
 
-// ─── Sidebar Issue Submission ───
+// ─── 侧边栏 Issue 提交 ───
 async function sidebarPreviewIssue(sessionId) {
     const resultEl = document.getElementById('sidebar-gh-result')
     if (resultEl) resultEl.innerHTML = `<span style="color:var(--text-3);font-size:0.8rem">Loading preview...</span>`
@@ -184,7 +184,7 @@ async function sidebarPreviewIssue(sessionId) {
 
     const data = await res.json()
 
-    // Check for warnings
+    // 检查是否有警告
     const w = data.warnings || {}
     const hasWarnings = data.requires_review || Object.keys(w).length > 0
 
@@ -231,7 +231,7 @@ async function sidebarSendIssue(sessionId) {
                 <span style="color:var(--verdict-advanced)">✓ Issue created</span><br>
                 <a href="${data.url}" target="_blank" style="font-size:0.75rem;word-break:break-all">${data.url}</a>
             </div>`
-        // Disable buttons after successful submission
+        // 提交成功后禁用按钮
         const actionsEl = document.getElementById('sidebar-gh-actions')
         if (actionsEl) actionsEl.innerHTML = `<div style="font-size:0.8rem;color:var(--verdict-advanced)">✓ Submitted</div>`
     } else if (data.manual) {
@@ -255,14 +255,13 @@ async function sidebarSendIssue(sessionId) {
     }
 }
 
-// ─── Ops-menu Preview + Submit flow ───
+// ─── 操作菜单预览 + 提交流程 ───
 //
-// Combines generate-report (local Claude CLI, humanize issue
-// taxonomy, forbidden-token scan, report body assembled against a
-// constrained methodology vocabulary) with preview + gh-issue
-// submission into one user-visible operation reachable from the
-// session-detail ops dropdown. Three states share the same modal:
-// generating -> preview -> submitting -> result.
+// 将生成报告（本地 Claude CLI、humanize issue 分类体系、
+// 禁止令牌扫描、基于受限方法论词汇组装报告正文）与预览 +
+// gh-issue 提交合并为一个用户可见的操作，可通过会话详情页的
+// 操作下拉菜单访问。三个状态共享同一个模态框：
+// 生成中 -> 预览 -> 提交中 -> 结果。
 
 async function opsPreviewIssue(sessionId) {
     if (!sessionId) return
@@ -279,9 +278,9 @@ async function opsPreviewIssue(sessionId) {
             <button class="btn btn-ghost" onclick="closeModal()">${t('cancel.dismiss')}</button>
         </div>`)
 
-    // Step 1: check if the sanitized-issue payload already builds
-    // cleanly (i.e. a methodology-analysis-report.md exists). If
-    // not, generate one via local Claude CLI, then re-check.
+    // 步骤 1：检查已脱敏的 issue 载荷是否已能正常构建
+    // （即 methodology-analysis-report.md 是否存在）。如果
+    // 不存在，则通过本地 Claude CLI 生成一份，然后重新检查。
     let check = await window.authedFetch(`/api/sessions/${sessionId}/sanitized-issue`)
     if (!check.ok) {
         const gen = await window.authedFetch(`/api/sessions/${sessionId}/generate-report`, { method: 'POST' })
@@ -362,8 +361,8 @@ async function opsSubmitIssue(sessionId) {
     }
 
     if (data.manual) {
-        // gh CLI missing or unauthenticated. Make the payload
-        // trivially copyable so the user can file the issue manually.
+        // gh CLI 缺失或未认证。将载荷制作成易于复制的形式，
+        // 以便用户可以手动提交 issue。
         window._issuePayload = `Title: ${data.title || ''}\n\n${data.body || ''}`
         _opsShowModal(`
             <h3>${t('analysis.failed')}</h3>
@@ -412,12 +411,12 @@ function _opsShowError(title, message, detail) {
         </div>`)
 }
 
-// Project switching removed in Round 5 (T10-frontend). The dashboard
-// is now CLI-fixed to one project at startup; multi-project users run
-// `humanize monitor web --project <path>` per project. The legacy
-// /api/projects/{switch,add,remove} endpoints return 410 Gone.
+// 项目切换功能在第 5 轮（T10-frontend）中移除。仪表盘
+// 现在通过 CLI 固定为启动时的单个项目；多项目用户可为
+// 每个项目运行 `humanize monitor web --project <path>`。
+// 旧的 /api/projects/{switch,add,remove} 端点返回 410 Gone。
 
-// ─── Plan Viewer ───
+// ─── 计划查看器 ───
 async function showPlanViewer(sessionId) {
     const res = await window.authedFetch(`/api/sessions/${sessionId}/plan`)
     if (!res.ok) return

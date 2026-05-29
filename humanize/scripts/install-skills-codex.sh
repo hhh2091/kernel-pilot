@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Convenience wrapper: install Humanize skills for Codex target.
+# 便捷包装器：为 Codex 目标安装 Humanize 技能。
 #
 
 set -euo pipefail

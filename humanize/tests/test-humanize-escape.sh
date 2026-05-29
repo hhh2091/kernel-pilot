@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Test script for humanize-escape fixes
+# humanize-escape 修复的测试脚本
 #
-# Tests:
-# 1. Zsh safety for empty/dotfile directory scenarios
-# 2. git_adds_humanize path variant detection (./.humanize, quoted paths)
+# 测试：
+# 1. 空目录/点文件目录场景的 Zsh 安全性
+# 2. git_adds_humanize 路径变体检测（./.humanize、带引号的路径）
 #
-# These tests verify the fixes for:
-# - No zsh/bash "no matches found" errors
-# - Block git add .humanize (including path variants)
+# 这些测试验证以下修复：
+# - 没有 zsh/bash "no matches found" 错误
+# - 阻止 git add .humanize（包括路径变体）
 #
 
 set -euo pipefail
@@ -17,15 +17,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色
 
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-# Test helper functions
+# 测试辅助函数
 pass() {
     echo -e "${GREEN}PASS${NC}: $1"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -38,10 +38,10 @@ fail() {
 }
 
 # ========================================
-# Test Group 1: git_adds_humanize Path Variants
+# 测试组 1：git_adds_humanize 路径变体
 # ========================================
 
-# Assert that a git add command SHOULD be blocked
+# 断言 git add 命令应该被阻止
 assert_blocks() {
     local command="$1"
     local description="$2"
@@ -55,7 +55,7 @@ assert_blocks() {
     fi
 }
 
-# Assert that a git add command should NOT be blocked
+# 断言 git add 命令不应该被阻止
 assert_allows() {
     local command="$1"
     local description="$2"
@@ -75,7 +75,7 @@ echo "========================================"
 echo ""
 
 # ========================================
-# Test Group 1: ./.humanize Path Variants
+# 测试组 1：./.humanize 路径变体
 # ========================================
 echo "Test Group 1: ./.humanize Path Variants"
 echo ""
@@ -90,7 +90,7 @@ assert_blocks "git add .humanize/rlcr/2026-03-01_00-00-00/round-3-summary.md" "B
 assert_blocks "git add .humanize/rlcr/2026-03-01_00-00-00/round-3-contract.md" "Block: RLCR round contract path"
 
 # ========================================
-# Test Group 2: Quoted Path Variants
+# 测试组 2：带引号的路径变体
 # ========================================
 echo ""
 echo "Test Group 2: Quoted Path Variants"
@@ -104,7 +104,7 @@ assert_blocks 'git add "path/to/.humanize"' "Block: double-quoted path/to/.human
 assert_blocks 'git add ".humanize/rlcr/2026-03-01_00-00-00/goal-tracker.md"' "Block: double-quoted RLCR file path"
 
 # ========================================
-# Test Group 3: Combined Force and Path Variants
+# 测试组 3：组合强制和路径变体
 # ========================================
 echo ""
 echo "Test Group 3: Combined Force and Path Variants"
@@ -115,7 +115,7 @@ assert_blocks "git add --force ./.humanize" "Block: --force with ./.humanize"
 assert_blocks 'git add -f ".humanize"' "Block: -f with quoted .humanize"
 assert_blocks "git add -f .humanize/rlcr/2026-03-01_00-00-00/goal-tracker.md" "Block: -f with RLCR goal tracker"
 
-# Force flag with broad scope (blocks gitignore bypass)
+# 广泛范围的强制标志（阻止 gitignore 绕过）
 assert_blocks "git add -f ." "Block: -f . (force with current dir)"
 assert_blocks "git add --force ." "Block: --force . (force with current dir)"
 assert_blocks "git add -f *" "Block: -f * (force with wildcard)"
@@ -124,14 +124,14 @@ assert_blocks "git add -fA" "Block: -fA (combined force and all)"
 assert_blocks "git add -Af" "Block: -Af (combined all and force)"
 
 # ========================================
-# Test Group 3b: git add -A / --all
+# 测试组 3b：git add -A / --all
 # ========================================
 echo ""
 echo "Test Group 3b: git add -A / --all"
 echo ""
 
-# These tests require .humanize directory to exist for blocking to trigger
-# (git_adds_humanize only blocks -A/--all when .humanize exists)
+# 这些测试需要 .humanize 目录存在才能触发阻止
+# （git_adds_humanize 仅在 .humanize 存在时阻止 -A/--all）
 TEST_HUMANIZE_DIR="/tmp/test-humanize-git-add-$$"
 mkdir -p "$TEST_HUMANIZE_DIR/.humanize"
 ORIGINAL_DIR="$(pwd)"
@@ -144,12 +144,12 @@ assert_blocks "git add --all ." "Block: --all . (all in current dir)"
 assert_blocks "git add -A src/" "Block: -A src/ (all flag present)"
 assert_blocks "git add --all src/" "Block: --all src/ (all flag present)"
 
-# Return to original directory and clean up
+# 返回原始目录并清理
 cd "$ORIGINAL_DIR"
 rm -rf "$TEST_HUMANIZE_DIR"
 
 # ========================================
-# Test Group 4: Chained Commands with Path Variants
+# 测试组 4：带路径变体的链接命令
 # ========================================
 echo ""
 echo "Test Group 4: Chained Commands with Path Variants"
@@ -160,7 +160,7 @@ assert_blocks "true; git add ./.humanize" "Block: true; git add ./.humanize"
 assert_blocks 'echo test && git add ".humanize"' "Block: echo && git add quoted"
 
 # ========================================
-# Test Group 5: git -C with Path Variants
+# 测试组 5：带路径变体的 git -C
 # ========================================
 echo ""
 echo "Test Group 5: git -C with Path Variants"
@@ -171,7 +171,7 @@ assert_blocks 'git -C /path add ".humanize"' "Block: git -C with quoted .humaniz
 assert_blocks "git --git-dir=/repo add ./.humanize" "Block: --git-dir with ./.humanize"
 
 # ========================================
-# Test Group 6: Allowed Commands (should NOT block)
+# 测试组 6：允许的命令（不应该阻止）
 # ========================================
 echo ""
 echo "Test Group 6: Allowed Commands (should NOT block)"
@@ -186,18 +186,18 @@ assert_allows "git status .humanize" "Allow: git status (not add)"
 assert_allows "git diff .humanize" "Allow: git diff (not add)"
 assert_allows "git log -- .humanize" "Allow: git log (not add)"
 
-# Patch mode is safe (interactive)
+# 补丁模式是安全的（交互式）
 assert_allows "git add -p" "Allow: -p (patch mode, interactive)"
 assert_allows "git add --patch" "Allow: --patch (patch mode)"
 assert_allows "git add -p src/" "Allow: -p src/ (patch mode with path)"
 
-# Files that start with .humanize but are NOT the .humanize directory
+# 以 .humanize 开头但不是 .humanize 目录的文件
 assert_allows "git add .humanizeconfig" "Allow: .humanizeconfig (different file)"
 assert_allows "git add .humanize-backup" "Allow: .humanize-backup (different file)"
 assert_allows "git add src/.humanizerc" "Allow: src/.humanizerc (different file)"
 
 # ========================================
-# Test Group 7: Zsh Empty Directory Safety
+# 测试组 7：Zsh 空目录安全性
 # ========================================
 echo ""
 echo "Test Group 7: Zsh Empty Directory Safety"
@@ -337,7 +337,7 @@ test_session_dir_detection() {
 test_session_dir_detection
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 echo ""
 echo "========================================"

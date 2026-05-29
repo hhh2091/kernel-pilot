@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# Tests for _humanize_monitor_skill (humanize monitor skill)
+# _humanize_monitor_skill（监控技能）的测试
 #
-# Tests the --once mode output and helper functions for the skill monitor.
-# Interactive mode is not tested here (requires terminal).
+# 测试技能监控器的 --once 模式输出和辅助函数。
+# 此处不测试交互模式（需要终端）。
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Test counters
+# 测试计数器
 TESTS_RUN=0
 TESTS_PASSED=0
 TESTS_FAILED=0
@@ -29,7 +29,7 @@ fail() {
 }
 
 # ========================================
-# Test Environment Setup
+# 测试环境设置
 # ========================================
 
 TEST_DIR=$(mktemp -d)
@@ -38,7 +38,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Setup a mock git repo and skill invocations
+# 设置模拟 Git 仓库和技能调用
 setup_test_env() {
     rm -rf "$TEST_DIR"
     mkdir -p "$TEST_DIR"
@@ -49,12 +49,12 @@ setup_test_env() {
     git config user.name "Test"
     touch dummy && git add dummy && git commit -q -m "init"
 
-    # Source humanize.sh (which sources monitor-common.sh and monitor-skill.sh)
+    # 加载 humanize.sh（它会加载 monitor-common.sh 和 monitor-skill.sh）
     source "$PROJECT_ROOT/scripts/humanize.sh"
 }
 
-# Create a completed skill invocation directory
-# Usage: create_skill_invocation <unique_id> <status> <model> <effort> <duration> <question>
+# 创建一个已完成的技能调用目录
+# 用法：create_skill_invocation <unique_id> <status> <model> <effort> <duration> <question>
 create_skill_invocation() {
     local unique_id="$1"
     local status="$2"
@@ -66,7 +66,7 @@ create_skill_invocation() {
     local dir=".humanize/skill/$unique_id"
     mkdir -p "$dir"
 
-    # Create input.md
+    # 创建 input.md
     cat > "$dir/input.md" << EOF
 # Ask Codex Input
 
@@ -82,7 +82,7 @@ $question
 - Timestamp: $(echo "$unique_id" | cut -d- -f1-3 | tr '_' ' ')
 EOF
 
-    # Create metadata.md (unless status is "running")
+    # 创建 metadata.md（状态为 "running" 时除外）
     if [[ "$status" != "running" ]]; then
         cat > "$dir/metadata.md" << EOF
 ---
@@ -97,14 +97,14 @@ started_at: 2026-02-19T21:02:35Z
 EOF
     fi
 
-    # Create output.md for successful invocations
+    # 为成功的调用创建 output.md
     if [[ "$status" == "success" ]]; then
         echo "This is the response from the model." > "$dir/output.md"
     fi
 }
 
 # ========================================
-# Tests: Directory not found
+# 测试：目录未找到
 # ========================================
 
 echo "=== Skill Monitor: Directory Checks ==="
@@ -118,7 +118,7 @@ else
 fi
 
 # ========================================
-# Tests: Empty skill directory
+# 测试：空技能目录
 # ========================================
 
 echo "=== Skill Monitor: Empty Directory ==="
@@ -133,7 +133,7 @@ else
 fi
 
 # ========================================
-# Tests: Single completed invocation
+# 测试：单次已完成调用
 # ========================================
 
 echo "=== Skill Monitor: Single Invocation ==="
@@ -192,7 +192,7 @@ else
 fi
 
 # ========================================
-# Tests: Multiple invocations with mixed statuses
+# 测试：多次调用（混合状态）
 # ========================================
 
 echo "=== Skill Monitor: Multiple Invocations ==="
@@ -229,7 +229,7 @@ else
     fail "Should count 1 timeout" "got: $(echo "$output" | grep 'Timeout')"
 fi
 
-# Latest should be the newest (2026-02-19_21-30-00)
+# 最新的应该是最新的（2026-02-19_21-30-00）
 if grep "Focused:" <<< "$output" | grep -q "2026-02-19_21-30-00"; then
     pass "Shows the most recent invocation with content as focused"
 else
@@ -243,7 +243,7 @@ else
 fi
 
 # ========================================
-# Tests: Running invocation (no metadata.md)
+# 测试：正在运行的调用（无 metadata.md）
 # ========================================
 
 echo "=== Skill Monitor: Running Invocation ==="
@@ -267,7 +267,7 @@ else
 fi
 
 # ========================================
-# Tests: Recent invocations list
+# 测试：最近调用列表
 # ========================================
 
 echo "=== Skill Monitor: Recent Invocations List ==="
@@ -285,7 +285,7 @@ else
     fail "Should show recent section" "got: $output"
 fi
 
-# Check that invocations appear in the output
+# 检查调用是否出现在输出中
 if grep -q "2026-02-19_21-00-00-333-ccc" <<< "$output"; then
     pass "Lists invocations in recent section"
 else
@@ -293,14 +293,14 @@ else
 fi
 
 # ========================================
-# Tests: Question extraction from input.md
+# 测试：从 input.md 中提取问题
 # ========================================
 
 echo "=== Skill Monitor: Question Extraction ==="
 
 setup_test_env
 mkdir -p .humanize/skill
-# Create an invocation with a multi-line question (only first line should be extracted)
+# 创建一个带有多行问题的调用（只提取第一行）
 local_dir=".humanize/skill/2026-02-19_22-00-00-555-eee"
 mkdir -p "$local_dir"
 cat > "$local_dir/input.md" << 'EOF'
@@ -338,7 +338,7 @@ else
     fail "Should extract question first line" "got: $output"
 fi
 
-# Should NOT contain the second line
+# 不应包含第二行
 if ! grep -q "Additional context" <<< "$output"; then
     pass "Does not include subsequent lines from question"
 else
@@ -346,7 +346,7 @@ else
 fi
 
 # ========================================
-# Tests: Empty response invocation
+# 测试：空响应调用
 # ========================================
 
 echo "=== Skill Monitor: Empty Response ==="
@@ -369,7 +369,7 @@ else
 fi
 
 # ========================================
-# Tests: Non-skill directories are ignored
+# 测试：非技能目录被忽略
 # ========================================
 
 echo "=== Skill Monitor: Non-skill Dir Filtering ==="
@@ -377,7 +377,7 @@ echo "=== Skill Monitor: Non-skill Dir Filtering ==="
 setup_test_env
 mkdir -p .humanize/skill
 create_skill_invocation "2026-02-19_21-00-00-111-aaa" "success" "gpt-5.5" "high" "10s" "Real question"
-# Create a non-matching directory
+# 创建一个不匹配的目录
 mkdir -p ".humanize/skill/not-a-skill-dir"
 echo "junk" > ".humanize/skill/not-a-skill-dir/input.md"
 
@@ -389,7 +389,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 
 echo ""

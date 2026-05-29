@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Tests for 4-layer config merge behavior in scripts/lib/config-loader.sh
+# scripts/lib/config-loader.sh 中 4 层配置合并行为的测试
 #
-# Validates:
-# - Default-only: values come from config/default_config.json
-# - Project config overrides defaults
-# - User config is overridden by project config (project wins)
-# - User keys not in project config are preserved (additive merge)
-# - Null values in a higher layer do not override lower-layer values (strip_nulls)
-# - HUMANIZE_CONFIG env var overrides the default project config path
+# 验证：
+# - 仅默认值：值来自 config/default_config.json
+# - 项目配置覆盖默认值
+# - 用户配置被项目配置覆盖（项目优先）
+# - 用户配置中不在项目配置中的键被保留（增量合并）
+# - 较高层的空值不覆盖较低层的值（strip_nulls）
+# - HUMANIZE_CONFIG 环境变量覆盖默认的项目配置路径
 #
 
 set -euo pipefail
@@ -33,7 +33,7 @@ fi
 source "$CONFIG_LOADER"
 
 # ========================================
-# Test 1: Default-only (no user/project config)
+# 测试 1：仅默认值（无用户/项目配置）
 # ========================================
 
 setup_test_dir
@@ -64,7 +64,7 @@ else
 fi
 
 # ========================================
-# Test 2: Project config overrides a default key
+# 测试 2：项目配置覆盖默认键
 # ========================================
 
 setup_test_dir
@@ -89,7 +89,7 @@ else
 fi
 
 # ========================================
-# Test 3: Project config wins over user config (priority order)
+# 测试 3：项目配置优先于用户配置（优先级顺序）
 # ========================================
 
 setup_test_dir
@@ -109,7 +109,7 @@ else
 fi
 
 # ========================================
-# Test 4: User config key not present in project config is preserved
+# 测试 4：用户配置中不在项目配置中的键被保留
 # ========================================
 
 setup_test_dir
@@ -132,7 +132,7 @@ else
 fi
 
 # ========================================
-# Test 5: Null in project config does not override default (strip_nulls)
+# 测试 5：项目配置中的空值不覆盖默认值（strip_nulls）
 # ========================================
 
 setup_test_dir
@@ -150,7 +150,7 @@ else
 fi
 
 # ========================================
-# Test 6: HUMANIZE_CONFIG env var overrides default project config path
+# 测试 6：HUMANIZE_CONFIG 环境变量覆盖默认的项目配置路径
 # ========================================
 
 setup_test_dir
@@ -173,7 +173,7 @@ else
 fi
 
 # ========================================
-# Test 7: All layers merge additively
+# 测试 7：所有层增量合并
 # ========================================
 
 setup_test_dir

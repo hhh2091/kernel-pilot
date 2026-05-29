@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for model-router.sh
+# model-router.sh 的测试
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -230,7 +230,7 @@ else
 fi
 
 # ========================================
-# Test 10: codex dependency succeeds when codex is in PATH
+# 测试 10：codex 在 PATH 中时依赖检查成功
 # ========================================
 echo ""
 echo "--- Test 10: codex dependency succeeds with mock binary ---"
@@ -247,7 +247,7 @@ else
 fi
 
 # ========================================
-# Test 11: codex dependency fails when codex is not in PATH
+# 测试 11：codex 不在 PATH 中时依赖检查失败
 # ========================================
 echo ""
 echo "--- Test 11: codex dependency fails without codex ---"
@@ -264,7 +264,7 @@ else
 fi
 
 # ========================================
-# Test 12: claude dependency succeeds when claude is in PATH
+# 测试 12：claude 在 PATH 中时依赖检查成功
 # ========================================
 echo ""
 echo "--- Test 12: claude dependency succeeds with mock binary ---"
@@ -281,7 +281,7 @@ else
 fi
 
 # ========================================
-# Test 13: claude dependency fails when claude is not in PATH
+# 测试 13：claude 不在 PATH 中时依赖检查失败
 # ========================================
 echo ""
 echo "--- Test 13: claude dependency fails without claude ---"
@@ -420,7 +420,7 @@ else
 fi
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 
 print_test_summary "Model Router Test Summary"

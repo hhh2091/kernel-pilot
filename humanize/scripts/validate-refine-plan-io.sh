@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # validate-refine-plan-io.sh
-# Validates input and output paths for the refine-plan command
-# Exit codes:
-#   0 - Success, all validations passed
-#   1 - Input file does not exist
-#   2 - Input file is empty
-#   3 - Input file has no valid comment blocks or has malformed comment syntax
-#   4 - Input file missing required gen-plan sections
-#   5 - Output directory does not exist or is not writable, or input directory is not writable for in-place mode
-#   6 - QA directory not writable
-#   7 - Invalid arguments
+# 验证 refine-plan 命令的输入和输出路径
+# 退出码:
+#   0 - 成功，所有验证通过
+#   1 - 输入文件不存在
+#   2 - 输入文件为空
+#   3 - 输入文件没有有效的注释块或注释语法格式错误
+#   4 - 输入文件缺少必需的 gen-plan 部分
+#   5 - 输出目录不存在或不可写，或输入目录对就地模式不可写
+#   6 - QA 目录不可写
+#   7 - 无效参数
 
 set -e
 

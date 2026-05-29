@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Install/update Humanize native Codex hooks in CODEX_HOME/hooks.json.
+# 在 CODEX_HOME/hooks.json 中安装/更新 Humanize 原生 Codex 钩子。
 #
 
 set -euo pipefail

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # validate-directions-json.sh
-# Validates a directions.json file against the schema version 1 contract.
+# 根据 schema version 1 契约验证 directions.json 文件。
 #
-# Usage: validate-directions-json.sh <path/to/file.directions.json>
+# 用法: validate-directions-json.sh <path/to/file.directions.json>
 #
-# Exit codes:
-#   0 - Validation passed
-#   1 - Missing input file argument or file does not exist
-#   2 - jq not available
-#   3 - Schema validation failed (jq returned false or file is invalid JSON)
+# 退出码:
+#   0 - 验证通过
+#   1 - 缺少输入文件参数或文件不存在
+#   2 - jq 不可用
+#   3 - 架构验证失败（jq 返回 false 或文件是无效的 JSON）
 
 set -euo pipefail
 

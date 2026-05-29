@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Shared test helper functions for all test scripts
+# 所有测试脚本共享的测试辅助函数
 #
-# Usage: source "$SCRIPT_DIR/test-helpers.sh" (from tests/)
-# Usage: source "$SCRIPT_DIR/../test-helpers.sh" (from tests/robustness/)
+# 用法：source "$SCRIPT_DIR/test-helpers.sh"（从 tests/）
+# 用法：source "$SCRIPT_DIR/../test-helpers.sh"（从 tests/robustness/）
 #
 
 # ========================================
-# Colors
+# 颜色
 # ========================================
 
 readonly TEST_RED='\033[0;31m'
@@ -16,7 +16,7 @@ readonly TEST_YELLOW='\033[1;33m'
 readonly TEST_NC='\033[0m'
 
 # ========================================
-# Test Counters
+# 测试计数器
 # ========================================
 
 TESTS_PASSED=0
@@ -24,7 +24,7 @@ TESTS_FAILED=0
 TESTS_SKIPPED=0
 
 # ========================================
-# Test Result Functions
+# 测试结果函数
 # ========================================
 
 pass() {
@@ -52,7 +52,7 @@ skip() {
 }
 
 # ========================================
-# Summary Function
+# 摘要函数
 # ========================================
 
 print_test_summary() {
@@ -78,18 +78,18 @@ print_test_summary() {
 }
 
 # ========================================
-# Test Directory Setup
+# 测试目录设置
 # ========================================
 
-# Create a temporary test directory with automatic cleanup
-# Sets TEST_DIR variable
+# 创建带有自动清理的临时测试目录
+# 设置 TEST_DIR 变量
 setup_test_dir() {
     TEST_DIR=$(mktemp -d)
     trap "rm -rf $TEST_DIR" EXIT
 }
 
-# Create a mock git repository in a directory
-# Usage: init_test_git_repo "$dir"
+# 在目录中创建模拟 git 仓库
+# 用法：init_test_git_repo "$dir"
 init_test_git_repo() {
     local dir="$1"
     mkdir -p "$dir"

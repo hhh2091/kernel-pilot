@@ -1,29 +1,25 @@
 #!/usr/bin/env bash
 #
-# AC-10 style-compliance test (added in Round 5 as task T15;
-# expanded in Rounds 6 and 7 to cover the full plan-required scope).
+# AC-10 风格合规测试（在第 5 轮作为任务 T15 添加；
+# 在第 6 和 7 轮扩展以覆盖计划要求的完整范围）。
 #
-# AC-10 forbids the literal substrings "AC-", "Milestone", "Step ",
-# "Phase " from appearing in implementation code or comments. Those
-# tokens are reserved for plan documentation; using them in code
-# makes the codebase carry workflow markers that have no domain
-# meaning at runtime.
+# AC-10 禁止字面量子串 "AC-"、"Milestone"、"Step "、"Phase "
+# 出现在实现代码或注释中。这些标记保留给计划文档；在代码中
+# 使用它们会使代码库携带在运行时没有领域含义的工作流标记。
 #
-# Scope (post-rebase against upstream/dev):
-#   - All .sh and .py files under viz/ (plan-authored code).
-#   - scripts/cancel-rlcr-session.sh (new file added by this plan).
+# 范围（rebase 到 upstream/dev 后）：
+#   - viz/ 下的所有 .sh 和 .py 文件（计划编写的代码）。
+#   - scripts/cancel-rlcr-session.sh（此计划添加的新文件）。
 #
-# The broader scripts/ directory is upstream-owned. Its files
-# legitimately reference workflow terms like "AC-1", "Phase",
-# "Review Phase" in regex patterns, template content, and user-
-# facing strings — those predate this plan and are outside AC-10's
-# remit. Same reasoning for commands/ and hooks/.
+# 更广泛的 scripts/ 目录由上游拥有。其文件合法地在正则表达式
+# 模式、模板内容和面向用户的字符串中引用工作流术语如 "AC-1"、
+# "Phase"、"Review Phase" —— 这些早于此计划且在 AC-10 的
+# 职权范围之外。commands/ 和 hooks/ 同理。
 #
-# Excluded:
-#   - tests/ themselves (fixtures legitimately contain forbidden
-#     literals as expected input).
-#   - scripts/* except the plan-authored cancel-rlcr-session.sh.
-#   - commands/ and hooks/ (upstream-owned workflow).
+# 排除：
+#   - tests/ 本身（夹具合法地包含禁止的字面量作为预期输入）。
+#   - scripts/* 除了计划编写的 cancel-rlcr-session.sh。
+#   - commands/ 和 hooks/（上游拥有的工作流）。
 
 set -euo pipefail
 
@@ -40,7 +36,7 @@ FAIL_COUNT=0
 _pass() { printf '\033[0;32mPASS\033[0m: %s\n' "$1"; PASS_COUNT=$((PASS_COUNT+1)); }
 _fail() { printf '\033[0;31mFAIL\033[0m: %s\n' "$1"; FAIL_COUNT=$((FAIL_COUNT+1)); }
 
-# Step 1: every .sh and .py under viz/.
+# 步骤 1：viz/ 下的每个 .sh 和 .py。
 CORE_FILES=()
 while IFS= read -r f; do
     CORE_FILES+=("$f")
@@ -51,7 +47,7 @@ done < <(
         2>/dev/null | sort
 )
 
-# Step 2: plan-authored files under scripts/.
+# 步骤 2：scripts/ 下计划编写的文件。
 PLAN_AUTHORED_SCRIPTS=(
     "$PLUGIN_ROOT/scripts/cancel-rlcr-session.sh"
 )
@@ -71,8 +67,8 @@ n_core=${#CORE_FILES[@]}
 n_extra=${#EXTRA_FILES[@]}
 echo "Scanning ${#FILES[@]} files (${n_core} under viz/, ${n_extra} plan-authored under scripts/)."
 
-# Per-file findings keyed by pattern, so we report a single PASS or
-# FAIL line per pattern with the offending file list.
+# 按模式键控的每文件发现，因此我们为每个模式报告单个 PASS 或
+# FAIL 行，附带违规文件列表。
 for pattern in 'AC-' 'Milestone' 'Step ' 'Phase '; do
     label="$pattern"
     found_files=()

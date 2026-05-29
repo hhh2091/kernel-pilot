@@ -1,31 +1,29 @@
 #!/usr/bin/env bash
 #
-# Background-task helpers for the RLCR stop hook.
+# RLCR stop hook 的后台任务辅助函数。
 #
-# Owns all logic that inspects the Claude Code transcript to decide
-# whether the hook should short-circuit (the main session is still
-# waiting on an asynchronous Agent/Bash dispatch), plus the four guard
-# blocks that the stop hook runs before its normal gate logic:
+# 拥有检查 Claude Code 转录本以决定钩子是否应短路的所有逻辑
+# （主会话仍在等待异步 Agent/Bash 调度），加上 stop hook 在
+# 正常门控逻辑之前运行的四个守卫块：
 #
-#   1. Ambiguous-caller marker guard
-#   2. Cross-session parked-loop guard
-#   3. Early exit: pending background tasks
-#   4. Same-session stale-marker cleanup
+#   1. 调用者歧义标记守卫
+#   2. 跨会话驻留循环守卫
+#   3. 提前退出：待处理的后台任务
+#   4. 同会话过期标记清理
 #
-# Depends on loop-common.sh (FIELD_SESSION_ID, resolve_active_state_file)
-# being sourced first.
+# 依赖于首先源码引入的 loop-common.sh（FIELD_SESSION_ID、resolve_active_state_file）。
 #
 
-# Source guard.
+# 源码守卫。
 [[ -n "${_LOOP_BG_TASKS_LOADED:-}" ]] && return 0 2>/dev/null || true
 _LOOP_BG_TASKS_LOADED=1
 
-# Expand a leading "~" or "~/" in a path to "$HOME" without using eval.
-# Only the bare "~" and "~/..." forms are expanded; "~user/..." and every
-# other input (absolute path, relative path, empty string) is returned verbatim.
+# 将路径中的前导 "~" 或 "~/" 扩展为 "$HOME"，不使用 eval。
+# 仅扩展裸 "~" 和 "~/..." 形式；"~user/..." 和所有其他输入
+# （绝对路径、相对路径、空字符串）按原样返回。
 #
-# Usage: expand_leading_tilde "$path"
-#   Prints the normalized path to stdout.
+# 用法：expand_leading_tilde "$path"
+#   将规范化后的路径打印到 stdout。
 expand_leading_tilde() {
     local path="$1"
     case "$path" in
@@ -35,9 +33,9 @@ expand_leading_tilde() {
     esac
 }
 
-# Extract transcript_path from hook JSON input and expand any leading tilde.
-# Usage: extract_transcript_path "$json_input"
-# Outputs the transcript_path to stdout, or empty string if not available.
+# 从钩子 JSON 输入中提取 transcript_path 并扩展任何前导波浪号。
+# 用法：extract_transcript_path "$json_input"
+# 将 transcript_path 输出到 stdout，如果不可用则输出空字符串。
 extract_transcript_path() {
     local input="$1"
     local raw
@@ -45,23 +43,20 @@ extract_transcript_path() {
     expand_leading_tilde "$raw"
 }
 
-# Convert an RLCR loop dir basename to a lexically-comparable ISO-8601
-# UTC timestamp suitable for filtering transcript events.
+# 将 RLCR 循环目录 basename 转换为适合过滤转录本事件的
+# 词法可比较的 ISO-8601 UTC 时间戳。
 #
-# `setup-rlcr-loop.sh` creates loop dirs named `YYYY-MM-DD_HH-MM-SS` in
-# the system's LOCAL wall clock (it calls `date +%Y-%m-%d_%H-%M-%S`
-# without `-u`). Claude transcript events carry actual UTC timestamps
-# like `2026-04-16T13:19:26.819Z`. To compare them correctly, this
-# helper converts the local wall-clock parse back to a real UTC moment
-# via a two-step: parse local -> epoch seconds -> format in UTC.
+# `setup-rlcr-loop.sh` 在系统的本地挂钟中创建名为 `YYYY-MM-DD_HH-MM-SS`
+# 的循环目录（它调用 `date +%Y-%m-%d_%H-%M-%S` 而不带 `-u`）。
+# Claude 转录本事件携带实际的 UTC 时间戳，如 `2026-04-16T13:19:26.819Z`。
+# 为了正确比较它们，此辅助函数通过两步将本地挂钟解析转换回真实的 UTC 时刻：
+# 解析本地 -> 纪元秒 -> UTC 格式。
 #
-# The `.000Z` suffix keeps sub-second transcript timestamps in the same
-# second compared greater via lexical string ordering.
+# `.000Z` 后缀保持亚秒级转录本时间戳在同一秒内通过词法字符串排序比较更大。
 #
-# Usage: derive_loop_start_iso_ts "$loop_dir"
-#   Prints the ISO-8601 UTC timestamp, or empty string when the
-#   basename does not match the expected format or the local `date`
-#   binary cannot parse it.
+# 用法：derive_loop_start_iso_ts "$loop_dir"
+#   打印 ISO-8601 UTC 时间戳，当 basename 不匹配预期格式或
+#   本地 `date` 二进制文件无法解析时打印空字符串。
 derive_loop_start_iso_ts() {
     local loop_dir="$1"
     local base
@@ -72,10 +67,9 @@ derive_loop_start_iso_ts() {
     local local_datetime
     local_datetime="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}:${BASH_REMATCH[3]}:${BASH_REMATCH[4]}"
 
-    # Local wall-clock -> epoch seconds. GNU `date -d` first,
-    # BSD/macOS `date -j -f ...` second. Both honour the caller's TZ
-    # for interpretation, matching setup-rlcr-loop.sh's behaviour at
-    # loop-dir creation time.
+    # 本地挂钟 -> 纪元秒。先试 GNU `date -d`，
+    # 再试 BSD/macOS `date -j -f ...`。两者都遵守调用者的 TZ 进行解释，
+    # 匹配 setup-rlcr-loop.sh 在循环目录创建时的行为。
     local epoch
     epoch=$(date -d "$local_datetime" +%s 2>/dev/null) || epoch=""
     if [[ -z "$epoch" ]]; then
@@ -85,7 +79,7 @@ derive_loop_start_iso_ts() {
         return
     fi
 
-    # Epoch -> UTC ISO-8601. Try GNU then BSD.
+    # 纪元 -> UTC ISO-8601。先试 GNU 再试 BSD。
     local utc_iso
     utc_iso=$(date -u -d "@$epoch" "+%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null) || utc_iso=""
     if [[ -z "$utc_iso" ]]; then
@@ -94,16 +88,16 @@ derive_loop_start_iso_ts() {
     printf '%s' "$utc_iso"
 }
 
-# Derive the Claude Code task-output directory from a transcript path.
+# 从转录本路径派生 Claude Code 任务输出目录。
 #
-# Claude Code writes background-task output files under:
+# Claude Code 在以下位置写入后台任务输出文件：
 #   /tmp/claude-<uid>/<project-slug>/<session-id>/tasks/<task-id>.output
 #
-# The project slug and session id are encoded in the transcript path:
+# 项目 slug 和会话 id 编码在转录本路径中：
 #   <claude-home>/projects/<slug>/<session-id>.jsonl
 #
-# Usage: derive_tasks_dir_from_transcript "$transcript_path"
-#   Prints the tasks dir path, or nothing when derivation fails.
+# 用法：derive_tasks_dir_from_transcript "$transcript_path"
+#   打印任务目录路径，当派生失败时不打印任何内容。
 derive_tasks_dir_from_transcript() {
     local transcript_path="$1"
     [[ -z "$transcript_path" ]] && return
@@ -117,33 +111,32 @@ derive_tasks_dir_from_transcript() {
     printf '/tmp/claude-%s/%s/%s/tasks' "$uid" "$slug" "$sid"
 }
 
-# Returns 0 if the background task identified by task_id appears to be alive
-# (output file absent, or lsof reports >= 1 holder), 1 if confirmed dead
-# (output file exists and lsof reports 0 holders).
+# 如果 task_id 标识的后台任务似乎存活则返回 0
+# （输出文件不存在，或 lsof 报告 >= 1 个持有者），
+# 如果确认死亡则返回 1（输出文件存在且 lsof 报告 0 个持有者）。
 #
-# Fail-open: returns 0 (alive) when the output file does not exist, when
-# the lsof binary is unavailable, or when lsof exits non-zero for any
-# reason other than "no holders".
+# 失败开放：当输出文件不存在时、当 lsof 二进制文件不可用时、
+# 或当 lsof 因"无持有者"以外的任何原因退出非零时返回 0（存活）。
 #
-# Set LSOF_BIN to override the lsof binary path (used in tests).
+# 设置 LSOF_BIN 以覆盖 lsof 二进制路径（在测试中使用）。
 #
-# Usage: is_bg_task_alive "$task_id" "$tasks_dir"
+# 用法：is_bg_task_alive "$task_id" "$tasks_dir"
 is_bg_task_alive() {
     local task_id="$1" tasks_dir="$2"
     local lsof_bin="${LSOF_BIN:-lsof}"
     local output_file="$tasks_dir/$task_id.output"
-    # Output file absent -> fail open (treat as still running).
+    # 输出文件不存在 -> 失败开放（视为仍在运行）。
     [[ -f "$output_file" ]] || return 0
-    # lsof unavailable -> fail open.
+    # lsof 不可用 -> 失败开放。
     command -v "$lsof_bin" >/dev/null 2>&1 || return 0
-    # lsof exits 0 when >= 1 process has the file open, 1 otherwise.
+    # 当 >= 1 个进程打开文件时 lsof 退出 0，否则退出 1。
     "$lsof_bin" "$output_file" >/dev/null 2>&1
 }
 
-# Filter a newline-delimited list of task IDs, retaining only those that
-# pass is_bg_task_alive. Prints surviving IDs one per line.
+# 过滤换行分隔的任务 ID 列表，仅保留通过 is_bg_task_alive 的那些。
+# 每行打印一个存活的 ID。
 #
-# Usage: prune_dead_bg_task_ids "$pending_ids" "$tasks_dir"
+# 用法：prune_dead_bg_task_ids "$pending_ids" "$tasks_dir"
 prune_dead_bg_task_ids() {
     local pending_ids="$1" tasks_dir="$2"
     local task_id
@@ -153,50 +146,45 @@ prune_dead_bg_task_ids() {
     done <<< "$pending_ids"
 }
 
-# Enumerate background-task ids that have been launched but not yet marked
-# completed in a Claude Code transcript.jsonl.
+# 枚举已启动但尚未在 Claude Code transcript.jsonl 中标记为完成的后台任务 id。
 #
-# Launch events (inspected in tool_result "user" messages):
-#   - Background subagent: toolUseResult.isAsync == true
-#     -> id is toolUseResult.agentId
-#   - Background shell: toolUseResult.backgroundTaskId non-empty
-#     -> id is toolUseResult.backgroundTaskId
+# 启动事件（在 tool_result "user" 消息中检查）：
+#   - 后台子代理：toolUseResult.isAsync == true
+#     -> id 是 toolUseResult.agentId
+#   - 后台 shell：toolUseResult.backgroundTaskId 非空
+#     -> id 是 toolUseResult.backgroundTaskId
 #
-# Completion events are recognised from two Claude Code transcript forms:
+# 完成事件从两种 Claude Code 转录本形式中识别：
 #
-#   1. Structured SDK record
-#      (see SDKTaskNotificationMessage in docs/typescript.md):
-#      `type == "system"`, `subtype == "task_notification"`,
-#      `task_id` is the completed id. Any `status` value
-#      (completed, failed, stopped, ...) is treated as terminal.
+#   1. 结构化 SDK 记录
+#      （参见 docs/typescript.md 中的 SDKTaskNotificationMessage）：
+#      `type == "system"`，`subtype == "task_notification"`，
+#      `task_id` 是完成的 id。任何 `status` 值
+#      （completed、failed、stopped 等）都被视为终端状态。
 #
-#   2. Legacy queue-operation enqueue whose `content` embeds a
-#      `<task-notification>` XML block with `<task-id>...</task-id>`;
-#      kept for transcripts produced by older Claude Code versions.
+#   2. 旧版队列操作 enqueue，其 `content` 嵌入了带有
+#      `<task-id>...</task-id>` 的 `<task-notification>` XML 块；
+#      为旧版 Claude Code 版本产生的转录本保留。
 #
 # pending := launched \ completed
 #
-# Optional second argument `since_ts` (ISO-8601 string, e.g. the value
-# returned by `derive_loop_start_iso_ts`): when provided, only launch
-# events whose top-level `.timestamp` field is >= `since_ts` count as
-# candidate launches. Events without a `.timestamp` are included (keeps
-# fixture transcripts and older record formats working). This keeps
-# pre-loop session-wide background work from pinning an RLCR loop that
-# has no pending work of its own.
+# 可选的第二个参数 `since_ts`（ISO-8601 字符串，例如
+# `derive_loop_start_iso_ts` 返回的值）：当提供时，只有顶层
+# `.timestamp` 字段 >= `since_ts` 的启动事件才算作候选启动。
+# 没有 `.timestamp` 的事件被包含（保持夹具转录本和旧记录格式工作）。
+# 这防止循环前的会话范围后台工作固定没有自己待处理工作的 RLCR 循环。
 #
-# Usage: list_pending_background_task_ids "$transcript_path" [since_ts]
-#   - Outputs one id per line on stdout (possibly empty).
-#   - Returns 0 when the transcript is readable (including when there are
-#     no pending tasks). Returns 1 when the transcript path is empty, not
-#     a regular file, or jq is unavailable, so callers must treat non-zero
-#     as "unknown -> do not short-circuit".
+# 用法：list_pending_background_task_ids "$transcript_path" [since_ts]
+#   - 在 stdout 上每行输出一个 id（可能为空）。
+#   - 当转录本可读时返回 0（包括没有待处理任务时）。
+#     当转录本路径为空、不是常规文件或 jq 不可用时返回 1，
+#     因此调用者必须将非零视为"未知 -> 不要短路"。
 list_pending_background_task_ids() {
     local transcript_path="$1"
     local since_ts="${2:-}"
 
-    # Normalize a leading tilde so direct callers (tests, ad-hoc scripts)
-    # work correctly even when transcript_path was not routed through
-    # extract_transcript_path.
+    # 规范化前导波浪号，以便直接调用者（测试、临时脚本）
+    # 即使 transcript_path 未通过 extract_transcript_path 路由也能正确工作。
     transcript_path=$(expand_leading_tilde "$transcript_path")
 
     if [[ -z "$transcript_path" ]] || [[ ! -f "$transcript_path" ]]; then
@@ -221,14 +209,12 @@ list_pending_background_task_ids() {
         | (.toolUseResult.agentId // .toolUseResult.backgroundTaskId)
     ' "$transcript_path" 2>/dev/null | sort -u) || return 1
 
-    # Union of both completion formats. Either source alone is enough to
-    # mark a launched id terminal.
+    # 两种完成格式的并集。任一来源单独就足以将已启动的 id 标记为终端状态。
     #
-    # The `grep -oE || true` guard on the legacy branch keeps `set -o
-    # pipefail` from poisoning the combined pipeline when no legacy
-    # queue-operation records exist in the transcript (grep with `-o`
-    # exits 1 on no matches, which would otherwise wipe out any SDK
-    # task_notification results collected above).
+    # 旧版分支上的 `grep -oE || true` 守卫防止 `set -o pipefail`
+    # 在转录本中没有旧版队列操作记录时毒化组合管道
+    # （grep 带 `-o` 在无匹配时退出 1，否则会清除上面收集的任何
+    # SDK task_notification 结果）。
     completed=$(
         {
             jq -r '
@@ -245,14 +231,14 @@ list_pending_background_task_ids() {
         } | sort -u | sed '/^$/d'
     ) || completed=""
 
-    # Collect launched ids that have no matching completion notification.
+    # 收集没有匹配完成通知的已启动 id。
     local pending
     pending=$(comm -23 \
         <(printf '%s\n' "$launched" | sed '/^$/d') \
         <(printf '%s\n' "$completed" | sed '/^$/d'))
 
-    # Apply liveness probe: drop orphaned task IDs whose output file exists
-    # but has zero open file descriptors (killed without a completion event).
+    # 应用存活探针：丢弃输出文件存在但没有打开文件描述符的孤立任务 ID
+    # （在没有完成事件的情况下被杀死）。
     if [[ -n "$pending" ]]; then
         local tasks_dir
         tasks_dir=$(derive_tasks_dir_from_transcript "$transcript_path")
@@ -264,11 +250,11 @@ list_pending_background_task_ids() {
     printf '%s\n' "$pending" | sed '/^$/d'
 }
 
-# Returns 0 when the transcript shows at least one pending background task.
-# Returns 1 when no pending tasks are detected (including fail-closed cases
-# like missing transcript, non-file path, or jq unavailable).
+# 当转录本显示至少一个待处理的后台任务时返回 0。
+# 当未检测到待处理任务时返回 1（包括关闭失败的情况，
+# 如缺失转录本、非文件路径或 jq 不可用）。
 #
-# Usage: has_pending_background_tasks "$transcript_path" [since_ts]
+# 用法：has_pending_background_tasks "$transcript_path" [since_ts]
 has_pending_background_tasks() {
     local transcript_path="$1"
     local since_ts="${2:-}"
@@ -277,10 +263,10 @@ has_pending_background_tasks() {
     [[ -n "$pending" ]]
 }
 
-# Prints the count of pending background tasks to stdout. Prints 0 for any
-# error case so callers can still format messages safely.
+# 将待处理后台任务的计数打印到 stdout。对任何错误情况打印 0，
+# 以便调用者仍能安全地格式化消息。
 #
-# Usage: count_pending_background_tasks "$transcript_path" [since_ts]
+# 用法：count_pending_background_tasks "$transcript_path" [since_ts]
 count_pending_background_tasks() {
     local transcript_path="$1"
     local since_ts="${2:-}"
@@ -296,61 +282,51 @@ count_pending_background_tasks() {
     fi
 }
 
-# Single entry point for the stop hook: runs the four guard blocks
-# (ambiguous-caller, cross-session parked, pending-bg short-circuit,
-# same-session stale-marker cleanup) in order. When a guard decides to
-# short-circuit the stop hook, it emits the appropriate JSON on stdout
-# and `exit 0`s directly; the caller (sourcing the hook script) never
-# returns. When no guard fires, this function returns 0 and the stop
-# hook continues into its normal gate logic.
+# stop hook 的单入口点：按顺序运行四个守卫块
+# （调用者歧义、跨会话驻留、待处理后台任务短路、同会话过期标记清理）。
+# 当守卫决定短路 stop hook 时，它在 stdout 上发出适当的 JSON 并直接
+# `exit 0`；调用者（源码引入钩子脚本）永远不会返回。
+# 当没有守卫触发时，此函数返回 0，stop hook 继续其正常门控逻辑。
 #
-# Depends on FIELD_SESSION_ID and resolve_active_state_file from
-# loop-common.sh.
+# 依赖于 loop-common.sh 中的 FIELD_SESSION_ID 和 resolve_active_state_file。
 #
-# Usage: handle_bg_task_short_circuit "$LOOP_DIR" "$HOOK_INPUT" "$HOOK_SESSION_ID"
+# 用法：handle_bg_task_short_circuit "$LOOP_DIR" "$HOOK_INPUT" "$HOOK_SESSION_ID"
 handle_bg_task_short_circuit() {
     local loop_dir="$1" hook_input="$2" hook_session_id="$3"
 
-    # Shared state used by the guard blocks below.
-    # Loop-start boundary: derived from the loop dir basename
-    # (`YYYY-MM-DD_HH-MM-SS`). Empty means derivation failed; helpers
-    # treat empty since_ts as no boundary.
+    # 下面守卫块使用的共享状态。
+    # 循环开始边界：从循环目录 basename 派生（`YYYY-MM-DD_HH-MM-SS`）。
+    # 空表示派生失败；辅助函数将空的 since_ts 视为无边界。
     local loop_start_ts transcript_path
     loop_start_ts=$(derive_loop_start_iso_ts "$loop_dir")
     transcript_path=$(extract_transcript_path "$hook_input")
 
     # ----------------------------------------
-    # Ambiguous-Caller Marker Guard
+    # 调用者歧义标记守卫
     # ----------------------------------------
-    # If a bg-pending.marker is present but we have no session_id on
-    # this hook invocation (typical of scripts/rlcr-stop-gate.sh
-    # invoked without --session-id, or any other caller that doesn't
-    # forward session_id), we cannot tell whether this caller owns the
-    # parked loop. Taking either branch (foreign-session guard below,
-    # or same-session cleanup further down) would be wrong in one of
-    # the two possible realities. Exit 0 silently: the real Claude
-    # hook will arrive with session_id populated and drive parking /
-    # cleanup from an authoritative context.
+    # 如果 bg-pending.marker 存在但此钩子调用没有 session_id
+    # （典型的 scripts/rlcr-stop-gate.sh 未使用 --session-id 调用，
+    # 或任何其他不转发 session_id 的调用者），我们无法判断此调用者
+    # 是否拥有驻留的循环。采取任一分支（下面的外部会话守卫或更下面的
+    # 同会话清理）在两种可能的现实中的一种是错误的。
+    # 静默退出 0：真正的 Claude 钩子将携带 session_id 到达，
+    # 并从权威上下文驱动驻留/清理。
     if [[ -f "$loop_dir/bg-pending.marker" ]] && [[ -z "$hook_session_id" ]]; then
         exit 0
     fi
 
     # ----------------------------------------
-    # Cross-Session Parked-Loop Guard
+    # 跨会话驻留循环守卫
     # ----------------------------------------
-    # If find_active_loop handed this dir over via the marker fallback,
-    # the loop is parked by a different session waiting on a background
-    # task. The current session has no authority to inspect or advance
-    # that loop - its transcript sees none of the foreign bg activity -
-    # so the only safe response is to exit 0 with a distinct
-    # systemMessage and leave every on-disk artifact (state file,
-    # stored session_id, marker) untouched.
+    # 如果 find_active_loop 通过标记回传将此目录交出，则循环被
+    # 等待后台任务的不同会话驻留。当前会话无权检查或推进该循环 -
+    # 其转录本看不到任何外部后台活动 - 因此唯一安全的响应是
+    # 带着不同的 systemMessage 退出 0，并保持每个磁盘产物
+    # （状态文件、存储的 session_id、标记）不变。
     #
-    # Both sides of the session-id comparison must be non-empty for
-    # this branch to trigger: an empty hook_session_id has already
-    # exited above via the ambiguous-caller guard, and an empty stored
-    # session_id keeps the backward-compat "matches any" semantics
-    # from find_active_loop.
+    # session-id 比较的两侧必须非空才能触发此分支：
+    # 空的 hook_session_id 已通过上面的调用者歧义守卫退出，
+    # 空的存储 session_id 保持 find_active_loop 的向后兼容"匹配任何"语义。
     if [[ -f "$loop_dir/bg-pending.marker" ]]; then
         local guard_state_file guard_stored_sid
         guard_state_file=$(resolve_active_state_file "$loop_dir")
@@ -367,37 +343,31 @@ handle_bg_task_short_circuit() {
     fi
 
     # ----------------------------------------
-    # Early Exit: Pending Background Tasks
+    # 提前退出：待处理的后台任务
     # ----------------------------------------
-    # When the main Claude Code session has dispatched background work
-    # (Agent with run_in_background=true, or Bash with
-    # run_in_background=true) whose completion notifications have not
-    # yet arrived, the natural "stop" is simply "I am waiting for the
-    # background task". Running git/summary/BitLesson/Codex gates in
-    # that state wastes Codex tokens and produces low-signal reviews.
+    # 当主 Claude Code 会话已派发后台工作（run_in_background=true 的 Agent，
+    # 或 run_in_background=true 的 Bash）且其完成通知尚未到达时，
+    # 自然的"停止"就是"我正在等待后台任务"。
+    # 在该状态下运行 git/摘要/BitLesson/Codex 门控会浪费 Codex 令牌并产生低信号审查。
     #
-    # Allow the stop (exit 0) and emit a user-visible systemMessage so
-    # nobody mistakes the pause for loop completion. The on-disk loop
-    # state is left untouched -- the next natural stop (after
-    # background work finishes) will re-enter this hook with no
-    # pending tasks and run the normal flow.
+    # 允许停止（exit 0）并发出用户可见的 systemMessage，
+    # 以便没有人将暂停误认为循环完成。磁盘上的循环状态保持不变 -
+    # 下一次自然停止（后台工作完成后）将重新进入此钩子，
+    # 没有待处理任务并运行正常流程。
     #
-    # loop_start_ts confines the transcript scan to launches that
-    # actually happened during this loop; earlier session-wide bg
-    # activity cannot pin the loop.
+    # loop_start_ts 将转录本扫描限制为在此循环期间实际发生的启动；
+    # 较早的会话范围后台活动不能固定循环。
     #
-    # This check MUST run before any other gate (phase detection,
-    # state parsing, branch / plan / git-clean / summary / max-iter
-    # checks, Codex review).
+    # 此检查必须在任何其他门控（阶段检测、状态解析、分支/计划/git 清洁/
+    # 摘要/最大迭代检查、Codex 审查）之前运行。
     local pending_bg_ids
     pending_bg_ids=$(list_pending_background_task_ids "$transcript_path" "$loop_start_ts" 2>/dev/null) || true
     if [[ -n "$pending_bg_ids" ]]; then
         local pending_bg_count
         pending_bg_count=$(printf '%s\n' "$pending_bg_ids" | sed '/^$/d' | wc -l | tr -d ' ')
-        # Mark the loop as parked; allows the same session to resume
-        # later and makes the cross-session guard above reachable if
-        # the user opens a different Claude session in this repo
-        # before the bg task completes.
+        # 将循环标记为驻留；允许同一会话稍后恢复，
+        # 并使上面的跨会话守卫在用户在后台任务完成之前
+        # 在此仓库中打开不同的 Claude 会话时可达。
         : > "$loop_dir/bg-pending.marker" 2>/dev/null || true
         jq -n --arg count "$pending_bg_count" \
             '{systemMessage: ("RLCR loop active. " + $count + " background task(s) still running - stop allowed naturally; loop has NOT terminated and will resume on completion.")}'
@@ -405,26 +375,21 @@ handle_bg_task_short_circuit() {
     fi
 
     # ----------------------------------------
-    # Same-Session Stale-Marker Cleanup
+    # 同会话过期标记清理
     # ----------------------------------------
-    # The cross-session guard above already exited for every foreign
-    # session, so reaching here with the marker present means the
-    # CURRENT session parked the loop and has now come back with a
-    # transcript showing no pending bg events. Remove the stale marker
-    # before the normal flow takes over.
+    # 上面的跨会话守卫已为每个外部会话退出，
+    # 因此在标记存在的情况下到达这里意味着当前会话驻留了循环，
+    # 现在带着显示没有待处理后台事件的转录本回来了。
+    # 在正常流程接管之前移除过期标记。
     #
-    # Two-part guard to make sure we never drop the parked-state
-    # signal without evidence:
-    #   (a) list_pending_background_task_ids returned exit 0 -- the
-    #       transcript was present, readable, AND parsed successfully.
-    #       The helper is fail-closed on missing files, empty paths,
-    #       jq parse failure, and truncation, so a non-zero exit
-    #       blocks cleanup here even when the transcript "file"
-    #       exists.
-    #   (b) its output is empty -- proves "no pending" was
-    #       authoritatively verified, not inferred from a failure.
-    # The check uses a single fresh call so we capture both the exit
-    # code and the emptiness without double-running jq.
+    # 两部分守卫确保我们永远不会在没有证据的情况下丢弃驻留状态信号：
+    #   (a) list_pending_background_task_ids 返回退出 0 -- 转录本存在、
+    #       可读且解析成功。辅助函数对缺失文件、空路径、jq 解析失败
+    #       和截断是关闭失败的，因此即使转录本"文件"存在，
+    #       非零退出也会在此阻止清理。
+    #   (b) 其输出为空 -- 证明"无待处理"是权威验证的，
+    #       而不是从失败推断的。
+    # 检查使用单个新调用，以便我们捕获退出码和空性而无需双重运行 jq。
     if [[ -f "$loop_dir/bg-pending.marker" ]]; then
         local pending_bg_check
         if pending_bg_check=$(list_pending_background_task_ids "$transcript_path" "$loop_start_ts" 2>/dev/null) \

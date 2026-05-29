@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# Template Reference Validation
+# 模板引用验证
 #
-# This script scans all shell scripts that use template loading functions
-# and verifies that all referenced template files actually exist.
+# 此脚本扫描所有使用模板加载函数的 shell 脚本，
+# 并验证所有引用的模板文件确实存在。
 #
-# This prevents the critical issue where a missing template file causes
-# Claude to receive empty error messages when a validator blocks an action.
+# 这防止了当验证器阻止操作时，缺失的模板文件导致
+# Claude 收到空错误消息的关键问题。
 #
 
 set -uo pipefail
@@ -15,12 +15,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATE_DIR="$PROJECT_ROOT/prompt-template"
 
-# Colors for output
+# 输出颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 无颜色
 
 TESTS_PASSED=0
 TESTS_FAILED=0
@@ -49,11 +49,11 @@ section() {
 }
 
 # ========================================
-# Section 1: Find All Template References
+# 第 1 部分：查找所有模板引用
 # ========================================
 section "Section 1: Scanning Shell Scripts for Template References"
 
-# Find all shell scripts that might use templates
+# 查找所有可能使用模板的 shell 脚本
 SCRIPTS_TO_CHECK=(
     "$PROJECT_ROOT/hooks/loop-codex-stop-hook.sh"
     "$PROJECT_ROOT/hooks/loop-read-validator.sh"
@@ -63,7 +63,7 @@ SCRIPTS_TO_CHECK=(
     "$PROJECT_ROOT/hooks/lib/loop-common.sh"
 )
 
-# Patterns that reference templates
+# 引用模板的模式
 # - load_template "$TEMPLATE_DIR" "path/to/template.md"
 # - load_and_render "$TEMPLATE_DIR" "path/to/template.md"
 # - load_and_render_safe "$TEMPLATE_DIR" "path/to/template.md"
@@ -80,9 +80,9 @@ for script in "${SCRIPTS_TO_CHECK[@]}"; do
     script_name=$(basename "$script")
     echo "Checking: $script_name"
 
-    # Extract template paths from load_template, load_and_render, load_and_render_safe calls
-    # Pattern: function_name "$TEMPLATE_DIR" "template/path.md"
-    # We look for quoted strings after $TEMPLATE_DIR
+    # 从 load_template、load_and_render、load_and_render_safe 调用中提取模板路径
+    # 模式：function_name "$TEMPLATE_DIR" "template/path.md"
+    # 我们查找 $TEMPLATE_DIR 后的带引号字符串
 
     while IFS= read -r line; do
         # Skip comments
@@ -114,11 +114,11 @@ echo ""
 echo "Total template references found: $FOUND_REFERENCES"
 
 # ========================================
-# Section 2: Check Template Directory Completeness
+# 第 2 部分：检查模板目录完整性
 # ========================================
 section "Section 2: Verify All Templates Are Referenced"
 
-# Get list of all template files
+# 获取所有模板文件列表
 TEMPLATE_FILES=()
 while IFS= read -r -d '' file; do
     relative_path="${file#$TEMPLATE_DIR/}"
@@ -127,12 +127,12 @@ done < <(find "$TEMPLATE_DIR" -name "*.md" -type f -print0)
 
 echo "Total template files: ${#TEMPLATE_FILES[@]}"
 
-# For each template, check if it's referenced somewhere
-# (This is informational - not all templates need to be referenced)
+# 对于每个模板，检查它是否在某处被引用
+# （这是信息性的 - 并非所有模板都需要被引用）
 UNREFERENCED=()
 
 for template in "${TEMPLATE_FILES[@]}"; do
-    # Search for this template path in any shell script
+    # 在任何 shell 脚本中搜索此模板路径
     if grep -rq "\"$template\"" "$PROJECT_ROOT/hooks/" 2>/dev/null; then
         pass "Template referenced: $template"
     else
@@ -142,11 +142,11 @@ for template in "${TEMPLATE_FILES[@]}"; do
 done
 
 # ========================================
-# Section 3: Cross-Reference Validation
+# 第 3 部分：交叉引用验证
 # ========================================
 section "Section 3: Cross-Reference Validation"
 
-# Check that message functions in loop-common.sh reference valid templates
+# 检查 loop-common.sh 中的消息函数是否引用有效模板
 echo "Checking loop-common.sh message functions..."
 
 COMMON_TEMPLATES=(
@@ -167,7 +167,7 @@ for template in "${COMMON_TEMPLATES[@]}"; do
 done
 
 # ========================================
-# Section 4: Verify Fallback Messages Exist
+# 第 4 部分：验证回退消息存在
 # ========================================
 section "Section 4: Verify load_and_render_safe Usage"
 
@@ -201,7 +201,7 @@ for script in "${CRITICAL_SCRIPTS[@]}"; do
 done
 
 # ========================================
-# Summary
+# 总结
 # ========================================
 section "Test Summary"
 

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # ========================================
-# Source Shared Libraries
+# 导入共享库
 # ========================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -13,10 +13,10 @@ source "$SCRIPT_DIR/../hooks/lib/project-root.sh"
 
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Source portable timeout wrapper
+# 导入可移植的超时封装器
 source "$SCRIPT_DIR/portable-timeout.sh"
 
-# Source shared loop library (kept for consistency with ask-codex.sh)
+# 导入共享循环库（为与 ask-codex.sh 保持一致性而保留）
 HOOKS_LIB_DIR="$(cd "$SCRIPT_DIR/../hooks/lib" && pwd)"
 source "$HOOKS_LIB_DIR/loop-common.sh"
 
@@ -97,7 +97,7 @@ if ! printf '%s\n' "$BITLESSON_CONTENT" | grep -Eq '^[[:space:]]*##[[:space:]]+L
 fi
 
 # ========================================
-# Detect BitLesson Project Root (for config and -C)
+# 检测 BitLesson 项目根目录（用于配置和 -C）
 # ========================================
 
 BITLESSON_DIR="$(cd "$(dirname "$BITLESSON_FILE")" && pwd -P)"
@@ -119,7 +119,7 @@ PROVIDER_MODE="$(get_config_value "$MERGED_CONFIG" "provider_mode")"
 PROVIDER_MODE="${PROVIDER_MODE:-auto}"
 
 # ========================================
-# Determine Provider from BITLESSON_MODEL
+# 根据 BITLESSON_MODEL 确定提供者
 # ========================================
 
 BITLESSON_PROVIDER="$(detect_provider "$BITLESSON_MODEL")"
@@ -130,18 +130,18 @@ if [[ "$PROVIDER_MODE" == "codex-only" ]] && [[ "$BITLESSON_PROVIDER" == "claude
 fi
 
 # ========================================
-# Conditional Dependency Check (with fallback)
+# 条件依赖检查（带回退）
 # ========================================
 
 if ! check_provider_dependency "$BITLESSON_PROVIDER" 2>/dev/null; then
-    # Fall back to codex provider when the configured provider binary is missing
+    # 当配置的提供者二进制文件缺失时，回退到 codex 提供者
     BITLESSON_MODEL="$DEFAULT_CODEX_MODEL"
     BITLESSON_PROVIDER="codex"
     check_provider_dependency "$BITLESSON_PROVIDER"
 fi
 
 # ========================================
-# Build Selector Prompt
+# 构建选择器提示
 # ========================================
 
 PROMPT="$(cat <<EOF
@@ -179,7 +179,7 @@ EOF
 )"
 
 # ========================================
-# Run Selector (Codex or Claude)
+# 运行选择器（Codex 或 Claude）
 # ========================================
 
 SELECTOR_TIMEOUT=120
@@ -190,16 +190,16 @@ run_selector() {
 
     if [[ "$provider" == "codex" ]]; then
         local codex_exec_args=()
-        # Capture help output first to avoid pipefail+SIGPIPE interaction when
-        # grep exits early (after finding a match) before codex finishes writing.
+        # 首先捕获帮助输出，以避免当 grep 提前退出（找到匹配后）
+        # 而 codex 尚未完成写入时的 pipefail+SIGPIPE 交互问题。
         local codex_help_output codex_exec_help_output
         codex_help_output=$(codex --help 2>&1) || true
         codex_exec_help_output=$(codex exec --help 2>&1) || true
-        # Probe whether the installed Codex CLI supports --disable flag
+        # 探测已安装的 Codex CLI 是否支持 --disable 标志
         if grep -q -- '--disable' <<< "$codex_help_output"; then
             codex_exec_args+=("--disable" "hooks")
         fi
-        # Probe for --skip-git-repo-check and --ephemeral support
+        # 探测是否支持 --skip-git-repo-check 和 --ephemeral
         if grep -q -- '--skip-git-repo-check' <<< "$codex_exec_help_output"; then
             codex_exec_args+=("--skip-git-repo-check")
         fi
@@ -240,7 +240,7 @@ if [[ $CODEX_EXIT_CODE -ne 0 ]]; then
 fi
 
 # ========================================
-# Enforce Stable Output Format
+# 强制稳定的输出格式
 # ========================================
 
 LESSON_IDS_VALUE="$(

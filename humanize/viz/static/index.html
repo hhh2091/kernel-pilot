@@ -5,24 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Humanize Viz</title>
 
-    <!-- Fonts -->
+    <!-- 字体 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Styles -->
+    <!-- 样式 -->
     <link rel="stylesheet" href="/css/theme.css?v=2">
     <link rel="stylesheet" href="/css/layout.css?v=2">
 
-    <!-- CDN libs -->
+    <!-- CDN 库 -->
     <script src="https://unpkg.com/marked@15.0.7/marked.min.js"></script>
     <script src="https://unpkg.com/dompurify@3.2.4/dist/purify.min.js"></script>
 </head>
 <body>
-    <!-- Grain overlay for atmosphere -->
+    <!-- 氛围颗粒纹理叠加层 -->
     <div class="grain-overlay" aria-hidden="true"></div>
 
-    <!-- Top bar -->
+    <!-- 顶部导航栏 -->
     <header class="topbar" id="topbar">
         <div class="topbar-left" id="topbar-left">
             <div class="topbar-logo">
@@ -32,7 +32,7 @@
         </div>
         <span class="topbar-title" id="topbar-title"></span>
         <div class="topbar-right">
-            <a class="topbar-link" href="#/">Home</a>
+            <a class="topbar-link" href="#/">首页</a>
             <a class="topbar-link" id="analytics-link" href="#/analytics"></a>
             <button class="topbar-btn" id="theme-btn" onclick="toggleTheme()"></button>
             <div class="dropdown" id="ops-dropdown-container" style="display:none">
@@ -50,15 +50,15 @@
         </div>
     </header>
 
-    <!-- Main content -->
+    <!-- 主内容区 -->
     <main id="main-content"></main>
 
-    <!-- Modal -->
+    <!-- 模态框 -->
     <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
         <div class="modal" id="modal-content"></div>
     </div>
 
-    <!-- Scripts -->
+    <!-- 脚本 -->
     <script src="/js/i18n.js?v=4"></script>
     <script src="/js/pipeline.js?v=4"></script>
     <script src="/js/actions.js?v=4"></script>

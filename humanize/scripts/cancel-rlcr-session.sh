@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
 #
-# Session-scoped cancel helper for the Humanize Viz dashboard.
+# Humanize Viz 仪表板的会话级取消助手。
 #
-# Cancels a single RLCR session by id, leaving any other active
-# sessions in the same project untouched. Mirrors the cancel
-# mechanism in scripts/cancel-rlcr-loop.sh (touch a .cancel-requested
-# signal, rename the active state file to cancel-state.md) but scoped
-# to the named session directory rather than the project's most
-# recent active session.
+# 通过 ID 取消单个 RLCR 会话，同一项目中的其他活跃会话不受影响。
+# 镜像了 scripts/cancel-rlcr-loop.sh 中的取消机制（创建 .cancel-requested
+# 信号文件，将活跃状态文件重命名为 cancel-state.md），但作用范围限定为
+# 指定的会话目录，而非项目中最近的活跃会话。
 #
-# Usage:
+# 用法:
 #   cancel-rlcr-session.sh --session-id <SID> [--project <path>] [--force]
-#   cancel-rlcr-session.sh <SID>                                       # legacy
+#   cancel-rlcr-session.sh <SID>                                       # 旧版用法
 #
-# Exit codes:
-#   0 - Successfully cancelled
-#   1 - No such session, or no active state file in the session dir
-#   2 - Finalize phase detected, --force required
-#   3 - Other error (missing arguments, unreadable directory)
+# 退出码:
+#   0 - 成功取消
+#   1 - 无此会话，或会话目录中无活跃状态文件
+#   2 - 检测到终结阶段，需要 --force
+#   3 - 其他错误（缺少参数、目录不可读）
 
 set -euo pipefail
 
@@ -36,7 +34,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --) shift ;;
         *)
-            # Legacy positional: first non-flag is the session id.
+            # 旧版位置参数：第一个非标志参数是会话 ID。
             if [[ -z "$SESSION_ID" ]]; then
                 SESSION_ID="$1"
             else
@@ -54,14 +52,13 @@ if [[ -z "$SESSION_ID" ]]; then
     exit 3
 fi
 
-# Reject session ids that could escape the per-project rlcr directory.
-# Valid ids are produced by ``setup-rlcr-loop.sh`` from
-# ``date +"%Y-%m-%d_%H-%M-%S"`` (digits, dashes, underscores). Allow
-# the same shape plus a handful of safe extras (alphanumerics, dots as
-# non-traversal separators) and explicitly reject path separators,
-# leading dots, and any parent-directory token so values like
-# ``../foo`` or ``/etc/passwd`` cannot rename state files outside the
-# session tree.
+# 拒绝可能逃逸出项目级 rlcr 目录的会话 ID。
+# 有效的 ID 由 ``setup-rlcr-loop.sh`` 从
+# ``date +"%Y-%m-%d_%H-%M-%S"`` 生成（数字、破折号、下划线）。
+# 允许相同的格式加上少量安全的额外字符（字母数字、点号作为
+# 非遍历分隔符），并显式拒绝路径分隔符、前导点号和任何
+# 父目录标记，以防止 ``../foo`` 或 ``/etc/passwd`` 等值
+# 重命名会话树之外的状态文件。
 if [[ "$SESSION_ID" == *"/"* || "$SESSION_ID" == *"\\"* ]]; then
     echo "Error: invalid --session-id (contains path separator): $SESSION_ID" >&2
     exit 3

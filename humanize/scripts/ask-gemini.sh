@@ -1,39 +1,38 @@
 #!/usr/bin/env bash
 #
-# Ask Gemini - One-shot consultation with Gemini CLI
+# Ask Gemini - 与 Gemini CLI 的一次性咨询
 #
-# Sends a question or task to gemini in non-interactive mode and returns
-# the response.  Gemini is always instructed to leverage Google Search
-# for deep web research.
+# 以非交互模式向 gemini 发送问题或任务并返回响应。
+# Gemini 始终被指示利用 Google 搜索进行深度网络研究。
 #
-# Usage:
+# 用法:
 #   ask-gemini.sh [--gemini-model MODEL] [--gemini-timeout SECONDS] [question...]
 #
-# Output:
-#   stdout: Gemini's response (for Claude to read)
-#   stderr: Status/debug info (model, log paths)
+# 输出:
+#   stdout: Gemini 的响应（供 Claude 读取）
+#   stderr: 状态/调试信息（模型、日志路径）
 #
-# Storage:
-#   Project-local: .humanize/skill/<unique-id>/{input,output,metadata}.md
-#   Cache: ~/.cache/humanize/<sanitized-path>/skill-<unique-id>/gemini-run.{cmd,out,log}
+# 存储:
+#   项目本地: .humanize/skill/<unique-id>/{input,output,metadata}.md
+#   缓存: ~/.cache/humanize/<sanitized-path>/skill-<unique-id>/gemini-run.{cmd,out,log}
 #
 
 set -euo pipefail
 
 # ========================================
-# Source Shared Libraries
+# 导入共享库
 # ========================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
-# Source portable timeout wrapper
+# 导入可移植的超时封装器
 source "$SCRIPT_DIR/portable-timeout.sh"
 
-# Shared project-root resolver (CLAUDE_PROJECT_DIR -> git toplevel, realpath-canonical)
+# 共享的项目根目录解析器（CLAUDE_PROJECT_DIR -> git 顶层目录，realpath 规范化）
 source "$SCRIPT_DIR/../hooks/lib/project-root.sh"
 
 # ========================================
-# Default Configuration
+# 默认配置
 # ========================================
 
 DEFAULT_GEMINI_MODEL="gemini-3.1-pro-preview"
@@ -43,7 +42,7 @@ GEMINI_MODEL="$DEFAULT_GEMINI_MODEL"
 GEMINI_TIMEOUT="$DEFAULT_ASK_GEMINI_TIMEOUT"
 
 # ========================================
-# Help
+# 帮助信息
 # ========================================
 
 show_help() {
@@ -82,7 +81,7 @@ HELP_EOF
 }
 
 # ========================================
-# Parse Arguments
+# 解析参数
 # ========================================
 
 QUESTION_PARTS=()
@@ -135,11 +134,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Join question parts into a single string
+# 将问题部分合并为单个字符串
 QUESTION="${QUESTION_PARTS[*]}"
 
 # ========================================
-# Validate Prerequisites
+# 验证前置条件
 # ========================================
 
 if ! command -v gemini &>/dev/null; then
@@ -159,7 +158,7 @@ if [[ -z "$QUESTION" ]]; then
     exit 1
 fi
 
-# Validate model name for safety (alphanumeric, hyphen, underscore, dot)
+# 验证模型名称的安全性（仅允许字母数字、连字符、下划线、点号）
 if [[ ! "$GEMINI_MODEL" =~ ^[a-zA-Z0-9._-]+$ ]]; then
     echo "Error: Gemini model contains invalid characters" >&2
     echo "  Model: $GEMINI_MODEL" >&2
@@ -168,7 +167,7 @@ if [[ ! "$GEMINI_MODEL" =~ ^[a-zA-Z0-9._-]+$ ]]; then
 fi
 
 # ========================================
-# Detect Project Root
+# 检测项目根目录
 # ========================================
 
 PROJECT_ROOT="$(resolve_project_root)" || {
@@ -178,17 +177,17 @@ PROJECT_ROOT="$(resolve_project_root)" || {
 }
 
 # ========================================
-# Create Storage Directories
+# 创建存储目录
 # ========================================
 
 TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
 UNIQUE_ID="${TIMESTAMP}-$$-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 
-# Project-local storage: .humanize/skill/<unique-id>/
+# 项目本地存储: .humanize/skill/<unique-id>/
 SKILL_DIR="$PROJECT_ROOT/.humanize/skill/$UNIQUE_ID"
 mkdir -p "$SKILL_DIR"
 
-# Cache storage: ~/.cache/humanize/<sanitized-path>/skill-<unique-id>/
+# 缓存存储: ~/.cache/humanize/<sanitized-path>/skill-<unique-id>/
 SANITIZED_PROJECT_PATH=$(echo "$PROJECT_ROOT" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g')
 CACHE_BASE="${XDG_CACHE_HOME:-$HOME/.cache}"
 CACHE_DIR="$CACHE_BASE/humanize/$SANITIZED_PROJECT_PATH/skill-$UNIQUE_ID"
@@ -199,7 +198,7 @@ if ! mkdir -p "$CACHE_DIR" 2>/dev/null; then
 fi
 
 # ========================================
-# Save Input
+# 保存输入
 # ========================================
 
 cat > "$SKILL_DIR/input.md" << EOF
@@ -218,22 +217,22 @@ $QUESTION
 EOF
 
 # ========================================
-# Build Gemini Command
+# 构建 Gemini 命令
 # ========================================
 
 GEMINI_ARGS=("-m" "$GEMINI_MODEL")
 
-# Determine approval mode
+# 确定审批模式
 if [[ "${HUMANIZE_GEMINI_YOLO:-}" == "true" ]] || [[ "${HUMANIZE_GEMINI_YOLO:-}" == "1" ]]; then
     GEMINI_ARGS+=("--yolo")
 else
     GEMINI_ARGS+=("--sandbox")
 fi
 
-# Use text output format for clean stdout
+# 使用文本输出格式以获得干净的标准输出
 GEMINI_ARGS+=("-o" "text")
 
-# Build the augmented prompt with web-search instruction
+# 构建带有网页搜索指令的增强提示
 AUGMENTED_PROMPT="You MUST use Google Search to find the most up-to-date and accurate information before answering. Perform thorough web research. Cite sources where possible.
 
 ---
@@ -241,7 +240,7 @@ AUGMENTED_PROMPT="You MUST use Google Search to find the most up-to-date and acc
 $QUESTION"
 
 # ========================================
-# Save Debug Command
+# 保存调试命令
 # ========================================
 
 GEMINI_CMD_FILE="$CACHE_DIR/gemini-run.cmd"
@@ -249,26 +248,26 @@ GEMINI_STDOUT_FILE="$CACHE_DIR/gemini-run.out"
 GEMINI_STDERR_FILE="$CACHE_DIR/gemini-run.log"
 
 {
-    echo "# Gemini ask-gemini invocation debug info"
-    echo "# Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "# Working directory: $PROJECT_ROOT"
-    echo "# Timeout: $GEMINI_TIMEOUT seconds"
+    echo "# Gemini ask-gemini 调用调试信息"
+    echo "# 时间戳: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "# 工作目录: $PROJECT_ROOT"
+    echo "# 超时时间: $GEMINI_TIMEOUT 秒"
     echo ""
     echo "gemini ${GEMINI_ARGS[*]} -p \"<prompt>\""
     echo ""
-    echo "# Prompt content:"
+    echo "# 提示内容:"
     echo "$AUGMENTED_PROMPT"
 } > "$GEMINI_CMD_FILE"
 
 # ========================================
-# Run Gemini
+# 运行 Gemini
 # ========================================
 
 echo "ask-gemini: model=$GEMINI_MODEL timeout=${GEMINI_TIMEOUT}s" >&2
 echo "ask-gemini: cache=$CACHE_DIR" >&2
 echo "ask-gemini: running gemini -p ..." >&2
 
-# Portable epoch-to-ISO8601 formatter
+# 可移植的 epoch 到 ISO8601 格式化器
 epoch_to_iso() {
     local epoch="$1"
     date -u -d "@$epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null ||
@@ -288,7 +287,7 @@ DURATION=$((END_TIME - START_TIME))
 echo "ask-gemini: exit_code=$GEMINI_EXIT_CODE duration=${DURATION}s" >&2
 
 # ========================================
-# Handle Results
+# 处理结果
 # ========================================
 
 if [[ $GEMINI_EXIT_CODE -eq 124 ]]; then
@@ -362,7 +361,7 @@ EOF
 fi
 
 # ========================================
-# Save Output and Metadata
+# 保存输出和元数据
 # ========================================
 
 cp "$GEMINI_STDOUT_FILE" "$SKILL_DIR/output.md"
@@ -382,7 +381,7 @@ EOF
 echo "ask-gemini: response saved to $SKILL_DIR/output.md" >&2
 
 # ========================================
-# Output Response
+# 输出响应
 # ========================================
 
 cat "$GEMINI_STDOUT_FILE"

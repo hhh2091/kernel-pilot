@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
 #
-# PreToolUse Hook: Validate Bash commands for RLCR loop
+# PreToolUse 钩子：验证 RLCR 循环中的 Bash 命令
 #
-# Blocks attempts to bypass Write/Edit hooks using shell commands:
-# - cat/echo/printf > file.md (redirection)
+# 阻止通过 shell 命令绕过 Write/Edit 钩子的尝试：
+# - cat/echo/printf > file.md（重定向）
 # - tee file.md
-# - sed -i file.md (in-place edit)
-# - goal-tracker.md modifications via Bash
+# - sed -i file.md（原地编辑）
+# - 通过 Bash 修改 goal-tracker.md
 #
 
 set -euo pipefail
 
-# Load shared functions
+# 加载共享函数
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 source "$SCRIPT_DIR/lib/loop-common.sh"
 
 # ========================================
-# Parse Hook Input
+# 解析钩子输入
 # ========================================
 
 HOOK_INPUT=$(cat)
 
-# Validate JSON input structure
+# 验证 JSON 输入结构
 if ! validate_hook_input "$HOOK_INPUT"; then
     exit 1
 fi
 
-# Check for deeply nested JSON (potential DoS)
+# 检查深度嵌套的 JSON（潜在的 DoS 攻击）
 if is_deeply_nested "$HOOK_INPUT" 30; then
     exit 1
 fi
@@ -37,7 +37,7 @@ if [[ "$TOOL_NAME" != "Bash" ]]; then
     exit 0
 fi
 
-# Require command for Bash tool
+# Bash 工具需要 command 参数
 if ! require_tool_input_field "$HOOK_INPUT" "command"; then
     exit 1
 fi
@@ -46,53 +46,47 @@ COMMAND=$(echo "$HOOK_INPUT" | jq -r '.tool_input.command // ""')
 COMMAND_LOWER=$(to_lower "$COMMAND")
 
 # ========================================
-# Find Active Loops (needed for multiple checks)
+# 查找活跃循环（多个检查需要）
 # ========================================
 
 PROJECT_ROOT="$(resolve_project_root)" || exit 0
 
-# Extract session_id from hook input for session-aware loop filtering
+# 从钩子输入中提取 session_id 用于会话感知的循环过滤
 HOOK_SESSION_ID=$(extract_session_id "$HOOK_INPUT")
 
-# Check for active RLCR loop (filtered by session_id)
+# 检查活跃的 RLCR 循环（按 session_id 过滤）
 LOOP_BASE_DIR="$PROJECT_ROOT/.humanize/rlcr"
 ACTIVE_LOOP_DIR=$(find_active_loop "$LOOP_BASE_DIR" "$HOOK_SESSION_ID")
 
 # ========================================
-# Methodology Analysis Phase Bash Restriction
+# 方法论分析阶段 Bash 限制
 # ========================================
-# During methodology analysis, block file-modifying bash commands.
-# Only read-only operations and cancel-rlcr-loop.sh are allowed.
-# This prevents source code modifications after Codex has signed off.
+# 在方法论分析期间，阻止修改文件的 bash 命令。
+# 仅允许只读操作和 cancel-rlcr-loop.sh。
+# 这防止了 Codex 签署后对源代码的修改。
 #
-# Accepted limitations:
-# - Read-only bash commands (cat, grep, find, etc.) are NOT blocked. Blocking
-#   them would break basic Claude operations. The analysis prompt directs Claude
-#   to derive user-facing content only from methodology-analysis-report.md.
-# - Spawned agents (different session_id) are not restricted by hooks; their
-#   sanitization is enforced by the analysis prompt. This is an inherent
-#   limitation of the hook architecture which cannot distinguish spawned agents
-#   from unrelated sessions.
+# 已接受的限制：
+# - 只读 bash 命令（cat、grep、find 等）不会被阻止。阻止它们会破坏基本的
+#   Claude 操作。分析提示词指导 Claude 仅从 methodology-analysis-report.md
+#   中派生面向用户的内容。
+# - 生成的代理（不同的 session_id）不受钩子限制；它们的清理由分析提示词强制执行。
+#   这是钩子架构的固有限制，无法区分生成的代理和无关会话。
 #
-# Use only the session-matched loop. Do NOT fall back to an unfiltered search,
-# as that would incorrectly restrict unrelated sessions opened in the same repo.
+# 仅使用会话匹配的循环。不要回退到未过滤的搜索，
+# 因为这会错误地限制在同一仓库中打开的无关会话。
 _MA_BASH_DIR="$ACTIVE_LOOP_DIR"
 
 if [[ -n "$_MA_BASH_DIR" ]] && [[ -f "$_MA_BASH_DIR/methodology-analysis-state.md" ]]; then
-    # Allow cancel-rlcr-loop.sh only as the leading command (not as an argument
-    # to another command like cp/mv). The optional path prefix must be a single
-    # token with no embedded whitespace, otherwise commands like
-    # `bash cancel-rlcr-loop.sh` or `tee cancel-rlcr-loop.sh` would match.
-    # The script name must be followed by whitespace or end-of-line so trailing
-    # tokens cannot hide additional arguments.
+    # 仅允许 cancel-rlcr-loop.sh 作为前导命令（不是作为 cp/mv 等另一个命令的参数）。
+    # 可选的路径前缀必须是不含嵌入空格的单个令牌，否则像
+    # `bash cancel-rlcr-loop.sh` 或 `tee cancel-rlcr-loop.sh` 这样的命令会匹配。
+    # 脚本名称后面必须跟空格或行尾，这样尾随令牌就无法隐藏额外的参数。
     #
-    # Also reject any shell metacharacter that can inject or redirect work
-    # after the cancel invocation: pipes/sequence/background operators,
-    # command substitution ($(...) or backticks), redirection (<, >), and
-    # multi-line payloads. The earlier narrower check only rejected ; | &,
-    # letting payloads like `cancel-rlcr-loop.sh $(touch /tmp/pwn)` or a
-    # newline-delimited second command slip past this early exit and reach
-    # arbitrary file modifications before the downstream blockers run.
+    # 同时拒绝任何可以在取消调用之后注入或重定向工作的 shell 元字符：
+    # 管道/序列/后台运算符、命令替换（$(...) 或反引号）、重定向（<、>）
+    # 和多行负载。之前较窄的检查只拒绝了 ; | &，
+    # 让像 `cancel-rlcr-loop.sh $(touch /tmp/pwn)` 或换行分隔的第二个命令
+    # 这样的负载绕过此早期退出，在下游阻止器运行之前到达任意文件修改。
     _ma_has_shell_meta=false
     case "$COMMAND_LOWER" in
         *';'*|*'|'*|*'&'*|*'`'*|*'>'*|*'<'*|*'$('*|*$'\n'*)
@@ -103,64 +97,64 @@ if [[ -n "$_MA_BASH_DIR" ]] && [[ -f "$_MA_BASH_DIR/methodology-analysis-state.m
        echo "$COMMAND_LOWER" | grep -qE '^[[:space:]]*"?([^[:space:]"]+/)?cancel-rlcr-loop\.sh"?([[:space:]]|$)'; then
         exit 0
     fi
-    # Block git commands that modify the working tree
+    # 阻止修改工作树的 git 命令
     if echo "$COMMAND_LOWER" | grep -qE '(^|[[:space:];|&])git[[:space:]]+(commit|add|reset|checkout|merge|rebase|cherry-pick|am|apply|stash|push|restore|clean|rm|mv|switch|pull|clone|submodule|worktree)'; then
         echo "# Bash Blocked During Methodology Analysis
 
 Git write commands are not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block file manipulation commands (touch, mv, cp, rm, mkdir, ln, patch, etc.)
+    # 阻止文件操作命令（touch、mv、cp、rm、mkdir、ln、patch 等）
     if echo "$COMMAND_LOWER" | grep -qE '(^|[[:space:];|&])(tee|install|touch|mv|cp|rm|dd|truncate|chmod|chown|mkdir|rmdir|ln|mktemp|patch)[[:space:]]'; then
         echo "# Bash Blocked During Methodology Analysis
 
 File modification commands are not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block in-place file editing tools
+    # 阻止原地文件编辑工具
     if echo "$COMMAND_LOWER" | grep -qE 'sed[[:space:]]+-i|awk[[:space:]]+-i[[:space:]]+inplace|perl[[:space:]]+-[^[:space:]]*i'; then
         echo "# Bash Blocked During Methodology Analysis
 
 In-place file editing is not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block common interpreters that could write files (defense-in-depth)
+    # 阻止可能写入文件的常见解释器（纵深防御）
     if echo "$COMMAND_LOWER" | grep -qE '(^|[[:space:];|&])(python[23]?|ruby|node|perl|php)[[:space:]]'; then
         echo "# Bash Blocked During Methodology Analysis
 
 Running interpreters is not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block shell script entry points (bash script.sh, sh script.sh, source, .)
+    # 阻止 shell 脚本入口点（bash script.sh、sh script.sh、source、.）
     if echo "$COMMAND_LOWER" | grep -qE '(^|[[:space:];|&])(/usr/bin/env[[:space:]]+)?(bash|sh|zsh|/bin/bash|/bin/sh|/bin/zsh)[[:space:]]'; then
         echo "# Bash Blocked During Methodology Analysis
 
 Running shell scripts is not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block build tools that execute arbitrary commands
+    # 阻止执行任意命令的构建工具
     if echo "$COMMAND_LOWER" | grep -qE '(^|[[:space:];|&])(make|cmake|ninja|gradle|mvn|ant|cargo|go[[:space:]]+run|go[[:space:]]+generate|npm[[:space:]]+run|yarn[[:space:]]+run|npx|pnpm)[[:space:]]'; then
         echo "# Bash Blocked During Methodology Analysis
 
 Build tools are not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block source/dot commands (source script.sh, . script.sh)
+    # 阻止 source/dot 命令（source script.sh、. script.sh）
     if echo "$COMMAND_LOWER" | grep -qE '(^|[[:space:];|&])(source|\.)[ 	]+[^[:space:]]'; then
         echo "# Bash Blocked During Methodology Analysis
 
 Sourcing scripts is not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block direct script execution (./script.sh, ../script.sh, /path/to/script)
+    # 阻止直接脚本执行（./script.sh、../script.sh、/path/to/script）
     if echo "$COMMAND_LOWER" | grep -qE '(^|[[:space:];|&])\.{0,2}/[^[:space:]>|&;]*\.(sh|bash|py|rb|pl|js)'; then
         echo "# Bash Blocked During Methodology Analysis
 
 Direct script execution is not allowed during the methodology analysis phase." >&2
         exit 2
     fi
-    # Block output redirection to files (catches cat > file, echo > file, etc.)
-    # Strip safe redirections (/dev/ paths, fd duplication) then check for remaining >
+    # 阻止输出重定向到文件（捕获 cat > file、echo > file 等）
+    # 剥离安全的重定向（/dev/ 路径、fd 复制）然后检查剩余的 >
     _ma_stripped=$(echo "$COMMAND_LOWER" | sed 's|[0-9]*>[>]*[[:space:]]*/dev/[^[:space:]]*||g; s|[0-9]*>&[0-9]*||g')
     if echo "$_ma_stripped" | grep -qE '[>]'; then
         echo "# Bash Blocked During Methodology Analysis
@@ -170,16 +164,16 @@ File redirection is not allowed during the methodology analysis phase." >&2
     fi
 fi
 
-# If no active RLCR loop, allow all commands
+# 如果没有活跃的 RLCR 循环，允许所有命令
 if [[ -z "$ACTIVE_LOOP_DIR" ]]; then
     exit 0
 fi
 
 # ========================================
-# Block Direct Execution of Hook Scripts
+# 阻止钩子脚本的直接执行
 # ========================================
-# Prevents Claude from manually running stop hook or stop gate scripts.
-# These scripts should only be invoked by the hooks system, not via Bash.
+# 防止 Claude 手动运行 stop hook 或 stop gate 脚本。
+# 这些脚本应仅由钩子系统调用，而不是通过 Bash。
 
 BLOCKED_HOOK_SCRIPTS="(loop-codex-stop-hook\.sh|rlcr-stop-gate\.sh)"
 HOOK_ASSIGNMENT_PREFIX="[[:alpha:]_][[:alnum:]_]*=[^[:space:];&|]+"
@@ -202,15 +196,15 @@ if echo "$COMMAND_LOWER" | grep -qE "(^|[;&|])[[:space:]]*${HOOK_WRAPPER_PREFIX_
 fi
 
 # ========================================
-# RLCR Loop Specific Checks
+# RLCR 循环特定检查
 # ========================================
-# The following checks only apply when an RLCR loop is active
+# 以下检查仅在 RLCR 循环活跃时适用
 
 if [[ -n "$ACTIVE_LOOP_DIR" ]]; then
-    # Detect if we're in Finalize Phase (finalize-state.md exists)
+    # 检测是否处于 Finalize 阶段（finalize-state.md 存在）
     STATE_FILE=$(resolve_active_state_file "$ACTIVE_LOOP_DIR")
 
-    # Parse state file using strict validation (fail closed on malformed state)
+    # 使用严格验证解析状态文件（格式错误时关闭失败）
     if ! parse_state_file_strict "$STATE_FILE" 2>/dev/null; then
         echo "Error: Malformed state file, blocking operation for safety" >&2
         exit 1
@@ -218,15 +212,15 @@ if [[ -n "$ACTIVE_LOOP_DIR" ]]; then
     CURRENT_ROUND="$STATE_CURRENT_ROUND"
 
     # ========================================
-    # Block Git Push When push_every_round is false
+    # 当 push_every_round 为 false 时阻止 Git Push
     # ========================================
-    # Default behavior: commits stay local, no need to push to remote
+    # 默认行为：提交保留在本地，无需推送到远程
 
-    # Note: parse_state_file was called above, STATE_* vars are available
+    # 注意：上面已调用 parse_state_file，STATE_* 变量可用
     PUSH_EVERY_ROUND="$STATE_PUSH_EVERY_ROUND"
 
     if [[ "$PUSH_EVERY_ROUND" != "true" ]]; then
-        # Check if command is a git push command
+        # 检查命令是否是 git push 命令
         if [[ "$COMMAND_LOWER" =~ ^[[:space:]]*git[[:space:]]+push ]]; then
             FALLBACK="# Git Push Blocked
 
@@ -239,10 +233,10 @@ Use --push-every-round flag when starting the loop if you need to push each roun
 fi
 
 # ========================================
-# Block Git Add Commands Targeting .humanize
+# 阻止针对 .humanize 的 Git Add 命令
 # ========================================
-# Prevents force-adding .humanize files to version control
-# Note: .humanize is in .gitignore, but git add -f bypasses it
+# 防止强制将 .humanize 文件添加到版本控制
+# 注意：.humanize 在 .gitignore 中，但 git add -f 会绕过它
 
 if git_adds_humanize "$COMMAND_LOWER"; then
     git_add_humanize_blocked_message >&2
@@ -250,26 +244,26 @@ if git_adds_humanize "$COMMAND_LOWER"; then
 fi
 
 # ========================================
-# RLCR State and File Protection
+# RLCR 状态和文件保护
 # ========================================
-# These checks only apply when an RLCR loop is active
+# 以下检查仅在 RLCR 循环活跃时适用
 
 if [[ -n "$ACTIVE_LOOP_DIR" ]]; then
 
 # ========================================
-# Block State File Modifications (All Rounds)
+# 阻止状态文件修改（所有轮次）
 # ========================================
-# State file is managed by the loop system, not Claude
-# This includes both state.md and finalize-state.md
-# NOTE: Check finalize-state.md FIRST because state\.md pattern also matches finalize-state.md
-# Exception: Allow mv to cancel-state.md when cancel signal file exists
+# 状态文件由循环系统管理，不是 Claude
+# 这包括 state.md 和 finalize-state.md
+# 注意：首先检查 finalize-state.md，因为 state\.md 模式也会匹配 finalize-state.md
+# 例外：当取消信号文件存在时，允许 mv 到 cancel-state.md
 #
-# Note: We check TWO patterns for mv/cp:
-# 1. command_modifies_file checks if DESTINATION contains state.md
-# 2. Additional check below catches if SOURCE contains state.md (e.g., mv state.md /tmp/foo)
+# 注意：我们检查两个模式用于 mv/cp：
+# 1. command_modifies_file 检查目标是否包含 state.md
+# 2. 下面的额外检查捕获源是否包含 state.md（例如 mv state.md /tmp/foo）
 
 if command_modifies_file "$COMMAND_LOWER" "methodology-analysis-state\.md"; then
-    # Check for cancel signal file - allow authorized cancel operation
+    # 检查取消信号文件 - 允许授权的取消操作
     if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
         exit 0
     fi
@@ -278,7 +272,7 @@ if command_modifies_file "$COMMAND_LOWER" "methodology-analysis-state\.md"; then
 fi
 
 if command_modifies_file "$COMMAND_LOWER" "finalize-state\.md"; then
-    # Check for cancel signal file - allow authorized cancel operation
+    # 检查取消信号文件 - 允许授权的取消操作
     if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
         exit 0
     fi
@@ -286,9 +280,9 @@ if command_modifies_file "$COMMAND_LOWER" "finalize-state\.md"; then
     exit 2
 fi
 
-# Check 1: Destination contains state.md (covers writes, redirects, mv/cp TO state.md)
+# 检查 1：目标包含 state.md（覆盖写入、重定向、mv/cp 到 state.md）
 if command_modifies_file "$COMMAND_LOWER" "state\.md"; then
-    # Check for cancel signal file - allow authorized cancel operation
+    # 检查取消信号文件 - 允许授权的取消操作
     if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
         exit 0
     fi
@@ -296,28 +290,28 @@ if command_modifies_file "$COMMAND_LOWER" "state\.md"; then
     exit 2
 fi
 
-# Check 2: Source of mv/cp contains state.md (covers mv/cp FROM state.md to any destination)
-# This catches bypass attempts like: mv state.md /tmp/foo.txt
-# Pattern handles:
-# - Options like -f, -- before the source path
-# - Leading whitespace and command prefixes with options (sudo -u root, env VAR=val, command --)
-# - Quoted relative paths like: mv -- "state.md" /tmp/foo
-# - Command chaining via ;, &&, ||, |, |&, & (each segment is checked independently)
-# - Shell wrappers: sh -c, bash -c, /bin/sh -c, /bin/bash -c
-# Requires state.md to be a proper filename (preceded by space, /, or quote)
-# Note: sudo/command patterns match zero or more arguments (each: space + optional-minus + non-space chars)
+# 检查 2：mv/cp 的源包含 state.md（覆盖从 state.md 到任何目标的 mv/cp）
+# 这捕获绕过尝试，如：mv state.md /tmp/foo.txt
+# 模式处理：
+# - 源路径前的选项，如 -f、--
+# - 前导空格和带选项的命令前缀（sudo -u root、env VAR=val、command --）
+# - 引用的相对路径，如：mv -- "state.md" /tmp/foo
+# - 通过 ;、&&、||、|、|&、& 的命令链接（每个段独立检查）
+# - Shell 包装器：sh -c、bash -c、/bin/sh -c、/bin/bash -c
+# 要求 state.md 是一个正确的文件名（前面有空格、/ 或引号）
+# 注意：sudo/command 模式匹配零个或多个参数（每个：空格 + 可选减号 + 非空格字符）
 
-# Split command on shell operators and check each segment
-# This catches chained commands like: true; mv state.md /tmp/foo
+# 按 shell 运算符拆分命令并检查每个段
+# 这捕获链式命令，如：true; mv state.md /tmp/foo
 MV_CP_SOURCE_PATTERN="^[[:space:]]*(sudo([[:space:]]+-?[^[:space:];&|]+)*[[:space:]]+)?(env[[:space:]]+[^;&|]*[[:space:]]+)?(command([[:space:]]+-?[^[:space:];&|]+)*[[:space:]]+)?(mv|cp)[[:space:]].*[[:space:]/\"']state\.md"
 MV_CP_FINALIZE_SOURCE_PATTERN="^[[:space:]]*(sudo([[:space:]]+-?[^[:space:];&|]+)*[[:space:]]+)?(env[[:space:]]+[^;&|]*[[:space:]]+)?(command([[:space:]]+-?[^[:space:];&|]+)*[[:space:]]+)?(mv|cp)[[:space:]].*[[:space:]/\"']finalize-state\.md"
 MV_CP_METHODOLOGY_SOURCE_PATTERN="^[[:space:]]*(sudo([[:space:]]+-?[^[:space:];&|]+)*[[:space:]]+)?(env[[:space:]]+[^;&|]*[[:space:]]+)?(command([[:space:]]+-?[^[:space:];&|]+)*[[:space:]]+)?(mv|cp)[[:space:]].*[[:space:]/\"']methodology-analysis-state\.md"
 
-# Replace shell operators with newlines, then check each segment
-# Order matters: |& before |, && before single &
-# For &: protect redirections (&>>, &>, >&, N>&M) with placeholders, then split on remaining &
-# Placeholders use control chars unlikely to appear in commands
-# Note: &>> must be replaced before &> to avoid leaving a stray >
+# 将 shell 运算符替换为换行符，然后检查每个段
+# 顺序很重要：|& 在 | 之前，&& 在单个 & 之前
+# 对于 &：用占位符保护重定向（&>>、&>、>&、N>&M），然后按剩余的 & 拆分
+# 占位符使用不太可能出现在命令中的控制字符
+# 注意：&>> 必须在 &> 之前替换，以避免留下杂散的 >
 COMMAND_SEGMENTS=$(echo "$COMMAND_LOWER" | sed '
     s/|&/\n/g
     s/&&/\n/g
@@ -331,22 +325,22 @@ COMMAND_SEGMENTS=$(echo "$COMMAND_LOWER" | sed '
     s/;/\n/g
 ')
 while IFS= read -r SEGMENT; do
-    # Skip empty segments
+    # 跳过空段
     [[ -z "$SEGMENT" ]] && continue
 
-    # Strip leading redirections before pattern matching
-    # This handles cases like: 2>/tmp/x mv, 2> /tmp/x mv, >/tmp/x mv, 2>&1 mv, &>/tmp/x mv
-    # Also handles append redirections: >> /tmp/x mv, 2>> /tmp/x mv, &>> /tmp/x mv
-    # Also handles quoted targets: >> "/tmp/x y" mv, >> '/tmp/x y' mv
-    # Also handles ANSI-C quoting: >> $'/tmp/x y' mv, >> $"/tmp/x y" mv
-    # Also handles escaped-space targets: >> /tmp/x\ y mv
-    # Must handle:
-    # - \x01 (from &>) followed by optional space and target path (quoted, ANSI-C, escaped, or unquoted)
-    # - \x02 (from >&, 2>&1) with NO target - just strip placeholder
-    # - \x03 (from &>>) followed by optional space and target path (quoted, ANSI-C, escaped, or unquoted)
-    # - Standard redirections [0-9]*[><]+ followed by optional space and target
-    # Order: double-quoted, single-quoted, ANSI-C $'...', locale $"...", escaped-unquoted, plain-unquoted
-    # Note: Escaped/ANSI-C patterns use sed -E for extended regex
+    # 在模式匹配之前剥离前导重定向
+    # 这处理以下情况：2>/tmp/x mv、2> /tmp/x mv、>/tmp/x mv、2>&1 mv、&>/tmp/x mv
+    # 还处理追加重定向：>> /tmp/x mv、2>> /tmp/x mv、&>> /tmp/x mv
+    # 还处理带引号的目标：>> "/tmp/x y" mv、>> '/tmp/x y' mv
+    # 还处理 ANSI-C 引用：>> $'/tmp/x y' mv、>> $"/tmp/x y" mv
+    # 还处理转义空格目标：>> /tmp/x\ y mv
+    # 必须处理：
+    # - \x01（来自 &>）后跟可选空格和目标路径（带引号、ANSI-C、转义或不带引号）
+    # - \x02（来自 >&、2>&1）没有目标 - 仅剥离占位符
+    # - \x03（来自 &>>）后跟可选空格和目标路径（带引号、ANSI-C、转义或不带引号）
+    # - 标准重定向 [0-9]*[><]+ 后跟可选空格和目标
+    # 顺序：双引号、单引号、ANSI-C $'...'、locale $"..."、转义不带引号、普通不带引号
+    # 注意：转义/ANSI-C 模式使用 sed -E 进行扩展正则表达式
     SEGMENT_CLEANED=$(echo "$SEGMENT" | sed '
         :again
         s/^[[:space:]]*\x01[[:space:]]*"[^"]*"[[:space:]]*//
@@ -425,9 +419,9 @@ while IFS= read -r SEGMENT; do
         t again
     ')
 
-    # Check for methodology-analysis-state.md as SOURCE first (most specific pattern)
+    # 首先检查 methodology-analysis-state.md 作为源（最具体的模式）
     if echo "$SEGMENT_CLEANED" | grep -qE "$MV_CP_METHODOLOGY_SOURCE_PATTERN"; then
-        # Check for cancel signal file - allow authorized cancel operation
+        # 检查取消信号文件 - 允许授权的取消操作
         if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
             exit 0
         fi
@@ -435,9 +429,9 @@ while IFS= read -r SEGMENT; do
         exit 2
     fi
 
-    # Check for finalize-state.md as SOURCE (more specific than state.md)
+    # 检查 finalize-state.md 作为源（比 state.md 更具体）
     if echo "$SEGMENT_CLEANED" | grep -qE "$MV_CP_FINALIZE_SOURCE_PATTERN"; then
-        # Check for cancel signal file - allow authorized cancel operation
+        # 检查取消信号文件 - 允许授权的取消操作
         if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
             exit 0
         fi
@@ -446,7 +440,7 @@ while IFS= read -r SEGMENT; do
     fi
 
     if echo "$SEGMENT_CLEANED" | grep -qE "$MV_CP_SOURCE_PATTERN"; then
-        # Check for cancel signal file - allow authorized cancel operation
+        # 检查取消信号文件 - 允许授权的取消操作
         if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
             exit 0
         fi
@@ -455,11 +449,11 @@ while IFS= read -r SEGMENT; do
     fi
 done <<< "$COMMAND_SEGMENTS"
 
-# Check 3: Shell wrapper bypass (sh -c, bash -c)
-# This catches bypass attempts like: sh -c 'mv state.md /tmp/foo'
-# Pattern: look for sh/bash with -c flag and state.md or finalize-state.md in the payload
+# 检查 3：Shell 包装器绕过（sh -c、bash -c）
+# 这捕获绕过尝试，如：sh -c 'mv state.md /tmp/foo'
+# 模式：查找带 -c 标志的 sh/bash，且负载中有 state.md 或 finalize-state.md
 if echo "$COMMAND_LOWER" | grep -qE "(^|[[:space:]/])(sh|bash)[[:space:]]+-c[[:space:]]"; then
-    # Shell wrapper detected - check if payload contains mv/cp methodology-analysis-state.md (most specific)
+    # 检测到 Shell 包装器 - 检查负载是否包含 mv/cp methodology-analysis-state.md（最具体）
     if echo "$COMMAND_LOWER" | grep -qE "(mv|cp)[[:space:]].*methodology-analysis-state\.md"; then
         if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
             exit 0
@@ -467,18 +461,18 @@ if echo "$COMMAND_LOWER" | grep -qE "(^|[[:space:]/])(sh|bash)[[:space:]]+-c[[:s
         methodology_analysis_state_file_blocked_message >&2
         exit 2
     fi
-    # Shell wrapper detected - check if payload contains mv/cp finalize-state.md (check first, more specific)
+    # 检测到 Shell 包装器 - 检查负载是否包含 mv/cp finalize-state.md（先检查，更具体）
     if echo "$COMMAND_LOWER" | grep -qE "(mv|cp)[[:space:]].*finalize-state\.md"; then
-        # Check for cancel signal file - allow authorized cancel operation
+        # 检查取消信号文件 - 允许授权的取消操作
         if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
             exit 0
         fi
         finalize_state_file_blocked_message >&2
         exit 2
     fi
-    # Shell wrapper detected - check if payload contains mv/cp state.md
+    # 检测到 Shell 包装器 - 检查负载是否包含 mv/cp state.md
     if echo "$COMMAND_LOWER" | grep -qE "(mv|cp)[[:space:]].*state\.md"; then
-        # Check for cancel signal file - allow authorized cancel operation
+        # 检查取消信号文件 - 允许授权的取消操作
         if is_cancel_authorized "$ACTIVE_LOOP_DIR" "$COMMAND_LOWER"; then
             exit 0
         fi
@@ -488,10 +482,10 @@ if echo "$COMMAND_LOWER" | grep -qE "(^|[[:space:]/])(sh|bash)[[:space:]]+-c[[:s
 fi
 
 # ========================================
-# Block Plan Backup Modifications (All Rounds)
+# 阻止计划备份修改（所有轮次）
 # ========================================
-# Plan backup is read-only - protects plan integrity during loop
-# Use command_modifies_file helper for consistent pattern matching
+# 计划备份是只读的 - 保护循环期间的计划完整性
+# 使用 command_modifies_file 辅助函数进行一致的模式匹配
 
 if command_modifies_file "$COMMAND_LOWER" "\.humanize/rlcr(/[^/]+)?/plan\.md"; then
     FALLBACK="Writing to plan.md backup is not allowed during RLCR loop."
@@ -501,10 +495,10 @@ if command_modifies_file "$COMMAND_LOWER" "\.humanize/rlcr(/[^/]+)?/plan\.md"; t
 fi
 
 # ========================================
-# Block Goal Tracker Modifications (All Rounds)
+# 阻止目标跟踪器修改（所有轮次）
 # ========================================
-# Round 0: prompt to use Write/Edit
-# Round > 0: prompt to put request in summary
+# 轮次 0：提示使用 Write/Edit
+# 轮次 > 0：提示将请求放入摘要
 
 if command_modifies_file "$COMMAND_LOWER" "goal-tracker\.md"; then
     GOAL_TRACKER_PATH="$ACTIVE_LOOP_DIR/goal-tracker.md"
@@ -517,9 +511,9 @@ if command_modifies_file "$COMMAND_LOWER" "goal-tracker\.md"; then
 fi
 
 # ========================================
-# Block Prompt File Modifications (All Rounds)
+# 阻止提示文件修改（所有轮次）
 # ========================================
-# Prompt files are read-only - they contain instructions FROM Codex TO Claude
+# 提示文件是只读的 - 它们包含从 Codex 到 Claude 的指令
 
 if command_modifies_file "$COMMAND_LOWER" "round-[0-9]+-prompt\.md"; then
     prompt_write_blocked_message >&2
@@ -527,9 +521,9 @@ if command_modifies_file "$COMMAND_LOWER" "round-[0-9]+-prompt\.md"; then
 fi
 
 # ========================================
-# Block Summary File Modifications (All Rounds)
+# 阻止摘要文件修改（所有轮次）
 # ========================================
-# Summary files should be written using Write or Edit tools for proper validation
+# 摘要文件应使用 Write 或 Edit 工具写入以进行正确验证
 
 if command_modifies_file "$COMMAND_LOWER" "round-[0-9]+-summary\.md"; then
     CORRECT_PATH="$ACTIVE_LOOP_DIR/round-${CURRENT_ROUND}-summary.md"
@@ -538,10 +532,10 @@ if command_modifies_file "$COMMAND_LOWER" "round-[0-9]+-summary\.md"; then
 fi
 
 # ========================================
-# Block Round Contract File Modifications (All Rounds)
+# 阻止轮次合同文件修改（所有轮次）
 # ========================================
-# Round contracts should be written using Write or Edit tools so round scoping
-# stays aligned with the current loop state.
+# 轮次合同应使用 Write 或 Edit 工具写入，以便轮次范围
+# 与当前循环状态保持一致。
 
 if command_modifies_file "$COMMAND_LOWER" "round-[0-9]+-contract\.md"; then
     CORRECT_PATH="$ACTIVE_LOOP_DIR/round-${CURRENT_ROUND}-contract.md"
@@ -555,12 +549,12 @@ Use the Write or Edit tool instead: {{CORRECT_PATH}}"
 fi
 
 # ========================================
-# Block Todos File Modifications (All Rounds)
+# 阻止 Todos 文件修改（所有轮次）
 # ========================================
 
 if command_modifies_file "$COMMAND_LOWER" "round-[0-9]+-todos\.md"; then
-    # Require full path to active loop dir to prevent same-basename bypass from different roots.
-    # Strip leading /private prefix so canonical paths (/private/var) match user paths (/var) on macOS.
+    # 要求活跃循环目录的完整路径，以防止来自不同根目录的同名绕过。
+    # 剥离前导 /private 前缀，以便规范路径（/private/var）在 macOS 上匹配用户路径（/var）。
     ACTIVE_LOOP_DIR_LOWER=$(to_lower "$ACTIVE_LOOP_DIR")
     ACTIVE_LOOP_DIR_LOWER_NORM="${ACTIVE_LOOP_DIR_LOWER#/private}"
     ACTIVE_LOOP_DIR_ESCAPED=$(echo "$ACTIVE_LOOP_DIR_LOWER_NORM" | sed 's/[\\.*^$[(){}+?|]/\\&/g')
@@ -570,6 +564,6 @@ if command_modifies_file "$COMMAND_LOWER" "round-[0-9]+-todos\.md"; then
     fi
 fi
 
-fi  # End of RLCR-specific checks
+fi  # RLCR 特定检查结束
 
 exit 0

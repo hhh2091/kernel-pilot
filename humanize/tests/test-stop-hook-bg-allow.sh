@@ -1,36 +1,35 @@
 #!/usr/bin/env bash
 #
-# Tests for the background-task short-circuit in loop-codex-stop-hook.sh.
+# loop-codex-stop-hook.sh 中后台任务短路的测试。
 #
-# When the current Claude Code session has dispatched background work that has
-# not yet completed (via Agent run_in_background=true or Bash
-# run_in_background=true), the RLCR stop hook must exit 0 with a user-facing
-# systemMessage instead of running any gate or Codex review. The on-disk loop
-# state must remain unchanged, so that the next natural stop (after the
-# background task finishes) re-enters the normal review flow.
+# 当当前 Claude Code 会话已派发尚未完成的后台工作（通过 Agent
+# run_in_background=true 或 Bash run_in_background=true）时，
+# RLCR 停止钩子必须以面向用户的 systemMessage 退出 0，而不是
+# 运行任何闸门或 Codex 审查。磁盘上的循环状态必须保持不变，
+# 以便下一个自然停止（后台任务完成后）重新进入正常审查流程。
 #
-# Acceptance criteria exercised here (see
-# .humanize/rlcr/2026-04-16_13-19-26/goal-tracker.md for authoritative list):
-#   AC-1   no bg dispatches                          -> normal Codex flow
-#   AC-2   pending subagent                          -> exit 0 + systemMessage
-#   AC-3   pending shell                             -> exit 0 + systemMessage
-#   AC-4   subagent launch + complete                -> normal Codex flow
-#   AC-5   2 subagents + 1 shell                     -> systemMessage mentions "3 background"
-#   AC-6   missing transcript path                   -> normal Codex flow (fail-closed)
-#   AC-7   no active loop                            -> exit 0, no systemMessage, no Codex
-#   AC-8   finalize phase pending bg                 -> exit 0 + systemMessage
-#   AC-9   via rlcr-stop-gate.sh                     -> exit 0 (wrapper ALLOW)
-#   AC-10  tilde transcript path                     -> short-circuit fires
-#   AC-11  cross-session bg-pending.marker           -> "parked" systemMessage, artifacts intact
-#   AC-12  find_active_loop prefers exact session    -> returns older exact-match dir
-#   AC-13  same-session resume                       -> stale marker removed
-#   AC-14  cross-session stop with marker            -> marker and stored session_id preserved
-#   AC-15  task_notification completion format       -> marks launch completed
-#   AC-16  mixed legacy + SDK completions            -> resolves to empty pending set
-#   AC-17  unreadable transcript with marker         -> marker and session_id preserved
-#   AC-18  find_active_loop default ignores marker   -> validators stay isolated
-#   AC-19  hook input omits session_id               -> cross-session guard fires
-#   AC-20  malformed transcript with marker          -> marker preserved (fail-closed)
+# 此处验证的验收标准（参见
+# .humanize/rlcr/2026-04-16_13-19-26/goal-tracker.md 获取权威列表）：
+#   AC-1   无后台派发                              -> 正常 Codex 流程
+#   AC-2   待处理子代理                            -> exit 0 + systemMessage
+#   AC-3   待处理 shell                            -> exit 0 + systemMessage
+#   AC-4   子代理启动 + 完成                       -> 正常 Codex 流程
+#   AC-5   2 个子代理 + 1 个 shell                 -> systemMessage 提及 "3 background"
+#   AC-6   缺失 transcript 路径                    -> 正常 Codex 流程（失败关闭）
+#   AC-7   无活跃循环                              -> exit 0，无 systemMessage，无 Codex
+#   AC-8   完成阶段有待处理后台                    -> exit 0 + systemMessage
+#   AC-9   通过 rlcr-stop-gate.sh                  -> exit 0（包装器 ALLOW）
+#   AC-10  波浪号 transcript 路径                  -> 触发短路
+#   AC-11  跨会话 bg-pending.marker                -> "parked" systemMessage，构件完整
+#   AC-12  find_active_loop 优先精确会话           -> 返回较旧的精确匹配目录
+#   AC-13  同会话恢复                              -> 移除过期标记
+#   AC-14  跨会话停止带标记                        -> 保留标记和存储的 session_id
+#   AC-15  task_notification 完成格式              -> 标记启动已完成
+#   AC-16  混合旧版 + SDK 完成                     -> 解析为空待处理集
+#   AC-17  不可读 transcript 带标记                -> 保留标记和 session_id
+#   AC-18  find_active_loop 默认忽略标记           -> 验证器保持隔离
+#   AC-19  钩子输入省略 session_id                 -> 触发跨会话守卫
+#   AC-20  格式错误的 transcript 带标记            -> 保留标记（失败关闭）
 #
 
 set -euo pipefail
@@ -47,19 +46,17 @@ setup_test_dir
 export XDG_CACHE_HOME="$TEST_DIR/.cache"
 mkdir -p "$XDG_CACHE_HOME"
 
-# Fake HOME rooted inside $TEST_DIR so the tilde-path regressions (AC-10,
-# AC-10b, AC-10c) do not write into the real user home. The hook, helper,
-# and wrapper invocations that need tilde expansion run with HOME set to
-# this directory; every other invocation keeps the real HOME. Cleanup is
-# covered by the setup_test_dir EXIT trap because FAKE_HOME is under
-# $TEST_DIR.
+# 假 HOME 根目录在 $TEST_DIR 内，使波浪号路径回归测试（AC-10、
+# AC-10b、AC-10c）不会写入真实用户主目录。需要波浪号展开的钩子、
+# 辅助函数和包装器调用使用 HOME 设置为此目录；其他调用保持真实 HOME。
+# 清理由 setup_test_dir EXIT 陷阱覆盖，因为 FAKE_HOME 在 $TEST_DIR 下。
 FAKE_HOME="$TEST_DIR/fake-home"
 mkdir -p "$FAKE_HOME"
 
 # ----------------------------------------------------------------------
-# Mock lsof binaries used by the liveness-probe tests (AC-23, AC-24).
-# lsof-alive exits 0 (simulates >= 1 holder: task is running).
-# lsof-dead  exits 1 (simulates   0 holders: task is orphaned/dead).
+# 存活探针测试使用的模拟 lsof 二进制文件（AC-23、AC-24）。
+# lsof-alive 退出 0（模拟 >= 1 个持有者：任务正在运行）。
+# lsof-dead  退出 1（模拟 0 个持有者：任务已孤立/死亡）。
 # ----------------------------------------------------------------------
 setup_mock_lsof() {
     mkdir -p "$TEST_DIR/bin"
@@ -77,7 +74,7 @@ EOF
 }
 
 # ----------------------------------------------------------------------
-# Mock codex CLI: records an invocation marker and prints canned feedback.
+# 模拟 codex CLI：记录调用标记并打印预设反馈。
 # ----------------------------------------------------------------------
 setup_mock_codex() {
     mkdir -p "$TEST_DIR/bin"
@@ -94,9 +91,9 @@ EOF
 }
 
 # ----------------------------------------------------------------------
-# Build a minimal "active loop" project that satisfies every gate the
-# stop hook enforces BEFORE it calls Codex (so tests that want to reach
-# the Codex review flow can pass cleanly when bg-pending is not expected).
+# 构建一个最小的"活跃循环"项目，满足停止钩子在调用 Codex 之前
+# 强制执行的所有闸门（以便想要到达 Codex 审查流程的测试在不期望
+# 后台待处理时可以干净通过）。
 # ----------------------------------------------------------------------
 create_full_fixture() {
     local repo_dir="$1"
@@ -173,19 +170,19 @@ Exercise background-task short-circuit.
 | Exercise stop hook | AC-1 | completed | - |
 EOF
 
-    # Echo the loop dir so callers can reach state artifacts.
+    # 回显循环目录，以便调用者可以访问状态构件。
     echo "$loop_dir"
 }
 
-# A project with no RLCR state file at all.
+# 一个完全没有 RLCR 状态文件的项目。
 create_empty_project() {
     local repo_dir="$1"
     init_test_git_repo "$repo_dir"
 }
 
 # ----------------------------------------------------------------------
-# Transcript fixture builders.
-# Each prints a JSONL transcript to stdout.
+# Transcript 夹具构建器。
+# 每个向 stdout 打印 JSONL transcript。
 # ----------------------------------------------------------------------
 emit_tool_use_assistant() {
     local tool_use_id="$1" tool_name="$2" extra_input_json="$3"
@@ -262,11 +259,10 @@ write_transcript() {
 }
 
 # ----------------------------------------------------------------------
-# Invoke the stop hook with a crafted hook input JSON. The optional third
-# argument overrides HOME for the hook invocation only, so tilde-path
-# regressions can point at a fake HOME rooted under $TEST_DIR without
-# leaking into the real user home.
-# Sets RUN_EXIT_CODE, RUN_OUTPUT, RUN_MARKER.
+# 使用精心构造的钩子输入 JSON 调用停止钩子。可选的第三个参数
+# 仅为钩子调用覆盖 HOME，使波浪号路径回归可以指向 $TEST_DIR
+# 下的假 HOME，而不会泄漏到真实用户主目录。
+# 设置 RUN_EXIT_CODE、RUN_OUTPUT、RUN_MARKER。
 # ----------------------------------------------------------------------
 run_stop_hook_with_input() {
     local repo_dir="$1" hook_input_json="$2" home_override="${3:-}" lsof_bin_override="${4:-}"
@@ -341,8 +337,7 @@ assert_reached_codex() {
 setup_mock_codex
 setup_mock_lsof
 
-# Transcripts live outside any test repo to avoid tripping git cleanliness
-# gates in the stop hook.
+# Transcript 位于任何测试仓库之外，以避免触发停止钩子中的 git 清洁闸门。
 TRANSCRIPTS_DIR="$TEST_DIR/transcripts"
 mkdir -p "$TRANSCRIPTS_DIR"
 
@@ -439,14 +434,14 @@ AC6_INPUT=$(jq -c -n --arg tp "/nonexistent/file-$$.jsonl" '{transcript_path:$tp
 run_stop_hook_with_input "$AC6_REPO" "$AC6_INPUT"
 assert_reached_codex "AC-6: missing transcript_path proceeds to Codex review (fail-closed)"
 
-# Also: empty transcript_path field
+# 另外：空 transcript_path 字段
 AC6B_REPO="$TEST_DIR/ac6b"
 create_full_fixture "$AC6B_REPO" > /dev/null
 AC6B_INPUT='{"transcript_path":""}'
 run_stop_hook_with_input "$AC6B_REPO" "$AC6B_INPUT"
 assert_reached_codex "AC-6b: empty transcript_path string proceeds to Codex review"
 
-# And: no transcript_path key at all
+# 以及：完全没有 transcript_path 键
 AC6C_REPO="$TEST_DIR/ac6c"
 create_full_fixture "$AC6C_REPO" > /dev/null
 AC6C_INPUT='{}'
@@ -498,8 +493,8 @@ AC9_RESULT=$(emit_async_agent_launch_result "toolu_G" "agent_pending_G")
 write_transcript "$AC9_TRANSCRIPT" "$AC9_LAUNCH" "$AC9_RESULT"
 
 AC9_OUT="$AC9_REPO/gate-out.txt"
-# Pass --project-root explicitly so an inherited CLAUDE_PROJECT_DIR
-# from the outer runner cannot redirect the gate to the outer repo.
+# 显式传递 --project-root，使外部运行器继承的 CLAUDE_PROJECT_DIR
+# 不能将闸门重定向到外部仓库。
 set +e
 (
     cd "$AC9_REPO"
@@ -518,14 +513,13 @@ else
 fi
 
 # ---------------- AC-10 / AC-10b / AC-10c ----------------
-# Regression: real sessions pass transcript_path as "~/.claude/projects/...".
-# Without tilde expansion the file check `[[ -f "~/..." ]]` is always false,
-# so the short-circuit silently misses pending background tasks.
+# 回归：真实会话将 transcript_path 传递为 "~/.claude/projects/..."。
+# 如果没有波浪号展开，文件检查 `[[ -f "~/..." ]]` 始终为 false，
+# 因此短路会静默错过待处理的后台任务。
 #
-# The fixture lives under a fake HOME rooted inside $TEST_DIR so the tests
-# remain portable on sandboxed or read-only-HOME environments. Only the
-# specific hook / helper / wrapper invocations that need tilde expansion
-# run with HOME=$FAKE_HOME; the rest of the suite keeps the real HOME.
+# 夹具位于 $TEST_DIR 内的假 HOME 下，使测试在沙箱或只读 HOME
+# 环境中保持可移植。只有需要波浪号展开的特定钩子/辅助/包装器
+# 调用使用 HOME=$FAKE_HOME；其余测试保持真实 HOME。
 echo "Test AC-10: '~/...' transcript path still triggers short-circuit"
 AC10_REPO="$TEST_DIR/ac10"
 AC10_LOOP=$(create_full_fixture "$AC10_REPO")
@@ -537,7 +531,7 @@ AC10_LAUNCH=$(emit_tool_use_assistant "toolu_H" "Agent" ',"description":"x","pro
 AC10_RESULT=$(emit_async_agent_launch_result "toolu_H" "agent_pending_H")
 write_transcript "$AC10_TRANSCRIPT" "$AC10_LAUNCH" "$AC10_RESULT"
 
-# Build the tilde-form string literally. Do NOT let the shell expand "~".
+# 构建波浪号形式的字符串。不要让 shell 展开 "~"。
 AC10_TILDE_PATH="~/session-data/ac10.jsonl"
 AC10_INPUT=$(jq -c -n --arg tp "$AC10_TILDE_PATH" '{transcript_path:$tp}')
 run_stop_hook_with_input "$AC10_REPO" "$AC10_INPUT" "$FAKE_HOME"
@@ -545,9 +539,8 @@ assert_systemmessage_only \
     "AC-10: '~/'-prefixed transcript_path is expanded and short-circuits on pending bg" \
     "$AC10_REPO" "$AC10_STATE" "1 background task"
 
-# Also prove the helper works directly against a "~/..." argument under a
-# fake HOME. Avoids masking a helper regression behind the hook's own
-# normalization.
+# 同时证明辅助函数在假 HOME 下直接对 "~/..." 参数工作。
+# 避免在钩子自身的规范化背后掩盖辅助函数回归。
 AC10_HELPER_OUT=$(
     cd "$AC10_REPO"
     HOME="$FAKE_HOME"
@@ -562,15 +555,13 @@ else
         "output containing 'agent_pending_H'" "$AC10_HELPER_OUT"
 fi
 
-# Verify the gate wrapper path with a tilde-form --transcript-path also
-# reaches the short-circuit. AC-9 uses an absolute transcript path; this
-# covers the same code path with a "~/..." form.
+# 验证带有波浪号形式 --transcript-path 的闸门包装器路径也
+# 到达短路。AC-9 使用绝对 transcript 路径；这用 "~/..." 形式
+# 覆盖相同的代码路径。
 #
-# Fresh fixture so the repo has no prior bg-pending.marker (AC-10 left
-# one behind). The ambiguous-caller guard in the hook only silences the
-# wrapper when a marker already exists; a clean repo falls through to
-# the normal short-circuit so the systemMessage surfaces in the wrapper
-# output.
+# 新夹具使仓库没有先前的 bg-pending.marker（AC-10 留下了一个）。
+# 钩子中的模糊调用者守卫仅在标记已存在时静默包装器；
+# 干净仓库会落入正常短路，使 systemMessage 出现在包装器输出中。
 echo "Test AC-10c: rlcr-stop-gate.sh with '~/...' --transcript-path -> ALLOW"
 AC10C_REPO="$TEST_DIR/ac10c"
 create_full_fixture "$AC10C_REPO" > /dev/null
@@ -604,20 +595,19 @@ else
 fi
 
 # ---------------- AC-11 / AC-11b ----------------
-# Cross-session parked-loop guard: when a loop in the repo carries the
-# bg-pending.marker and its stored session_id does not match the caller,
-# the stop hook must exit 0 with a dedicated "parked by another session"
-# systemMessage and leave every on-disk artifact intact. The current
-# session has no authority to advance or cleanup a foreign parked loop
-# because its transcript cannot observe the other session's bg task.
+# 跨会话驻留循环守卫：当仓库中的循环携带 bg-pending.marker
+# 且其存储的 session_id 与调用者不匹配时，停止钩子必须以
+# 专用的"parked by another session" systemMessage 退出 0，
+# 并保持所有磁盘构件完整。当前会话无权推进或清理外来驻留循环，
+# 因为其 transcript 无法观察其他会话的后台任务。
 echo "Test AC-11: cross-session bg-pending.marker emits 'parked' systemMessage"
 AC11_REPO="$TEST_DIR/ac11"
 AC11_LOOP=$(create_full_fixture "$AC11_REPO")
 AC11_STATE="$AC11_LOOP/state.md"
 AC11_MARKER="$AC11_LOOP/bg-pending.marker"
 
-# Override state.md with an explicit stored session_id so find_active_loop
-# sees a real mismatch when we later pass a different session_id.
+# 用显式存储的 session_id 覆盖 state.md，使 find_active_loop
+# 在我们稍后传递不同 session_id 时看到真实的不匹配。
 AC11_BRANCH=$(git -C "$AC11_REPO" rev-parse --abbrev-ref HEAD)
 AC11_BASE_COMMIT=$(git -C "$AC11_REPO" rev-parse HEAD)
 cat > "$AC11_STATE" <<EOF_AC11
@@ -642,7 +632,7 @@ session_id: session_alpha
 EOF_AC11
 AC11_STATE_HASH_BEFORE=$(sha256sum "$AC11_STATE" | awk '{print $1}')
 
-# Simulate the state left by a previous session that took the short-circuit.
+# 模拟先前会话采取短路后留下的状态。
 : > "$AC11_MARKER"
 
 AC11_TRANSCRIPT="$TRANSCRIPTS_DIR/ac11.jsonl"
@@ -667,9 +657,8 @@ else
         "exit $RUN_EXIT_CODE, codex_marker=$(test -f "$RUN_MARKER" && echo present || echo missing), bg_marker=$(test -f "$AC11_MARKER" && echo present || echo missing), state_unchanged=$([[ "$AC11_STATE_HASH_BEFORE" == "$AC11_STATE_HASH_AFTER" ]] && echo yes || echo no), systemMessage='$AC11_SYS_MSG'; output: $RUN_OUTPUT"
 fi
 
-# Negative counterpart: same session mismatch but NO marker must still
-# reject the loop (preserving the existing session-bound isolation when
-# the loop was not explicitly parked).
+# 负面对应：相同的会话不匹配但没有标记时仍必须拒绝循环
+# （在循环未被显式驻留时保持现有的会话绑定隔离）。
 echo "Test AC-11b: cross-session without marker is still rejected"
 AC11B_REPO="$TEST_DIR/ac11b"
 AC11B_LOOP=$(create_full_fixture "$AC11B_REPO")
@@ -696,7 +685,7 @@ agent_teams: false
 session_id: session_alpha
 ---
 EOF_AC11B
-# Intentionally NO marker in AC11B_LOOP.
+# 故意在 AC11B_LOOP 中不放置标记。
 
 AC11B_TRANSCRIPT="$TRANSCRIPTS_DIR/ac11b.jsonl"
 AC11B_LAUNCH=$(emit_tool_use_assistant "toolu_J" "Agent" ',"description":"x","prompt":"x"')
@@ -715,9 +704,8 @@ else
         "exit $RUN_EXIT_CODE, marker=$(test -f "$RUN_MARKER" && echo present || echo missing), systemMessage='$AC11B_SYS_MSG'; output: $RUN_OUTPUT"
 fi
 
-# AC-11c: short-circuit should actually write bg-pending.marker so the
-# adoption path in AC-11 is reachable from real usage (not only from
-# synthetic test setup).
+# AC-11c：短路应实际写入 bg-pending.marker，使 AC-11 中的
+# 采纳路径可从真实使用中到达（不仅从合成测试设置中）。
 echo "Test AC-11c: short-circuit writes bg-pending.marker"
 AC11C_REPO="$TEST_DIR/ac11c"
 AC11C_LOOP=$(create_full_fixture "$AC11C_REPO")
@@ -740,11 +728,10 @@ else
 fi
 
 # ---------------- AC-12 ----------------
-# Session isolation under multiple concurrent RLCR loops: when the caller's
-# own exact-match dir exists in the listing, find_active_loop must return
-# it even if a newer sibling dir (belonging to another session) also has a
-# bg-pending.marker. The marker fallback is only for orphan recovery when
-# no exact match exists.
+# 多个并发 RLCR 循环下的会话隔离：当调用者自己的精确匹配目录
+# 存在于列表中时，find_active_loop 必须返回它，即使较新的兄弟目录
+# （属于另一个会话）也有 bg-pending.marker。标记回退仅用于
+# 不存在精确匹配时的孤立恢复。
 echo "Test AC-12: find_active_loop prefers exact session match over marker"
 AC12_BASE="$TEST_DIR/ac12-loops"
 mkdir -p "$AC12_BASE/2026-03-02_00-00-00"
@@ -791,9 +778,9 @@ else
 fi
 
 # ---------------- AC-13 ----------------
-# Same-session resume after background completion: a stale marker from the
-# previous short-circuit must be cleaned up on the next stop where no bg is
-# pending. State.md session_id stays put because it already matches.
+# 后台完成后的同会话恢复：先前短路的过期标记必须在下次停止时
+# 清理（没有后台待处理时）。State.md session_id 保持不变，因为
+# 它已经匹配。
 echo "Test AC-13: same-session resume removes stale bg-pending.marker"
 AC13_REPO="$TEST_DIR/ac13"
 AC13_LOOP=$(create_full_fixture "$AC13_REPO")
@@ -843,12 +830,10 @@ else
 fi
 
 # ---------------- AC-14 ----------------
-# Anti-hijack: a different session walking in MUST NOT rewrite the stored
-# session_id and MUST NOT delete bg-pending.marker, even when its own
-# transcript shows no pending bg events. The foreign session's transcript
-# cannot observe the parking session's bg activity, so nothing the new
-# session sees is authoritative. The cross-session guard takes over
-# instead.
+# 防劫持：进入的不同会话不得重写存储的 session_id，也不得删除
+# bg-pending.marker，即使其自身的 transcript 显示没有待处理后台事件。
+# 外来会话的 transcript 无法观察驻留会话的后台活动，因此新会话
+# 看到的任何内容都不是权威的。跨会话守卫接管。
 echo "Test AC-14: cross-session stop preserves marker and stored session_id"
 AC14_REPO="$TEST_DIR/ac14"
 AC14_LOOP=$(create_full_fixture "$AC14_REPO")
@@ -899,11 +884,10 @@ else
 fi
 
 # ---------------- AC-15 ----------------
-# Completion recognition: the current Claude Code transcript format emits
-# background-task completion as
+# 完成识别：当前 Claude Code transcript 格式以后台任务完成形式发出
 #   type: "system", subtype: "task_notification", task_id: "..."
-# The helper must recognise this form (not only the legacy queue-operation
-# XML block) or launched tasks will stay "pending" forever.
+# 辅助函数必须识别此形式（不仅是旧版队列操作 XML 块），
+# 否则已启动的任务将永远保持"pending"。
 echo "Test AC-15: task_notification system records mark launches completed"
 AC15_TRANSCRIPT="$TRANSCRIPTS_DIR/ac15.jsonl"
 AC15_LAUNCH=$(emit_tool_use_assistant "toolu_L" "Agent" ',"description":"x","prompt":"x"')
@@ -924,10 +908,9 @@ else
 fi
 
 # ---------------- AC-16 ----------------
-# Completion recognition mixed formats: two launches, one completed via the
-# legacy queue-operation XML block, the other via the current
-# system/task_notification record. Union of both sources must resolve to
-# an empty pending set.
+# 混合格式的完成识别：两次启动，一次通过旧版队列操作 XML 块完成，
+# 另一次通过当前 system/task_notification 记录完成。两个来源的
+# 并集必须解析为空待处理集。
 echo "Test AC-16: helper unions legacy queue-operation and task_notification completions"
 AC16_TRANSCRIPT="$TRANSCRIPTS_DIR/ac16.jsonl"
 AC16_L1=$(emit_tool_use_assistant "toolu_M1" "Agent" ',"description":"x","prompt":"x"')
@@ -953,11 +936,10 @@ else
 fi
 
 # ---------------- AC-17 ----------------
-# Marker preservation when completion cannot be verified: if
-# transcript_path is missing or unreadable, has_pending_background_tasks
-# fails closed (returns no pending). The non-short-circuit cleanup must NOT
-# erase bg-pending.marker or rewrite session_id in that case, because the
-# cross-session recovery signal is still needed.
+# 无法验证完成时的标记保留：如果 transcript_path 缺失或不可读，
+# has_pending_background_tasks 失败关闭（返回无待处理）。在这种情况下，
+# 非短路清理不得擦除 bg-pending.marker 或重写 session_id，
+# 因为跨会话恢复信号仍然需要。
 echo "Test AC-17: missing transcript preserves bg-pending.marker and session_id"
 AC17_REPO="$TEST_DIR/ac17"
 AC17_LOOP=$(create_full_fixture "$AC17_REPO")
@@ -986,8 +968,8 @@ session_id: session_foreign
 EOF_AC17
 : > "$AC17_LOOP/bg-pending.marker"
 
-# Hook input has NO transcript_path -> has_pending_background_tasks is
-# fail-closed; cleanup path must leave marker and session_id intact.
+# 钩子输入没有 transcript_path -> has_pending_background_tasks
+# 失败关闭；清理路径必须保持标记和 session_id 完整。
 AC17_INPUT='{"session_id":"session_home"}'
 run_stop_hook_with_input "$AC17_REPO" "$AC17_INPUT"
 
@@ -1005,9 +987,8 @@ else
         "session_id: session_foreign" "$(grep '^session_id:' "$AC17_STATE" || echo '(missing)')"
 fi
 
-# AC-17c: transcript_path is provided but points at a non-existent file
-# (equally unreadable). Same guarantee: marker + stored session_id
-# preserved.
+# AC-17c：提供了 transcript_path 但指向不存在的文件（同样不可读）。
+# 相同保证：保留标记 + 存储的 session_id。
 echo "Test AC-17c: transcript_path pointing at non-existent file preserves marker"
 AC17C_REPO="$TEST_DIR/ac17c"
 AC17C_LOOP=$(create_full_fixture "$AC17C_REPO")
@@ -1050,11 +1031,10 @@ else
 fi
 
 # ---------------- AC-18 ----------------
-# Validator isolation: find_active_loop's marker-based adoption is opt-in
-# via its third positional argument. Default callers (read/write/bash/etc.
-# validators) must continue to see strict session-id isolation; a parked
-# loop for a different session must NOT become visible to them through a
-# bg-pending.marker.
+# 验证器隔离：find_active_loop 的基于标记的采纳通过其第三个
+# 位置参数选择加入。默认调用者（read/write/bash 等验证器）
+# 必须继续看到严格的 session-id 隔离；不同会话的驻留循环
+# 不得通过 bg-pending.marker 对它们可见。
 echo "Test AC-18: find_active_loop default invocation ignores foreign marker"
 AC18_BASE="$TEST_DIR/ac18-loops"
 mkdir -p "$AC18_BASE/2026-03-02_00-00-00"
@@ -1094,13 +1074,11 @@ else
 fi
 
 # ---------------- AC-19 ----------------
-# Empty-session caller + bg-pending.marker present: the caller might be
-# the parked loop's owner invoking through a wrapper that didn't forward
-# session_id, OR it might be a different session. The hook cannot tell
-# them apart from the input, so the safe response is `exit 0` silently
-# with no systemMessage and no on-disk mutation. The real Claude stop
-# hook (which always has session_id populated) drives actual parking and
-# cleanup.
+# 空会话调用者 + bg-pending.marker 存在：调用者可能是驻留循环的
+# 所有者通过未转发 session_id 的包装器调用，或者可能是不同会话。
+# 钩子无法从输入中区分它们，因此安全响应是静默 `exit 0`，
+# 没有 systemMessage 和磁盘变更。真实的 Claude 停止钩子
+# （始终填充 session_id）驱动实际的驻留和清理。
 echo "Test AC-19: ambiguous caller (empty session_id + marker) exits silently"
 AC19_REPO="$TEST_DIR/ac19"
 AC19_LOOP=$(create_full_fixture "$AC19_REPO")
@@ -1134,8 +1112,8 @@ AC19_STATE_HASH_BEFORE=$(sha256sum "$AC19_STATE" | awk '{print $1}')
 AC19_TRANSCRIPT="$TRANSCRIPTS_DIR/ac19.jsonl"
 write_transcript "$AC19_TRANSCRIPT" '{"type":"user","message":{"role":"user","content":"hello"}}'
 
-# Hook input without any session_id key (mirrors rlcr-stop-gate.sh
-# invoked without --session-id).
+# 没有任何 session_id 键的钩子输入（镜像不带 --session-id
+# 调用的 rlcr-stop-gate.sh）。
 AC19_INPUT=$(jq -c -n --arg tp "$AC19_TRANSCRIPT" '{transcript_path:$tp}')
 run_stop_hook_with_input "$AC19_REPO" "$AC19_INPUT"
 AC19_SYS_MSG=$(printf '%s' "$RUN_OUTPUT" | jq -r '.systemMessage // empty' 2>/dev/null || echo "")
@@ -1153,9 +1131,9 @@ else
 fi
 
 # ---------------- AC-20 ----------------
-# Non-short-circuit cleanup must not drop bg-pending.marker when the
-# transcript exists but cannot be parsed. The helper is fail-closed on
-# malformed JSON; that failure must NOT be treated as "no pending".
+# 当 transcript 存在但无法解析时，非短路清理不得丢弃
+# bg-pending.marker。辅助函数对格式错误的 JSON 是失败关闭的；
+# 该失败不得被视为"无待处理"。
 echo "Test AC-20: malformed transcript preserves bg-pending.marker"
 AC20_REPO="$TEST_DIR/ac20"
 AC20_LOOP=$(create_full_fixture "$AC20_REPO")
@@ -1185,8 +1163,8 @@ session_id: session_home
 EOF_AC20
 : > "$AC20_MARKER"
 
-# Write a deliberately malformed transcript (truncated JSON object) so
-# list_pending_background_task_ids's jq invocations fail the parse.
+# 写入故意格式错误的 transcript（截断的 JSON 对象），
+# 使 list_pending_background_task_ids 的 jq 调用解析失败。
 AC20_TRANSCRIPT="$TRANSCRIPTS_DIR/ac20.jsonl"
 printf '%s\n' '{"type":"user","message":' > "$AC20_TRANSCRIPT"
 
@@ -1203,17 +1181,16 @@ else
 fi
 
 # ---------------- AC-21 ----------------
-# Transcript scan boundary: the Claude transcript is session-wide and
-# can contain background launches that predate the RLCR loop. The
-# helper filters launch events by `.timestamp >= since_ts` (derived
-# from the loop dir basename) so only launches made after the loop
-# started count as pending.
+# Transcript 扫描边界：Claude transcript 是会话范围的，可能包含
+# 早于 RLCR 循环的后台启动。辅助函数通过 `.timestamp >= since_ts`
+# （从循环目录基名派生）过滤启动事件，因此只有循环开始后进行的
+# 启动才算作待处理。
 echo "Test AC-21: pre-loop launches are filtered out by since_ts"
 AC21_TRANSCRIPT="$TRANSCRIPTS_DIR/ac21.jsonl"
 
-# The loop boundary used throughout the suite's fixtures is
-# 2026-03-01 00:00:00. Build two launches: one BEFORE that boundary
-# (should be filtered) and one AFTER (should still count as pending).
+# 整个测试套件夹具使用的循环边界是 2026-03-01 00:00:00。
+# 构建两次启动：一次在该边界之前（应被过滤），一次在之后
+# （应仍算作待处理）。
 AC21_PRE_LAUNCH=$(jq -c -n '{
     type:"user",
     timestamp:"2026-02-28T10:00:00.000Z",
@@ -1239,8 +1216,8 @@ else
         "only 'agent_in_loop' (pre-loop launch excluded)" "got: $AC21_FILTERED"
 fi
 
-# AC-21b: confirm the derive helper produces the expected ISO-8601 form
-# under TZ=UTC, where local wall clock == UTC so no offset is applied.
+# AC-21b：确认 derive 辅助函数在 TZ=UTC 下产生预期的 ISO-8601 格式，
+# 其中本地挂钟 == UTC，因此不应用偏移。
 AC21B_DERIVED=$(
     # shellcheck source=/dev/null
     source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
@@ -1254,9 +1231,9 @@ else
         "2026-03-01T00:00:00.000Z" "$AC21B_DERIVED"
 fi
 
-# AC-21d: setup-rlcr-loop.sh names the dir with local wall clock, so a
-# non-UTC caller must see the boundary shifted into actual UTC.
-# JST (UTC+9) example: 09:00 JST == 00:00 UTC.
+# AC-21d：setup-rlcr-loop.sh 使用本地挂钟命名目录，因此非 UTC
+# 调用者必须看到边界偏移到实际 UTC。
+# JST（UTC+9）示例：09:00 JST == 00:00 UTC。
 AC21D_DERIVED=$(
     # shellcheck source=/dev/null
     source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
@@ -1270,9 +1247,9 @@ else
         "2026-03-01T00:00:00.000Z (9am JST = 0am UTC)" "$AC21D_DERIVED"
 fi
 
-# AC-21e: PST (UTC-8) example. Pick March 1 which is still PST (DST
-# does not start until March 8, 2026), so the offset is a fixed -8h:
-# 00:00 PST == 08:00 UTC.
+# AC-21e：PST（UTC-8）示例。选择仍在 PST 的 3 月 1 日（DST
+# 直到 2026 年 3 月 8 日才开始），因此偏移为固定的 -8 小时：
+# 00:00 PST == 08:00 UTC。
 AC21E_DERIVED=$(
     # shellcheck source=/dev/null
     source "$PROJECT_ROOT/hooks/lib/loop-common.sh"
@@ -1286,8 +1263,8 @@ else
         "2026-03-01T08:00:00.000Z (0am PST = 8am UTC before DST)" "$AC21E_DERIVED"
 fi
 
-# AC-21c: end-to-end through the stop hook. Pre-loop launch only -> hook
-# must NOT short-circuit (no pending bg "belongs" to this loop).
+# AC-21c：通过停止钩子的端到端测试。仅循环前启动 -> 钩子
+# 不得短路（没有"属于"此循环的待处理后台）。
 echo "Test AC-21c: stop hook ignores pre-loop launches for this loop"
 AC21C_REPO="$TEST_DIR/ac21c"
 AC21C_LOOP=$(create_full_fixture "$AC21C_REPO")
@@ -1298,9 +1275,8 @@ AC21C_INPUT=$(jq -c -n --arg tp "$AC21C_TRANSCRIPT" \
     '{transcript_path:$tp, session_id:"session_home"}')
 run_stop_hook_with_input "$AC21C_REPO" "$AC21C_INPUT"
 
-# With the pre-loop launch filtered out, the transcript has no in-loop
-# pending bg -> no short-circuit -> no marker written -> hook proceeds
-# to the normal flow (which will call Codex in this fixture).
+# 过滤掉循环前启动后，transcript 没有循环内待处理后台 ->
+# 无短路 -> 无标记写入 -> 钩子进入正常流程（在此夹具中将调用 Codex）。
 if [[ ! -f "$AC21C_MARKER" ]] && [[ -f "$RUN_MARKER" ]]; then
     pass "AC-21c: pre-loop launch does not write bg-pending.marker; Codex runs"
 else
@@ -1310,12 +1286,11 @@ else
 fi
 
 # ---------------- AC-22 ----------------
-# Wrapper without --session-id on a repo that has NO marker: should
-# behave just like the normal same-session path, i.e. a pending bg in
-# the transcript writes the marker and the wrapper output surfaces the
-# "background task" systemMessage. This confirms the ambiguous-caller
-# guard only fires on a pre-existing marker, not on every no-session
-# call.
+# 在没有标记的仓库上不带 --session-id 的包装器：应与正常的
+# 同会话路径行为相同，即 transcript 中的待处理后台写入标记，
+# 包装器输出显示"background task" systemMessage。这确认了
+# 模糊调用者守卫仅在先前存在的标记上触发，而不是在每次
+# 无会话调用上触发。
 echo "Test AC-22: wrapper without session_id, no prior marker, pending bg -> ALLOW with systemMessage"
 AC22_REPO="$TEST_DIR/ac22"
 create_full_fixture "$AC22_REPO" > /dev/null
@@ -1350,10 +1325,10 @@ else
         "exit $AC22_EXIT; marker=$(test -f "$AC22_MARKER" && echo present || echo missing); output: $AC22_BODY"
 fi
 
-# AC-22b: wrapper without --session-id on a repo that ALREADY has a
-# marker (e.g. set up by a prior hook call). Must exit 0 silently -- no
-# systemMessage, no state mutation. Mirrors the real scenario Codex
-# flagged: rlcr-stop-gate.sh re-run by an unaware caller.
+# AC-22b：在已有标记的仓库上不带 --session-id 的包装器
+# （例如由先前钩子调用设置）。必须静默退出 0 -- 无 systemMessage，
+# 无状态变更。镜像 Codex 标记的真实场景：rlcr-stop-gate.sh
+# 被不知情的调用者重新运行。
 echo "Test AC-22b: wrapper without session_id, prior marker -> silent ALLOW"
 AC22B_REPO="$TEST_DIR/ac22b"
 AC22B_LOOP=$(create_full_fixture "$AC22B_REPO")
@@ -1408,9 +1383,8 @@ else
 fi
 
 # ---------------- AC-23 ----------------
-# Liveness probe positive: a pending task whose output file is open by at
-# least one process (lsof exits 0) must still be treated as running.
-# The short-circuit must fire and emit a systemMessage.
+# 存活探针阳性：输出文件被至少一个进程打开（lsof 退出 0）的
+# 待处理任务仍必须被视为正在运行。短路必须触发并发出 systemMessage。
 echo "Test AC-23: liveness probe - alive task (lsof has holder) -> still short-circuits"
 AC23_REPO="$TEST_DIR/ac23"
 AC23_LOOP=$(create_full_fixture "$AC23_REPO")
@@ -1435,9 +1409,9 @@ assert_systemmessage_only \
     "$AC23_REPO" "$AC23_STATE" "1 background task"
 
 # ---------------- AC-24 ----------------
-# Liveness probe negative: a pending task whose output file has no open
-# file descriptors (lsof exits 1) was killed without a completion event.
-# The probe must drop it so the hook proceeds to normal Codex review.
+# 存活探针阴性：输出文件没有打开的文件描述符（lsof 退出 1）的
+# 待处理任务在没有完成事件的情况下被杀死。探针必须丢弃它，
+# 使钩子进入正常 Codex 审查。
 echo "Test AC-24: liveness probe - dead/orphaned task (lsof no holder) -> reaches Codex"
 AC24_REPO="$TEST_DIR/ac24"
 create_full_fixture "$AC24_REPO" > /dev/null

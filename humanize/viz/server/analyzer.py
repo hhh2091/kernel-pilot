@@ -1,26 +1,25 @@
-"""Cross-session analytics for RLCR loop data.
+"""RLCR 循环数据的跨会话分析。
 
-Computes statistics across multiple sessions: efficiency metrics,
-quality indicators, verdict distributions, and BitLesson growth.
+计算跨多个会话的统计信息：效率指标、质量指标、
+判决分布和 BitLesson 增长。
 """
 
 import time
 
 
 def _rounds_per_day(sessions, window_days=14):
-    """Return a ``window_days``-length list of rounds-completed-per-day.
+    """返回一个长度为 ``window_days`` 的每日完成轮次列表。
 
-    Buckets round-complete timestamps (the round's summary mtime) into
-    calendar days anchored at the current local midnight, so the
-    tail entry always represents "today" and the head entry is
-    ``window_days - 1`` days ago. Consumed by the home-page analytics
-    strip to drive a compact sparkline.
+    将轮次完成时间戳（轮次摘要的 mtime）按日历天分桶，
+    锚定在当前本地午夜，因此尾部条目始终代表"今天"，
+    头部条目为 ``window_days - 1`` 天前。供首页分析条带
+    使用以驱动紧凑的迷你图。
     """
     if window_days <= 0:
         return []
     now = time.time()
-    # Anchor bucket boundaries at local midnight for stable day-aligned
-    # buckets regardless of call time.
+    # 将桶边界锚定在本地午夜，以获得稳定的按天对齐的桶，
+    # 不受调用时间影响。
     tm_today = time.localtime(now)
     midnight_today = time.mktime(time.struct_time((
         tm_today.tm_year, tm_today.tm_mon, tm_today.tm_mday,
@@ -34,9 +33,9 @@ def _rounds_per_day(sessions, window_days=14):
             ts = r.get('summary_mtime')
             if ts is None or ts < earliest:
                 continue
-            # Offset from the earliest bucket's midnight; floor-div to
-            # the matching bucket index (clamped to the window tail
-            # for timestamps that fall on or after today's midnight).
+            # 从最早桶的午夜开始的偏移量；向下取整除法
+            # 得到匹配的桶索引（对于落在今天午夜或之后的时间戳，
+            # 钳制到窗口尾部）。
             idx = int((ts - earliest) // 86400)
             if idx < 0:
                 continue
@@ -47,27 +46,26 @@ def _rounds_per_day(sessions, window_days=14):
 
 
 def compute_analytics(sessions):
-    """Compute cross-session statistics from a list of parsed sessions."""
+    """从已解析会话列表计算跨会话统计信息。"""
     if not sessions:
         return _empty_analytics()
 
     total = len(sessions)
     completed = sum(1 for s in sessions if s['status'] == 'complete')
-    # ``current_round`` is a 0-based *index*, not a count — a session
-    # that has finished round 0 reports ``current_round=0`` with one
-    # entry in ``s['rounds']``. Use the rounds list length (which the
-    # parser builds from ``range(max_disk_round + 1)``) so
-    # ``overview.average_rounds`` and the per-session ``rounds`` field
-    # reflect the true count. The prior ``current_round > 0`` filter
-    # also wrongly excluded single-round sessions, further skewing
-    # the average; drop the filter and accept any session that has
-    # at least one round entry.
+    # ``current_round`` 是从 0 开始的*索引*，不是计数——一个
+    # 完成了第 0 轮的会话报告 ``current_round=0``，同时
+    # ``s['rounds']`` 中有一个条目。使用轮次列表长度（解析器
+    # 从 ``range(max_disk_round + 1)`` 构建）以便
+    # ``overview.average_rounds`` 和每个会话的 ``rounds`` 字段
+    # 反映真实计数。之前的 ``current_round > 0`` 过滤器还
+    # 错误地排除了单轮会话，进一步扭曲了平均值；移除该过滤器
+    # 并接受任何至少有一个轮次条目的会话。
     rounds_counts = [len(s.get('rounds') or []) for s in sessions]
     rounds_counts = [n for n in rounds_counts if n > 0]
     avg_rounds = round(sum(rounds_counts) / len(rounds_counts), 1) if rounds_counts else 0
     rounds_per_day = _rounds_per_day(sessions, window_days=14)
 
-    # Verdict distribution — only count rounds that have an actual review result
+    # 判决分布——仅统计有实际审查结果的轮次
     verdict_counts = {'advanced': 0, 'stalled': 0, 'regressed': 0, 'complete': 0}
     for s in sessions:
         for r in s['rounds']:
@@ -77,36 +75,36 @@ def compute_analytics(sessions):
             if v != 'unknown':
                 verdict_counts[v] = verdict_counts.get(v, 0) + 1
 
-    # P0-P9 distribution
+    # P0-P9 分布
     p_distribution = {}
     for s in sessions:
         for r in s['rounds']:
             for level, count in r.get('p_issues', {}).items():
                 p_distribution[level] = p_distribution.get(level, 0) + count
 
-    # Per-session stats for charts
+    # 每个会话的图表统计
     session_stats = []
     cumulative_bitlesson = 0
     bitlesson_growth = []
 
     for s in sessions:
-        # Same 0-based-index fix as the overview above: use the parsed
-        # rounds list so a session with only round 0 still reports
-        # ``rounds=1`` instead of 0.
+        # 与上面概览相同的从 0 开始索引的修正：使用解析后的
+        # 轮次列表，使得只有第 0 轮的会话仍然报告
+        # ``rounds=1`` 而不是 0。
         rounds_count = len(s.get('rounds') or [])
 
-        # Average round duration
+        # 平均轮次时长
         durations = [r['duration_minutes'] for r in s['rounds'] if r.get('duration_minutes')]
         avg_duration = round(sum(durations) / len(durations), 1) if durations else None
 
-        # First COMPLETE round
+        # 第一个 COMPLETE 轮次
         first_complete = None
         for r in s['rounds']:
             if r.get('verdict') == 'complete':
                 first_complete = r['number']
                 break
 
-        # Rework count (rounds after review phase started)
+        # 返工计数（审查阶段开始后的轮次）
         rework = 0
         in_review = False
         for r in s['rounds']:
@@ -115,14 +113,14 @@ def compute_analytics(sessions):
             if in_review:
                 rework += 1
 
-        # Verdict breakdown for this session
+        # 此会话的判决细分
         sv = {'advanced': 0, 'stalled': 0, 'regressed': 0}
         for r in s['rounds']:
             v = r.get('verdict', '')
             if v in sv:
                 sv[v] += 1
 
-        # BitLesson count
+        # BitLesson 计数
         bl_count = sum(1 for r in s['rounds'] if r.get('bitlesson_delta') in ('add', 'update'))
         cumulative_bitlesson += bl_count
 
@@ -143,7 +141,7 @@ def compute_analytics(sessions):
             'verdict_breakdown': sv,
         })
 
-    # Total BitLessons (count from bitlesson.md if available, else estimate)
+    # BitLesson 总数（如果可用则从 bitlesson.md 计数，否则估算）
     total_bitlessons = cumulative_bitlesson
 
     return {
@@ -164,7 +162,7 @@ def compute_analytics(sessions):
 
 
 def _empty_analytics():
-    """Return empty analytics structure."""
+    """返回空的分析结构。"""
     return {
         'overview': {
             'total_sessions': 0,
