@@ -1,9 +1,9 @@
-# Wrong File Location
+# 错误的文件位置
 
-You are trying to read `{{FILE_PATH}}`, but loop files are in `{{ACTIVE_LOOP_DIR}}/`.
+您正在尝试读取 `{{FILE_PATH}}`，但循环文件在 `{{ACTIVE_LOOP_DIR}}/` 中。
 
-**Current round files**:
-- Prompt: `{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-prompt.md`
-- Summary: `{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-summary.md`
+**当前轮次文件**：
+- 提示：`{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-prompt.md`
+- 摘要：`{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-summary.md`
 
-If you need this file, use: `cat {{FILE_PATH}}`
+如果需要此文件，请使用：`cat {{FILE_PATH}}`

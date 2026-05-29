@@ -1,7 +1,7 @@
-# Wrong Round Number
+# 错误的轮次编号
 
-You are trying to {{ACTION}} `round-{{CLAUDE_ROUND}}-{{FILE_TYPE}}.md`, but the current round is **{{CURRENT_ROUND}}**.
+您正在尝试 {{ACTION}} `round-{{CLAUDE_ROUND}}-{{FILE_TYPE}}.md`，但当前轮次是 **{{CURRENT_ROUND}}**。
 
-**Correct path**: `{{CORRECT_PATH}}`
+**正确路径**：`{{CORRECT_PATH}}`
 
-Do NOT increment the round number yourself.
+不要自行递增轮次编号。

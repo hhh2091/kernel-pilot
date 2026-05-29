@@ -1,9 +1,9 @@
-# Wrong Round File
+# 错误的轮次文件
 
-You are trying to read `round-{{CLAUDE_ROUND}}-{{FILE_TYPE}}.md`, but the current round is **{{CURRENT_ROUND}}**.
+您正在尝试读取 `round-{{CLAUDE_ROUND}}-{{FILE_TYPE}}.md`，但当前轮次是 **{{CURRENT_ROUND}}**。
 
-**Current round files**:
-- Prompt: `{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-prompt.md`
-- Summary: `{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-summary.md`
+**当前轮次文件**：
+- 提示：`{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-prompt.md`
+- 摘要：`{{ACTIVE_LOOP_DIR}}/round-{{CURRENT_ROUND}}-summary.md`
 
-If you need this file, use: `cat {{FILE_PATH}}`
+如果需要此文件，请使用：`cat {{FILE_PATH}}`

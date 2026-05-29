@@ -2,8 +2,7 @@
 
 # KernelPilot
 
-**An autonomous Humanize-powered GPU kernel optimization loop wired to
-KernelWiki evidence and the external Nsight Compute profiling skill.**
+**一个由 Humanize 驱动的自主 GPU 内核优化循环，连接 KernelWiki 证据和外部 Nsight Compute 性能分析 skill。**
 
 [![GitHub stars](https://img.shields.io/github/stars/BBuf/kernel-pilot?style=social)](https://github.com/BBuf/kernel-pilot/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/BBuf/kernel-pilot?style=social)](https://github.com/BBuf/kernel-pilot/forks)
@@ -13,51 +12,33 @@ KernelWiki evidence and the external Nsight Compute profiling skill.**
 
 </div>
 
-KernelPilot is for serious CUDA kernel tuning runs where the important facts
-are easy to lose: which upstream PR inspired a candidate, which shape regressed,
-what Nsight Compute actually said, which evidence changed the next edit, and
-whether the candidate belongs in a framework repo or a clean experiment.
+KernelPilot 适用于严肃的 CUDA 内核调优场景，在这些场景中关键信息很容易丢失：哪个上游 PR 启发了候选方案、哪个 shape 出现了性能回退、Nsight Compute 实际报告了什么、哪条证据改变了下一次编辑、以及候选方案应该放入框架仓库还是独立实验中。
 
-The project now keeps Humanize loop logic in this repository and uses two
-external skill submodules for kernel evidence and profiling:
+项目将 Humanize 循环逻辑保存在本仓库中，并使用两个外部 skill 子模块提供内核证据和性能分析：
 
-| Skill | Source | Role |
+| Skill | 来源 | 角色 |
 | --- | --- | --- |
-| [`humanize-kernel-agent-loop`](humanize/skills/humanize-kernel-agent-loop/) | KernelPilot | Creates a clean kernel optimization loop around `K`, `R`, and `W`: standalone workspace, correctness/benchmark evidence, lightweight ledgers, optional profiling, optional prior-art lookup, and Humanize review. |
-| [`KernelWiki`](external/KernelWiki/) | [`BBuf/KernelWiki`](https://github.com/BBuf/KernelWiki/tree/kernelpilot-knowledge-expansion) | Use when prior PRs, wiki synthesis, docs, blogs, or upstream kernel examples can inform the current design. |
-| [`ncu-report-skill`](external/ncu-report-skill/) | [`DongyunZou/ncu-report-skill`](https://github.com/DongyunZou/ncu-report-skill) | Use when Nsight Compute evidence is needed to profile a kernel, diagnose a bottleneck, explain a regression, or choose the next optimization edit. |
+| [`humanize-kernel-agent-loop`](humanize/skills/humanize-kernel-agent-loop/) | KernelPilot | 围绕 `K`、`R`、`W` 创建干净的内核优化循环：独立工作区、正确性/基准证据、轻量级账本、可选的性能分析、可选的先验知识查找，以及 Humanize 审查。 |
+| [`KernelWiki`](external/KernelWiki/) | [`BBuf/KernelWiki`](https://github.com/BBuf/KernelWiki/tree/kernelpilot-knowledge-expansion) | 当先前的 PR、wiki 综合页面、文档、博客或上游内核示例可以为当前设计提供参考时使用。 |
+| [`ncu-report-skill`](external/ncu-report-skill/) | [`DongyunZou/ncu-report-skill`](https://github.com/DongyunZou/ncu-report-skill) | 当需要 Nsight Compute 证据来分析内核性能、诊断瓶颈、解释回退或选择下一次优化编辑时使用。 |
 
-Together they make an optimization loop that can work from a simple request:
+它们共同构成了一个可以从简单请求开始工作的优化循环：
 
 ```text
-[$humanize-kernel-agent-loop] Optimize SGLang's GEMM path for M=64, N=2048, K=2048, fp16, bias=true, and beat the current SGLang baseline by at least 10%.
+[$humanize-kernel-agent-loop] 为 M=64, N=2048, K=2048, fp16, bias=true 优化 SGLang 的 GEMM 路径，目标是比当前 SGLang 基线至少快 10%。
 ```
 
-The loop keeps the engineering structure in place while staying light on
-policy: set up a clean workspace, commit the scaffold, verify an active
-strict-success RLCR state before kernel edits, prove correctness, measure
-latency, consult KernelWiki when prior art helps, profile when profiling would
-change the next edit, and let Humanize review the round evidence.
+该循环在保持工程结构的同时保持策略上的轻量化：设置干净的工作区、提交脚手架、在内核编辑前验证活跃的严格成功 RLCR 状态、证明正确性、测量延迟、在先验知识有帮助时查阅 KernelWiki、在性能分析能改变下一次编辑时进行分析，并让 Humanize 审查每轮的证据。
 
-## Why Use It
+## 为什么使用它
 
-- **Prior art when useful.** The agent can use KernelWiki PR artifacts,
-  synthesis pages, blogs/docs/contests, and live upstream research when they
-  help the current kernel decision.
-- **Standalone by default.** Candidate kernels do not pollute SGLang, vLLM,
-  PyTorch, or other large framework repos. The loop creates an isolated repo
-  with bindings, tests, benchmarks, ledgers, lineage, and profile artifacts.
-- **Profiling when needed.** The agent uses `ncu-report-skill` when Nsight
-  Compute evidence can explain a baseline, regression, plateau, surprising win,
-  or next optimization edit.
-- **Review-gated iteration.** Humanize RLCR keeps the loop from declaring
-  victory too early; default loop budget is 84 iterations unless configured
-  otherwise.
-- **Shape-aware tuning.** The loop treats benchmark cases as a workload
-  distribution, builds a performance map, and emits dispatcher/tuning decisions
-  when different regimes need different kernels or configurations.
+- **需要时提供先验知识。** 当 KernelWiki PR 产物、综合页面、博客/文档/竞赛和实时上游研究有助于当前内核决策时，agent 可以使用它们。
+- **默认独立运行。** 候选内核不会污染 SGLang、vLLM、PyTorch 或其他大型框架仓库。循环创建一个包含绑定、测试、基准、账本、谱系和性能分析产物的隔离仓库。
+- **需要时进行性能分析。** 当 Nsight Compute 证据可以解释基线、回退、平台期、意外提升或下一次优化编辑时，agent 使用 `ncu-report-skill`。
+- **审查门控迭代。** Humanize RLCR 防止循环过早宣布胜利；默认循环预算为 84 次迭代，除非另行配置。
+- **Shape 感知调优。** 循环将基准测试用例视为工作负载分布，构建性能图，并在不同场景需要不同内核或配置时发出调度/调优决策。
 
-## Kernel Agent Loop
+## 内核 Agent 循环
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/BBuf/kernel-pilot/main/docs/assets/kernel-agent-loop.svg" alt="KernelPilot Agent Loop" width="620">
@@ -65,21 +46,17 @@ change the next edit, and let Humanize review the round evidence.
 
 ## KernelWiki
 
-KernelWiki lives in [`external/KernelWiki`](external/KernelWiki/). KernelPilot
-points this submodule at the `kernelpilot-knowledge-expansion` branch of
-`BBuf/KernelWiki`, which includes the KernelPilot-only PR and source knowledge
-merged through KernelWiki's own candidate ledgers, PR page generator, artifact
-fetcher, index generator, and validator.
+KernelWiki 位于 [`external/KernelWiki`](external/KernelWiki/)。KernelPilot 将此子模块指向 `BBuf/KernelWiki` 的 `kernelpilot-knowledge-expansion` 分支，该分支包含通过 KernelWiki 自身的候选账本、PR 页面生成器、产物获取器、索引生成器和验证器合并的 KernelPilot 专属 PR 和源知识。
 
-Current snapshot:
+当前快照：
 
-| Corpus layer | Contents |
+| 语料层 | 内容 |
 | --- | --- |
-| PR pages | 2,692 merged CUDA/Triton/CuTe/CUTLASS-related PR pages from SGLang, vLLM, TensorRT-LLM, PyTorch, FlashAttention, FlashInfer, CUTLASS/CuTe, CCCL, Triton, DeepGEMM, ThunderKittens, TileLang, QuACK, and DeepSeek TileKernels. |
-| PR artifacts | Fetched `diff.patch` and provenance bundles for selected high-value PRs, including FlashAttention SM100 MLA TopK, TensorRT-LLM Blackwell DSA/indexer, and CCCL scan/memory primitives. |
-| Synthesis | KernelWiki wiki pages, blog/code-source notes, docs, contests, and generated query indices for hardware features, techniques, repos, languages, and kernel types. |
+| PR 页面 | 来自 SGLang、vLLM、TensorRT-LLM、PyTorch、FlashAttention、FlashInfer、CUTLASS/CuTe、CCCL、Triton、DeepGEMM、ThunderKittens、TileLang、QuACK 和 DeepSeek TileKernels 的 2,692 个已合并的 CUDA/Triton/CuTe/CUTLASS 相关 PR 页面。 |
+| PR 产物 | 为选定的高价值 PR 获取的 `diff.patch` 和来源包，包括 FlashAttention SM100 MLA TopK、TensorRT-LLM Blackwell DSA/indexer 和 CCCL scan/memory 原语。 |
+| 综合 | KernelWiki wiki 页面、博客/代码源注释、文档、竞赛，以及为硬件特性、技术、仓库、语言和内核类型生成的查询索引。 |
 
-Query examples:
+查询示例：
 
 ```bash
 cd external/KernelWiki
@@ -93,10 +70,7 @@ python3 scripts/validate.py
 
 ## ncu-report-skill
 
-`ncu-report-skill` lives in
-[`external/ncu-report-skill`](external/ncu-report-skill/). It provides the
-profiling workflow used by the loop when profiler evidence is the best next
-source of truth:
+`ncu-report-skill` 位于 [`external/ncu-report-skill`](external/ncu-report-skill/)。它提供当性能分析证据是最佳下一个真相来源时循环使用的工作流：
 
 ```bash
 cd external/ncu-report-skill
@@ -105,56 +79,46 @@ less reference/03-collection.md
 less reference/08-b200-metric-names.md
 ```
 
-The skill emphasizes one run directory per profile, standalone harnesses when
-possible, `ncu --set full` plus source-level collection, Python parsing through
-the `ncu_report` API, and a final report that ranks evidence-backed next edits.
+该 skill 强调每次分析使用独立运行目录、尽可能使用独立测试工具、`ncu --set full` 加源码级收集、通过 `ncu_report` API 进行 Python 解析，以及最终生成按证据支持排序的下一次编辑建议报告。
 
-## Install
+## 安装
 
-Clone with submodules:
+克隆仓库及子模块：
 
 ```bash
 git clone --recurse-submodules https://github.com/BBuf/kernel-pilot.git
 cd kernel-pilot
 ```
 
-For an existing checkout:
+对于已有的检出：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-### Claude Code Install
+### Claude Code 安装
 
 ```bash
 humanize/scripts/install-skills-claude.sh
 ```
 
-The installer adds the KernelPilot marketplace, installs `humanize@KernelPilot`,
-links `KernelWiki` and `ncu-report-skill` into Claude Code's skills directory,
-installs KernelWiki query dependencies, hydrates Claude Code's installed skill
-cache with absolute `HUMANIZE_RUNTIME_ROOT`, `KERNELPILOT_ROOT`,
-`KERNELWIKI_ROOT`, and `NCU_REPORT_SKILL_ROOT` paths, and fails if placeholders
-remain.
+安装程序会添加 KernelPilot 市场、安装 `humanize@KernelPilot`、将 `KernelWiki` 和 `ncu-report-skill` 链接到 Claude Code 的 skills 目录、安装 KernelWiki 查询依赖、使用绝对路径 `HUMANIZE_RUNTIME_ROOT`、`KERNELPILOT_ROOT`、`KERNELWIKI_ROOT` 和 `NCU_REPORT_SKILL_ROOT` 注入 Claude Code 已安装的 skill 缓存，如果仍有占位符残留则失败。
 
-Inside Claude Code, you should see commands such as
-`/humanize:start-rlcr-loop` and skills such as `humanize-kernel-agent-loop`,
-`KernelWiki`, and `ncu-report-skill`.
+在 Claude Code 中，你应该能看到 `/humanize:start-rlcr-loop` 等命令和 `humanize-kernel-agent-loop`、`KernelWiki`、`ncu-report-skill` 等 skill。
 
-### Codex Install
+### Codex 安装
 
 ```bash
 humanize/scripts/install-skills-codex.sh
 ```
 
-Generic installer:
+通用安装程序：
 
 ```bash
 humanize/scripts/install-skill.sh --target codex
 ```
 
-After installation, restart the agent session and check that these skills are
-available:
+安装后，重启 agent 会话并检查以下 skill 是否可用：
 
 ```text
 humanize-kernel-agent-loop
@@ -162,18 +126,18 @@ KernelWiki
 ncu-report-skill
 ```
 
-## Prompt Card
+## Prompt 卡片
 
-End-to-end prompt cards live in [`prompts/`](prompts/):
+端到端 prompt 卡片位于 [`prompts/`](prompts/)：
 
-| Prompt | Goal |
+| Prompt | 目标 |
 | --- | --- |
-| [`B200 int8_scaled_mm`](prompts/b200-int8-scaled-mm.md) | Optimize SGLang `int8_scaled_mm` on B200 for M=64, N=2048, K=2048, fp16 output with bias, targeting at least 2.5x speedup over the SGLang baseline. |
-| [`B200 FA4 MHA`](prompts/b200-fa4-mha.md) | Build a standalone BF16 forward-only MHA kernel and beat official FlashAttention-4 by at least 5% geometric-mean TFLOPS across the configured B200 cases. |
+| [`B200 int8_scaled_mm`](prompts/b200-int8-scaled-mm.md) | 在 B200 上优化 SGLang `int8_scaled_mm`，M=64, N=2048, K=2048, fp16 输出带 bias，目标是比 SGLang 基线至少 2.5 倍加速。 |
+| [`B200 FA4 MHA`](prompts/b200-fa4-mha.md) | 构建独立的 BF16 前向 MHA 内核，在配置的 B200 用例上以几何平均 TFLOPS 至少超过官方 FlashAttention-4 5%。 |
 
-## Maintenance
+## 维护
 
-Validate external knowledge and installer wiring:
+验证外部知识和安装程序连接：
 
 ```bash
 cd external/KernelWiki
@@ -184,18 +148,15 @@ humanize/tests/test-ncu-report-skill.sh
 humanize/tests/run-all-tests.sh
 ```
 
-Refresh or update submodules:
+刷新或更新子模块：
 
 ```bash
 git submodule update --remote external/KernelWiki
 git submodule update --remote external/ncu-report-skill
 ```
 
-## Related
+## 相关项目
 
-- [Humanize](https://github.com/PolyArch/humanize): the RLCR runtime that
-  KernelPilot specializes for GPU kernel optimization.
-- [KernelWiki](https://github.com/BBuf/KernelWiki/tree/kernelpilot-knowledge-expansion):
-  the expanded GPU kernel evidence skill used by this repo.
-- [AI-Infra-Auto-Driven-SKILLS](https://github.com/BBuf/AI-Infra-Auto-Driven-SKILLS):
-  broader serving, profiling, SGLang, incident, and model optimization skills.
+- [Humanize](https://github.com/PolyArch/humanize)：KernelPilot 为其专门化 GPU 内核优化的 RLCR 运行时。
+- [KernelWiki](https://github.com/BBuf/KernelWiki/tree/kernelpilot-knowledge-expansion)：本仓库使用的扩展 GPU 内核证据 skill。
+- [AI-Infra-Auto-Driven-SKILLS](https://github.com/BBuf/AI-Infra-Auto-Driven-SKILLS)：更广泛的 serving、性能分析、SGLang、事件和模型优化 skill。

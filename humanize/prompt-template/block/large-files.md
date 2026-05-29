@@ -1,25 +1,25 @@
-# Large Files Detected
+# 检测到大文件
 
-You are trying to stop, but some files exceed the **{{MAX_LINES}}-line limit**:
+您正在尝试停止，但某些文件超过了 **{{MAX_LINES}} 行的限制**：
 {{LARGE_FILES}}
 
-**Why This Matters**:
-- Large files are harder to maintain, review, and understand
-- They hinder modular development and code reusability
-- They make future changes more error-prone
+**为什么这很重要**：
+- 大文件更难维护、审查和理解
+- 它们阻碍模块化开发和代码复用
+- 它们使未来的更改更容易出错
 
-**Required Actions**:
+**必需的操作**：
 
-For **code files**:
-1. Split into smaller, modular files (each < {{MAX_LINES}} lines)
-2. Ensure functionality remains **strictly unchanged** after splitting
-3. If the `code-simplifier` plugin is installed, use it to review and optimize the refactored code. Invoke via: `/code-simplifier`, `@agent-code-simplifier`, or `@code-simplifier:code-simplifier (agent)`
-4. Maintain clear module boundaries and interfaces
+对于**代码文件**：
+1. 拆分为更小的模块化文件（每个文件 < {{MAX_LINES}} 行）
+2. 确保拆分后功能**严格不变**
+3. 如果已安装 `code-simplifier` 插件，请使用它来审查和优化重构的代码。通过以下方式调用：`/code-simplifier`、`@agent-code-simplifier` 或 `@code-simplifier:code-simplifier (agent)`
+4. 保持清晰的模块边界和接口
 
-For **documentation files**:
-1. Split into logical sections or chapters (each < {{MAX_LINES}} lines)
-2. Ensure smooth **cross-references** between split files
-3. Maintain **narrative flow** and coherence across files
-4. Update any table of contents or navigation structures
+对于**文档文件**：
+1. 拆分为逻辑章节（每个文件 < {{MAX_LINES}} 行）
+2. 确保拆分文件之间的**交叉引用**顺畅
+3. 保持文件间的**叙述流程**和连贯性
+4. 更新任何目录或导航结构
 
-After splitting the files, commit the changes and attempt to exit again.
+拆分文件后，提交更改并再次尝试退出。

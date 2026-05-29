@@ -1,14 +1,14 @@
-# Mainline Drift Circuit Breaker
+# 主线漂移断路器
 
-The RLCR loop has been stopped because the implementation failed to advance the mainline for **{{STALL_COUNT}} consecutive rounds**.
+RLCR 循环已停止，因为实现未能在 **{{STALL_COUNT}} 连续轮次**中推进主线。
 
-- Last mainline verdict: `{{LAST_VERDICT}}`
-- Plan anchor: `{{PLAN_FILE}}`
-- Drift status: `replan_required`
+- 最后一次主线判定：`{{LAST_VERDICT}}`
+- 计划锚点：`{{PLAN_FILE}}`
+- 漂移状态：`replan_required`
 
-This loop should not continue automatically.
+此循环不应自动继续。
 
-Next action:
-1. Re-read the original plan
-2. Identify why recent rounds kept stalling or regressing
-3. Start a fresh RLCR loop with a narrower recovered mainline objective
+下一步操作：
+1. 重新阅读原始计划
+2. 识别为什么最近的轮次持续停滞或倒退
+3. 以更窄的恢复主线目标启动新的 RLCR 循环

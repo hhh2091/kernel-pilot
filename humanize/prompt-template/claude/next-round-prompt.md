@@ -1,75 +1,75 @@
-Your work is not finished. Read and execute the below with ultrathink.
+你的工作尚未完成。请仔细阅读并执行以下内容。
 
-## Original Implementation Plan
+## 原始实现计划
 
-**IMPORTANT**: Before proceeding, review the original plan you are implementing:
+**重要**：在继续之前，审查你正在实现的原始计划：
 @{{PLAN_FILE}}
 
-This plan contains the full scope of work and requirements. Ensure your work aligns with this plan.
+此计划包含完整的工作范围和需求。确保你的工作与此计划一致。
 
 ---
 
-## Round Re-anchor (REQUIRED FIRST STEP)
+## 轮次重锚定（必需的第一步）
 
-Before writing code:
-- Re-read @{{PLAN_FILE}}
-- Re-read @{{GOAL_TRACKER_FILE}}
-- Re-read the most recent round summaries/reviews that led to this round
-- Write the current round contract to @{{ROUND_CONTRACT_FILE}}
+在编写代码之前：
+- 重新阅读 @{{PLAN_FILE}}
+- 重新阅读 @{{GOAL_TRACKER_FILE}}
+- 重新阅读导致本轮的最近轮次摘要/审查
+- 将当前轮次契约写入 @{{ROUND_CONTRACT_FILE}}
 
-Your round contract must contain:
-- Exactly one **mainline objective**
-- The 1-2 target ACs for this round
-- Which issues are truly **blocking** that mainline objective
-- Which issues are **queued** and explicitly out of scope
-- Concrete success criteria for this round
+你的轮次契约必须包含：
+- 恰好一个**主线目标**
+- 本轮的 1-2 个目标验收标准
+- 哪些问题真正**阻塞**该主线目标
+- 哪些问题**排队**且明确超出范围
+- 本轮的具体成功标准
 
-Do not start implementation until the round contract exists.
+在轮次契约存在之前不要开始实现。
 
-## Task Lane Rules
+## 任务通道规则
 
-Use the Task system (TaskCreate, TaskUpdate, TaskList) with one required tag per task:
-- `[mainline]` for plan-derived work that directly advances this round's objective
-- `[blocking]` for issues that prevent the mainline objective from succeeding safely
-- `[queued]` for non-blocking bugs, cleanup, or follow-up work
+使用 Task 系统（TaskCreate、TaskUpdate、TaskList），每个任务需要一个标签：
+- `[mainline]` 用于直接推进本轮目标的计划衍生工作
+- `[blocking]` 用于阻止主线目标安全成功的问题
+- `[queued]` 用于非阻塞的错误、清理或后续工作
 
-Rules:
-- `[mainline]` work is the round's primary success condition
-- `[blocking]` work is allowed only when it truly blocks the mainline objective
-- `[queued]` work must be documented but must NOT replace the round objective
-- If a new bug does not block the current objective, tag it `[queued]` and keep moving on mainline work
+规则：
+- `[mainline]` 工作是本轮的主要成功条件
+- `[blocking]` 工作仅在真正阻塞主线目标时才允许
+- `[queued]` 工作必须记录，但不得替代轮次目标
+- 如果新错误不阻塞当前目标，将其标记为 `[queued]` 并继续主线工作
 
-Before executing each task in this round:
-1. Read @{{BITLESSON_FILE}}
-2. Run `bitlesson-selector` for each task/sub-task
-3. Follow selected lesson IDs (or `NONE`) during implementation
+在本轮执行每个任务之前：
+1. 阅读 @{{BITLESSON_FILE}}
+2. 为每个任务/子任务运行 `bitlesson-selector`
+3. 在实现过程中遵循选定的 lesson ID（或 `NONE`）
 
 ---
-Below is Codex's review result:
+以下是 Codex 的审查结果：
 <!-- CODEX's REVIEW RESULT START -->
 {{REVIEW_CONTENT}}
 <!-- CODEX's REVIEW RESULT  END  -->
 ---
 
-## Goal Tracker Reference
+## 目标跟踪器参考
 
-Before starting work, **read** @{{GOAL_TRACKER_FILE}} to understand:
-- The Ultimate Goal and Acceptance Criteria you're working toward
-- Which tasks are Active, Completed, or Deferred
-- Which side issues are blocking vs queued
-- Any Plan Evolution that has occurred
-- The latest side-issue state that needs attention
+在开始工作之前，**阅读** @{{GOAL_TRACKER_FILE}} 以了解：
+- 你正在努力实现的最终目标和验收标准
+- 哪些任务处于活跃、已完成或已推迟状态
+- 哪些侧问题是阻塞的还是排队的
+- 已发生的任何计划演进
+- 需要关注的最新侧问题状态
 
-**IMPORTANT**: Keep the mutable section of `goal-tracker.md` up to date during the round.
-Do NOT change the immutable section after Round 0.
-If you cannot safely reconcile the tracker yourself, include an optional "Goal Tracker Update Request" section in your summary (see below).
+**重要**：在轮次期间保持 `goal-tracker.md` 的可变部分为最新。
+在第 0 轮之后不要更改不可变部分。
+如果你无法安全地自行协调跟踪器，请在摘要中包含一个可选的"目标跟踪器更新请求"部分（见下文）。
 
-## Mainline Guardrails
+## 主线护栏
 
-- Keep the mainline objective from @{{ROUND_CONTRACT_FILE}} stable for this round
-- Do not let queued issues take over the round
-- If Codex reported several findings, classify them into:
-  - mainline gaps
-  - blocking side issues
-  - queued side issues
-- Only mainline gaps and blocking side issues should drive the next code changes
+- 保持 @{{ROUND_CONTRACT_FILE}} 中的主线目标在本轮稳定
+- 不要让排队的问题接管轮次
+- 如果 Codex 报告了多个发现，将它们分类为：
+  - 主线差距
+  - 阻塞侧问题
+  - 排队侧问题
+- 只有主线差距和阻塞侧问题应该驱动下一次代码更改

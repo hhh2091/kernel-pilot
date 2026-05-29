@@ -1,34 +1,34 @@
-# Git Add Blocked: .humanize Protection
+# Git Add 被阻止：.humanize 保护
 
-The `.humanize/` directory contains local loop state that should NOT be committed.
-This directory is already listed in `.gitignore`.
+`.humanize/` 目录包含不应提交的本地循环状态。
+此目录已列在 `.gitignore` 中。
 
-Your command was blocked because it would add .humanize files to version control.
+您的命令被阻止，因为它会将 .humanize 文件添加到版本控制中。
 
-## Allowed Commands
+## 允许的命令
 
-Use specific file paths instead of broad patterns:
+使用具体的文件路径而不是宽泛的模式：
 
     git add <specific-file>
     git add src/
     git add -p  # patch mode
 
-## Blocked Commands
+## 被阻止的命令
 
-These commands are blocked when .humanize exists:
+当 .humanize 存在时，以下命令会被阻止：
 
-    git add .humanize      # direct reference
-    git add -A             # adds all including .humanize
-    git add --all          # adds all including .humanize
-    git add .              # may include .humanize if not gitignored
-    git add -f .           # force bypasses gitignore
+    git add .humanize      # 直接引用
+    git add -A             # 添加所有文件，包括 .humanize
+    git add --all          # 添加所有文件，包括 .humanize
+    git add .              # 如果未被 gitignore 忽略，可能包含 .humanize
+    git add -f .           # 强制绕过 gitignore
 
-## Adding .humanize to .gitignore
+## 将 .humanize 添加到 .gitignore
 
-If you need to add `.humanize*` to `.gitignore`, follow these steps:
+如果需要将 `.humanize*` 添加到 `.gitignore`，请按照以下步骤操作：
 
-1. Edit `.gitignore` to append `.humanize*`
-2. Run: `git add .gitignore`
-3. Run: `git commit -m "Add humanize local folder into gitignore"`
+1. 编辑 `.gitignore` 以追加 `.humanize*`
+2. 运行：`git add .gitignore`
+3. 运行：`git commit -m "Add humanize local folder into gitignore"`
 
-IMPORTANT: The commit message must NOT contain the literal string ".humanize" to avoid triggering this protection.
+重要提示：提交消息不得包含字面字符串 ".humanize"，以避免触发此保护机制。

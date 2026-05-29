@@ -1,45 +1,45 @@
 # <TITLE>
 
-## Run Context
+## 运行上下文
 
 - Run ID: <RUN_ID>
 - Directions JSON: <DIRECTIONS_JSON_FILE>
 - Explore Report: <REPORT_PATH>
 - Final Idea: <FINAL_IDEA_PATH>
 
-## Final Recommendation
+## 最终建议
 
 <FINAL_RECOMMENDATION>
 
-## Rationale
+## 理由
 
 <RATIONALE>
 
-## Approach Summary
+## 方法摘要
 
 <APPROACH_SUMMARY>
 
-## Objective Evidence
+## 客观证据
 
 <OBJECTIVE_EVIDENCE>
 
-## Explore Outcomes
+## 探索结果
 
 <EXPLORE_OUTCOMES>
 
-## Constraints
+## 约束条件
 
 <CONSTRAINTS>
 
-## Known Risks
+## 已知风险
 
 <KNOWN_RISKS>
 
-## Cross-Direction Learnings
+## 跨方向经验
 
 <CROSS_DIRECTION_LEARNINGS>
 
-## Suggested Productization Flow
+## 建议的产品化流程
 
 ```bash
 /humanize:gen-plan --input <FINAL_IDEA_PATH> --output <plan-path>

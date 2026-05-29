@@ -1,12 +1,12 @@
-# Plan File Modified
+# 计划文件已修改
 
-The plan file `{{PLAN_FILE}}` has been modified since the session started.
+计划文件 `{{PLAN_FILE}}` 自会话开始以来已被修改。
 
-**Modifying plan files is forbidden during an active session.**
+**在活动会话期间禁止修改计划文件。**
 
-If you need to change the plan:
-1. Cancel the current session: `/humanize:cancel-rlcr-loop`
-2. Update the plan file
-3. Start a new session: `/humanize:start-rlcr-loop {{PLAN_FILE}}`
+如果需要更改计划：
+1. 取消当前会话：`/humanize:cancel-rlcr-loop`
+2. 更新计划文件
+3. 启动新会话：`/humanize:start-rlcr-loop {{PLAN_FILE}}`
 
-Backup available at: `{{BACKUP_PATH}}`
+备份位于：`{{BACKUP_PATH}}`

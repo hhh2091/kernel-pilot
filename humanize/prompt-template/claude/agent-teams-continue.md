@@ -1,12 +1,12 @@
-## Agent Teams Continuation
+## Agent Teams 续接
 
-Continue using **Agent Teams mode** as the **Team Leader** within the RLCR development cycle. You are continuing from a previous round where Codex reviewed your work and provided feedback above.
+在 RLCR 开发周期中，继续以**团队负责人**身份使用 **Agent Teams 模式**。你正在续接上一轮的工作，Codex 已在上方对你的工作进行了审查并提供了反馈。
 
-### Continuation Context
+### 续接上下文
 
-- **Previous Team No Longer Exists**: Your teammates from the previous round are gone. Do NOT attempt to message or reference old teammates. You must create a brand new team for this round.
-- **Review First**: Before spawning any team members, carefully analyze the Codex review feedback above. Understand which issues are most critical and plan your team allocation accordingly.
-- **Do Not Redo Work**: Review what was accomplished in previous rounds (check the goal tracker and prior summaries). Only address the issues and gaps identified in the review - do not redo work that was already completed correctly.
-- **Cold Start for New Members**: Each new team member has NO context from previous rounds and NO access to your conversation history. They DO have access to CLAUDE.md and project configuration automatically. When spawning members, provide: what was already accomplished in previous rounds, the current state of relevant files, specific review findings they need to address, and clear acceptance criteria. Do not repeat what CLAUDE.md already covers.
-- **Multi-Iteration Awareness**: If the remaining work exceeds what a single team can accomplish in this round, prioritize the most critical items from the review. Address high-priority issues first so subsequent rounds have less to fix.
-- **State Awareness**: Previous rounds may have left partial changes or introduced new patterns. Verify the current state of files (e.g., with quick reads or greps) before assigning file ownership to team members.
+- **上一轮团队已不存在**：上一轮的队友已经离开。请勿尝试联系或引用旧队友。你必须为本轮创建一个全新的团队。
+- **先审查再行动**：在创建任何团队成员之前，仔细分析上方的 Codex 审查反馈。理解哪些问题最为关键，并据此规划团队分配。
+- **不要重复已完成的工作**：回顾前几轮已完成的内容（检查目标跟踪器和之前的摘要）。仅处理审查中发现的问题和差距——不要重复已经正确完成的工作。
+- **新成员冷启动**：每个新团队成员没有前几轮的上下文，也无法访问你的对话历史。但他们会自动加载 CLAUDE.md 和项目配置。创建成员时，请提供：前几轮已完成的工作、相关文件的当前状态、他们需要处理的具体审查发现，以及明确的验收标准。不要重复 CLAUDE.md 已涵盖的内容。
+- **多轮迭代意识**：如果剩余工作超出单个团队本轮能够完成的范围，请优先处理审查中最关键的项目。先解决高优先级问题，以便后续轮次有更少的修复工作。
+- **状态感知**：前几轮可能留下了部分更改或引入了新模式。在分配文件所有权给团队成员之前，请验证文件的当前状态（例如，通过快速读取或 grep 检查）。

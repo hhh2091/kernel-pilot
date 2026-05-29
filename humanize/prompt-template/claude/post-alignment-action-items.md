@@ -1,8 +1,8 @@
 
-### Post-Alignment Check Action Items
+### 对齐检查后行动项
 
-This round follows a Full Goal Alignment Check. Pay special attention to:
-- **Forgotten Items**: Codex may have identified tasks that were being ignored. Address them.
-- **AC Status**: If any Acceptance Criteria were marked NOT MET, prioritize work toward those.
-- **Deferred Items**: If any deferrals were flagged as unjustified, un-defer them now.
-- **Queued Issues**: Keep non-blocking follow-up work queued unless it now clearly blocks mainline progress.
+本轮遵循完整目标对齐检查。请特别注意：
+- **遗忘的项目**：Codex 可能已识别出被忽略的任务。请处理它们。
+- **验收标准状态**：如果有任何验收标准被标记为未满足，请优先处理这些工作。
+- **推迟的项目**：如果有任何推迟被标记为不合理的，请立即取消推迟。
+- **排队的问题**：保持非阻塞的后续工作排队，除非它现在明显阻塞了主线进展。

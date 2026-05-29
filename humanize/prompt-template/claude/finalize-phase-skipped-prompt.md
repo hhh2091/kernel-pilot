@@ -1,51 +1,51 @@
-# Finalize Phase (Review Skipped)
+# 收尾阶段（跳过审查）
 
-**Warning**: Code review was skipped due to: {{REVIEW_SKIP_REASON}}
+**警告**：代码审查已跳过，原因：{{REVIEW_SKIP_REASON}}
 
-The implementation could not be fully validated. You are now in the **Finalize Phase**.
+实现无法被完全验证。你现在处于**收尾阶段**。
 
-## Important Notice
+## 重要通知
 
-Since the code review was skipped, please manually verify your changes before finalizing:
+由于代码审查已被跳过，请在完成之前手动验证你的更改：
 
-1. Review your code changes for any obvious issues
-2. Run any available tests to verify correctness
-3. Check for common code quality issues
+1. 审查你的代码更改，检查是否有明显问题
+2. 运行任何可用的测试以验证正确性
+3. 检查常见的代码质量问题
 
-## Simplification (Optional)
+## 简化（可选）
 
-If time permits, use the `code-simplifier:code-simplifier` agent via the Task tool to simplify and refactor your code.
+如果时间允许，通过 Task 工具使用 `code-simplifier:code-simplifier` agent 来简化和重构你的代码。
 
-Focus more on changes between branch from `{{BASE_BRANCH}}` to `{{START_BRANCH}}`.
+更多关注从 `{{BASE_BRANCH}}` 到 `{{START_BRANCH}}` 分支之间的更改。
 
-Example invocation:
+调用示例：
 ```
 Task tool with subagent_type="code-simplifier:code-simplifier"
 ```
 
-## Constraints
+## 约束条件
 
-These constraints are **non-negotiable**:
+这些约束条件**不可协商**：
 
-1. **Must NOT change existing functionality** - All features must work exactly as before
-2. **Must NOT fail existing tests** - Run tests to verify nothing is broken
-3. **Must NOT introduce new bugs** - Be careful with refactoring
-4. **Only perform functionality-equivalent changes** - Simplification and cleanup only
+1. **不得更改现有功能** - 所有功能必须与之前完全一致
+2. **不得使现有测试失败** - 运行测试以验证没有破坏任何内容
+3. **不得引入新错误** - 重构时要小心
+4. **仅执行功能等效的更改** - 仅限简化和清理
 
-## Reference Files
+## 参考文件
 
-- Original plan: @{{PLAN_FILE}}
-- Goal tracker: @{{GOAL_TRACKER_FILE}}
+- 原始计划：@{{PLAN_FILE}}
+- 目标跟踪器：@{{GOAL_TRACKER_FILE}}
 
-## Before Exiting
+## 退出前
 
-1. Complete all `[mainline]` and `[blocking]` tasks (mark them as completed using TaskUpdate with status "completed")
-2. `[queued]` tasks may remain only if they are documented as non-blocking follow-up work
-3. Commit your changes with a descriptive message
-4. Write your finalize summary to: **{{FINALIZE_SUMMARY_FILE}}**
+1. 完成所有 `[mainline]` 和 `[blocking]` 任务（使用 TaskUpdate 将状态标记为 "completed"）
+2. `[queued]` 任务仅在被记录为非阻塞后续工作时才可以保留
+3. 使用描述性消息提交你的更改
+4. 将收尾摘要写入：**{{FINALIZE_SUMMARY_FILE}}**
 
-Your summary should include:
-- What work was done
-- Files modified
-- Confirmation that tests still pass (if possible)
-- Any notes about manual verification performed
+你的摘要应包含：
+- 完成了哪些工作
+- 修改的文件
+- 确认测试仍然通过（如可能）
+- 关于执行的手动验证的任何说明

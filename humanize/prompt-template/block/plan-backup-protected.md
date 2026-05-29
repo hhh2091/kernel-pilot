@@ -1,7 +1,7 @@
-# Plan Backup Protected
+# 计划备份受保护
 
-The `plan.md` file in the loop directory is a backup of the original plan file and cannot be modified.
+循环目录中的 `plan.md` 文件是原始计划文件的备份，不能修改。
 
-This backup ensures plan integrity throughout the session.
+此备份确保整个会话期间计划的完整性。
 
-If you need to reference the plan, read it instead of modifying it.
+如果需要参考计划，请读取而不是修改它。

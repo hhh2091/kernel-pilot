@@ -1,10 +1,10 @@
 
-**Note on Untracked Files**:
-Some untracked files may be build artifacts, test outputs, or runtime-generated files.
-These should typically be added to `.gitignore` rather than committed:
-- Build outputs (e.g., `target/`, `build/`, `dist/`)
-- Dependencies (e.g., `node_modules/`, `vendor/`)
-- IDE/editor files (e.g., `.idea/`, `.vscode/`)
-- Log files, cache files, temporary files
+**关于未跟踪文件的说明**：
+一些未跟踪的文件可能是构建产物、测试输出或运行时生成的文件。
+这些通常应添加到 `.gitignore` 而不是提交：
+- 构建输出（例如 `target/`、`build/`、`dist/`）
+- 依赖项（例如 `node_modules/`、`vendor/`）
+- IDE/编辑器文件（例如 `.idea/`、`.vscode/`）
+- 日志文件、缓存文件、临时文件
 
-Review untracked files and add appropriate patterns to `.gitignore`.
+请检查未跟踪的文件，并将适当的模式添加到 `.gitignore`。

@@ -1,8 +1,8 @@
-# Todos File Access Blocked
+# 待办文件访问被阻止
 
-Do NOT create or access `round-*-todos.md` files.
+不要创建或访问 `round-*-todos.md` 文件。
 
-**Use the native Task tools instead (TaskCreate, TaskUpdate, TaskList).**
+**请改用原生 Task 工具（TaskCreate、TaskUpdate、TaskList）。**
 
-The native task tools provide proper state tracking visible in the UI and
-integration with Claude Code's task management system.
+原生任务工具提供在 UI 中可见的正确状态跟踪，
+并与 Claude Code 的任务管理系统集成。

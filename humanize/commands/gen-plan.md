@@ -1,5 +1,5 @@
 ---
-description: "Generate implementation plan from draft document"
+description: "从草稿文档生成实施计划"
 argument-hint: "--input <path/to/draft.md> --output <path/to/plan.md> [--auto-start-rlcr-if-converged] [--discussion|--direct]"
 allowed-tools:
   - "Bash(${CLAUDE_PLUGIN_ROOT}/scripts/validate-gen-plan-io.sh:*)"
@@ -13,57 +13,57 @@ allowed-tools:
   - "AskUserQuestion"
 ---
 
-# Generate Plan from Draft
+# 从草稿生成计划
 
-Read and execute below with ultrathink.
+请仔细阅读并执行以下内容。
 
-## Hard Constraint: No Coding During Plan Generation
+## 硬性约束：计划生成期间禁止编码
 
-This command MUST ONLY generate a plan document during the planning phases. It MUST NOT implement tasks, modify repository source code, or make commits/PRs while producing the plan.
+本命令在规划阶段只能生成计划文档。在生成计划期间不得实施任务、修改仓库源代码或创建提交/PR。
 
-Permitted writes (before any optional auto-start) are limited to:
-- The plan output file (`--output`)
-- Optional translated language variant (only when `ALT_PLAN_LANGUAGE` is configured)
+允许的写入（在任何可选自动启动之前）仅限于：
+- 计划输出文件（`--output`）
+- 可选的翻译语言变体（仅在配置了 `ALT_PLAN_LANGUAGE` 时）
 
-If `--auto-start-rlcr-if-converged` is enabled, the command MAY immediately start the RLCR loop by running `/humanize:start-rlcr-loop <output-plan-path>`, but only in `discussion` mode when `PLAN_CONVERGENCE_STATUS=converged` and there are no pending user decisions. All coding happens in that subsequent command/loop, not during plan generation.
+如果启用了 `--auto-start-rlcr-if-converged`，命令可以通过运行 `/humanize:start-rlcr-loop <output-plan-path>` 立即启动 RLCR 循环，但仅在 `discussion` 模式下且 `PLAN_CONVERGENCE_STATUS=converged` 且没有待处理的用户决策时。所有编码发生在后续命令/循环中，而非计划生成期间。
 
-This command transforms a user's draft document into a well-structured implementation plan with clear goals, acceptance criteria (AC-X format), path boundaries, and feasibility suggestions.
+本命令将用户的草稿文档转换为结构良好的实施计划，包含明确的目标、验收标准（AC-X 格式）、路径边界和可行性建议。
 
-## Workflow Overview
+## 工作流程概览
 
-> **Sequential Execution Constraint**: All phases below MUST execute strictly in order. Do NOT parallelize tool calls across different phases. Each phase must fully complete before the next one begins.
+> **顺序执行约束**：以下所有阶段必须严格按顺序执行。不得跨不同阶段并行化工具调用。每个阶段必须完全完成后才能开始下一个。
 
-1. **Execution Mode Setup**: Parse optional behaviors from command arguments
-2. **Load Project Config**: Resolve merged Humanize config defaults for `alternative_plan_language` and `gen_plan_mode`
-3. **IO Validation**: Validate input and output paths
-4. **Relevance Check**: Verify draft is relevant to the repository
-5. **Codex First-Pass Analysis**: Use one planning Codex before Claude synthesizes plan details
-6. **Claude Candidate Plan (v1)**: Claude builds an initial plan from draft + Codex findings
-7. **Iterative Convergence Loop**: Claude and a second Codex iteratively challenge/refine plan reasonability
-8. **Issue and Disagreement Resolution**: Resolve unresolved opposite opinions (or skip manual review if converged, auto-start mode is enabled, and `GEN_PLAN_MODE=discussion`)
-9. **Final Plan Generation**: Generate the converged structured plan.md with task routing tags
-10. **Write and Complete**: Write output file, optionally write translated language variant, optionally auto-start implementation, and report results
-
----
-
-## Phase 0: Execution Mode Setup
-
-Parse `$ARGUMENTS` and set:
-- `AUTO_START_RLCR_IF_CONVERGED=true` if `--auto-start-rlcr-if-converged` is present
-- `AUTO_START_RLCR_IF_CONVERGED=false` otherwise
-- `GEN_PLAN_MODE_DISCUSSION=true` if `--discussion` is present
-- `GEN_PLAN_MODE_DIRECT=true` if `--direct` is present
-- If both `--discussion` and `--direct` are present simultaneously, report error "Cannot use --discussion and --direct together" and stop
-
-`AUTO_START_RLCR_IF_CONVERGED=true` allows skipping manual plan review and starting implementation immediately (by invoking `/humanize:start-rlcr-loop <output-plan-path>`), but only when `GEN_PLAN_MODE=discussion`, plan convergence is achieved, and no pending user decisions remain. In `direct` mode this condition is never satisfied.
+1. **执行模式设置**：从命令参数解析可选行为
+2. **加载项目配置**：解析 `alternative_plan_language` 和 `gen_plan_mode` 的合并 Humanize 配置默认值
+3. **IO 验证**：验证输入和输出路径
+4. **相关性检查**：验证草稿与仓库相关
+5. **Codex 首轮分析**：在 Claude 合成计划详情之前使用一次规划 Codex
+6. **Claude 候选计划（v1）**：Claude 从草稿 + Codex 发现构建初始计划
+7. **迭代收敛循环**：Claude 和第二个 Codex 迭代挑战/优化计划合理性
+8. **问题和分歧解决**：解决未解决的相反意见（或在已收敛、自动启动模式已启用且 `GEN_PLAN_MODE=discussion` 时跳过手动审查）
+9. **最终计划生成**：生成带任务路由标签的收敛结构化 plan.md
+10. **写入并完成**：写入输出文件，可选写入翻译语言变体，可选自动启动实施，并报告结果
 
 ---
 
-## Phase 0.5: Load Project Config
+## 阶段 0：执行模式设置
 
-After setting execution mode flags, resolve configuration using `${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-loader.sh`. Reuse that behavior; do not read `.humanize/config.json` directly.
+解析 `$ARGUMENTS` 并设置：
+- 如果存在 `--auto-start-rlcr-if-converged`，则 `AUTO_START_RLCR_IF_CONVERGED=true`
+- 否则 `AUTO_START_RLCR_IF_CONVERGED=false`
+- 如果存在 `--discussion`，则 `GEN_PLAN_MODE_DISCUSSION=true`
+- 如果存在 `--direct`，则 `GEN_PLAN_MODE_DIRECT=true`
+- 如果同时存在 `--discussion` 和 `--direct`，报告错误"Cannot use --discussion and --direct together"并停止
 
-### Config Merge Semantics
+`AUTO_START_RLCR_IF_CONVERGED=true` 允许跳过手动计划审查并立即开始实施（通过调用 `/humanize:start-rlcr-loop <output-plan-path>`），但仅在 `GEN_PLAN_MODE=discussion`、计划已收敛且没有待处理的用户决策时。在 `direct` 模式下此条件永远不满足。
+
+---
+
+## 阶段 0.5：加载项目配置
+
+设置执行模式标志后，使用 `${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-loader.sh` 解析配置。复用该行为；不要直接读取 `.humanize/config.json`。
+
+### 配置合并语义
 
 1. Source `${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-loader.sh`.
 2. Call `load_merged_config "${CLAUDE_PLUGIN_ROOT}" "${PROJECT_ROOT}"` to obtain `MERGED_CONFIG_JSON`, where `PROJECT_ROOT` is the repository root where the command was invoked.
@@ -71,32 +71,32 @@ After setting execution mode flags, resolve configuration using `${CLAUDE_PLUGIN
    - Required default config: `${CLAUDE_PLUGIN_ROOT}/config/default_config.json`
    - Optional user config: `${XDG_CONFIG_HOME:-$HOME/.config}/humanize/config.json`
    - Optional project config: `${HUMANIZE_CONFIG:-$PROJECT_ROOT/.humanize/config.json}`
-4. Later layers override earlier layers. Malformed optional JSON objects are warnings and ignored. A malformed required default config, missing `jq`, or any other fatal `load_merged_config` failure is a configuration error and must stop the command.
+4. 后续层覆盖前面的层。格式错误的可选 JSON 对象作为警告并被忽略。格式错误的必需默认配置、缺少 `jq` 或任何其他致命的 `load_merged_config` 失败都是配置错误，必须停止命令。
 
-### Values to Extract
+### 需要提取的值
 
-Use `get_config_value` against `MERGED_CONFIG_JSON` to read:
+使用 `get_config_value` 对 `MERGED_CONFIG_JSON` 读取：
 
-- `CONFIG_ALT_LANGUAGE_RAW` from `alternative_plan_language`
-- `CONFIG_GEN_PLAN_MODE_RAW` from `gen_plan_mode`
-- `CONFIG_CHINESE_PLAN_RAW` from `chinese_plan` (legacy fallback only)
+- 从 `alternative_plan_language` 获取 `CONFIG_ALT_LANGUAGE_RAW`
+- 从 `gen_plan_mode` 获取 `CONFIG_GEN_PLAN_MODE_RAW`
+- 从 `chinese_plan` 获取 `CONFIG_CHINESE_PLAN_RAW`（仅旧版回退）
 
-Also detect whether `alternative_plan_language` is explicitly present in `MERGED_CONFIG_JSON` so an empty string still counts as an explicit override:
+同时检测 `alternative_plan_language` 是否明确存在于 `MERGED_CONFIG_JSON` 中，以便空字符串仍算作显式覆盖：
 
-- `HAS_ALT_LANGUAGE_KEY=true` when `MERGED_CONFIG_JSON` contains the `alternative_plan_language` key
-- `HAS_ALT_LANGUAGE_KEY=false` otherwise
+- 当 `MERGED_CONFIG_JSON` 包含 `alternative_plan_language` 键时，`HAS_ALT_LANGUAGE_KEY=true`
+- 否则 `HAS_ALT_LANGUAGE_KEY=false`
 
-### Alternative Language Resolution
+### 替代语言解析
 
-1. Resolve the effective `alternative_plan_language` value with this priority:
-   - Merged config `alternative_plan_language`, when `HAS_ALT_LANGUAGE_KEY=true` (even if the value is an empty string)
-   - Deprecated merged config `chinese_plan`, only when `HAS_ALT_LANGUAGE_KEY=false`
-   - Default disabled state
-2. Backward compatibility for deprecated `chinese_plan`:
-   - If `HAS_ALT_LANGUAGE_KEY=true` and `CONFIG_CHINESE_PLAN_RAW` is `true`, log: `Warning: deprecated "chinese_plan" field ignored; "alternative_plan_language" takes precedence. Remove "chinese_plan" from your humanize config.`
-   - If `HAS_ALT_LANGUAGE_KEY=false` and `CONFIG_CHINESE_PLAN_RAW` is `true`, treat the effective `alternative_plan_language` as `"Chinese"`. Log: `Warning: deprecated "chinese_plan" field detected. Replace it with "alternative_plan_language": "Chinese" in your humanize config.`
-   - Otherwise treat the effective `alternative_plan_language` as disabled.
-3. Resolve `ALT_PLAN_LANGUAGE` and `ALT_PLAN_LANG_CODE` from the effective `alternative_plan_language` value using the built-in mapping table below. Matching is **case-insensitive**.
+1. 使用以下优先级解析有效的 `alternative_plan_language` 值：
+   - 合并配置中的 `alternative_plan_language`，当 `HAS_ALT_LANGUAGE_KEY=true` 时（即使值为空字符串）
+   - 已弃用的合并配置中的 `chinese_plan`，仅当 `HAS_ALT_LANGUAGE_KEY=false` 时
+   - 默认禁用状态
+2. 已弃用 `chinese_plan` 的向后兼容：
+   - 如果 `HAS_ALT_LANGUAGE_KEY=true` 且 `CONFIG_CHINESE_PLAN_RAW` 为 `true`，记录日志：`Warning: deprecated "chinese_plan" field ignored; "alternative_plan_language" takes precedence. Remove "chinese_plan" from your humanize config.`
+   - 如果 `HAS_ALT_LANGUAGE_KEY=false` 且 `CONFIG_CHINESE_PLAN_RAW` 为 `true`，将有效的 `alternative_plan_language` 视为 `"Chinese"`。记录日志：`Warning: deprecated "chinese_plan" field detected. Replace it with "alternative_plan_language": "Chinese" in your humanize config.`
+   - 否则将有效的 `alternative_plan_language` 视为禁用。
+3. 使用下面的内置映射表从有效的 `alternative_plan_language` 值解析 `ALT_PLAN_LANGUAGE` 和 `ALT_PLAN_LANG_CODE`。匹配**不区分大小写**。
 
    | Language   | Code | Suffix |
    |------------|------|--------|
@@ -110,345 +110,345 @@ Also detect whether `alternative_plan_language` is explicitly present in `MERGED
    | Russian    | ru   | `_ru`  |
    | Arabic     | ar   | `_ar`  |
 
-   Matching accepts both the language name (e.g. `"Chinese"`) and the ISO 639-1 code (e.g. `"zh"`), both case-insensitive. Leading/trailing whitespace is trimmed before matching.
+   匹配接受语言名称（例如 `"Chinese"`）和 ISO 639-1 代码（例如 `"zh"`），均不区分大小写。匹配前修剪前导/尾随空格。
 
-   - If the value is empty or absent: set `ALT_PLAN_LANGUAGE=""` and `ALT_PLAN_LANG_CODE=""` (disabled).
-   - If the value is `"English"` or `"en"` (case-insensitive): set `ALT_PLAN_LANGUAGE=""` and `ALT_PLAN_LANG_CODE=""` (no-op; the plan is already in English).
-   - If the value matches a language name or code in the table: set `ALT_PLAN_LANGUAGE` to the matched language name and `ALT_PLAN_LANG_CODE` to the corresponding code.
-   - If the value does NOT match any language name or code in the table: set `ALT_PLAN_LANGUAGE=""` and `ALT_PLAN_LANG_CODE=""` (disabled). Log: `Warning: unsupported alternative_plan_language "<value>". Supported values: Chinese (zh), Korean (ko), Japanese (ja), Spanish (es), French (fr), German (de), Portuguese (pt), Russian (ru), Arabic (ar). Translation variant will not be generated.`
-4. Resolve `CONFIG_GEN_PLAN_MODE_RAW` from the merged config:
-   - Valid values: `"discussion"` or `"direct"` (case-insensitive).
-   - Invalid or absent values: treat as absent (fall back to default) and log a warning if the value is present but invalid.
-5. Resolve `GEN_PLAN_MODE` using the following priority (highest to lowest), with CLI flags taking priority over merged config:
-   - CLI flag: if `GEN_PLAN_MODE_DISCUSSION=true`, set `GEN_PLAN_MODE=discussion`; if `GEN_PLAN_MODE_DIRECT=true`, set `GEN_PLAN_MODE=direct`
-   - Merged config `gen_plan_mode` field (if valid)
-   - Default: `discussion`
-6. Malformed optional user or project config files should be reported as warnings by `load_merged_config` and must NOT stop execution. In those cases, continue with the remaining valid layers and the same effective defaults (`ALT_PLAN_LANGUAGE=""`, `ALT_PLAN_LANG_CODE=""`, and `GEN_PLAN_MODE=discussion`) when no higher-precedence value is available.
+   - 如果值为空或不存在：设置 `ALT_PLAN_LANGUAGE=""` 和 `ALT_PLAN_LANG_CODE=""`（禁用）。
+   - 如果值为 `"English"` 或 `"en"`（不区分大小写）：设置 `ALT_PLAN_LANGUAGE=""` 和 `ALT_PLAN_LANG_CODE=""`（无操作；计划已经是英文）。
+   - 如果值匹配表中的语言名称或代码：设置 `ALT_PLAN_LANGUAGE` 为匹配的语言名称，`ALT_PLAN_LANG_CODE` 为对应的代码。
+   - 如果值不匹配表中的任何语言名称或代码：设置 `ALT_PLAN_LANGUAGE=""` 和 `ALT_PLAN_LANG_CODE=""`（禁用）。记录日志：`Warning: unsupported alternative_plan_language "<value>". Supported values: Chinese (zh), Korean (ko), Japanese (ja), Spanish (es), French (fr), German (de), Portuguese (pt), Russian (ru), Arabic (ar). Translation variant will not be generated.`
+4. 从合并配置解析 `CONFIG_GEN_PLAN_MODE_RAW`：
+   - 有效值：`"discussion"` 或 `"direct"`（不区分大小写）。
+   - 无效或不存在的值：视为不存在（回退到默认值），如果值存在但无效则记录警告。
+5. 使用以下优先级（从高到低）解析 `GEN_PLAN_MODE`，CLI 标志优先于合并配置：
+   - CLI 标志：如果 `GEN_PLAN_MODE_DISCUSSION=true`，设置 `GEN_PLAN_MODE=discussion`；如果 `GEN_PLAN_MODE_DIRECT=true`，设置 `GEN_PLAN_MODE=direct`
+   - 合并配置的 `gen_plan_mode` 字段（如果有效）
+   - 默认：`discussion`
+6. 格式错误的可选用户或项目配置文件应由 `load_merged_config` 报告为警告，不得停止执行。在这些情况下，当没有更高优先级的值可用时，继续使用剩余的有效层和相同的有效默认值（`ALT_PLAN_LANGUAGE=""`、`ALT_PLAN_LANG_CODE=""` 和 `GEN_PLAN_MODE=discussion`）。
 
-`ALT_PLAN_LANGUAGE` and `ALT_PLAN_LANG_CODE` control whether a translated language variant of the output file is written in Phase 8. When `ALT_PLAN_LANGUAGE` is non-empty, a variant file with the `_<ALT_PLAN_LANG_CODE>` suffix is generated.
+`ALT_PLAN_LANGUAGE` 和 `ALT_PLAN_LANG_CODE` 控制是否在阶段 8 写入输出文件的翻译语言变体。当 `ALT_PLAN_LANGUAGE` 非空时，生成带有 `_<ALT_PLAN_LANG_CODE>` 后缀的变体文件。
 
 ---
 
-## Phase 1: IO Validation
+## 阶段 1：IO 验证
 
-Execute the validation script with the provided arguments:
+使用提供的参数执行验证脚本：
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/validate-gen-plan-io.sh" $ARGUMENTS
 ```
 
-**Handle exit codes:**
-- Exit code 0: Continue to Phase 2. Parse the `TEMPLATE_FILE:` line from stdout to get the template path.
-- Exit code 1: Report "Input file not found" and stop
-- Exit code 2: Report "Input file is empty" and stop
-- Exit code 3: Report "Output directory does not exist - please create it" and stop
-- Exit code 4: Report "Output file already exists - please choose another path" and stop
-- Exit code 5: Report "No write permission to output directory" and stop
-- Exit code 6: Report "Invalid arguments" and show usage, then stop
-- Exit code 7: Report "Plan template file not found - plugin configuration error" and stop
+**处理退出码：**
+- 退出码 0：继续阶段 2。从标准输出解析 `TEMPLATE_FILE:` 行以获取模板路径。
+- 退出码 1：报告"输入文件未找到"并停止
+- 退出码 2：报告"输入文件为空"并停止
+- 退出码 3：报告"输出目录不存在 - 请创建它"并停止
+- 退出码 4：报告"输出文件已存在 - 请选择其他路径"并停止
+- 退出码 5：报告"没有输出目录的写入权限"并停止
+- 退出码 6：报告"参数无效"并显示用法，然后停止
+- 退出码 7：报告"计划模板文件未找到 - 插件配置错误"并停止
 
-**Note:** The validation script is side-effect-free. It does NOT create the output file.
+**注意：** 验证脚本无副作用。它不会创建输出文件。
 
 ---
 
-## Phase 2: Relevance Check
+## 阶段 2：相关性检查
 
-After IO validation passes, check if the draft is relevant to this repository.
+IO 验证通过后，检查草稿是否与此仓库相关。
 
-> **Note**: Do not spend too much time on this check. As long as the draft is not completely unrelated to the current project - not like the difference between ship design and cake recipes - it passes.
+> **注意**：不要在此检查上花费太多时间。只要草稿与当前项目不是完全无关 — 不像船舶设计和蛋糕配方之间的差异 — 就通过。
 
-1. Read the input draft file to get its content
-2. Use the Task tool to invoke the `humanize:draft-relevance-checker` agent (haiku model):
+1. 读取输入草稿文件以获取其内容
+2. 使用 Task 工具调用 `humanize:draft-relevance-checker` 代理（haiku 模型）：
    ```
-   Task tool parameters:
+   Task 工具参数：
    - model: "haiku"
-   - prompt: Include the draft content and ask the agent to:
-     1. Explore the repository structure (README, CLAUDE.md, main files)
-     2. Analyze if the draft content relates to this repository
-     3. Return either `RELEVANT: <reason>` or `NOT_RELEVANT: <reason>`
+   - prompt: 包含草稿内容并要求代理：
+     1. 探索仓库结构（README、CLAUDE.md、主要文件）
+     2. 分析草稿内容是否与此仓库相关
+     3. 返回 `RELEVANT: <reason>` 或 `NOT_RELEVANT: <reason>`
    ```
 
-3. **If NOT_RELEVANT**:
-   - Report: "The draft content does not appear to be related to this repository."
-   - Show the reason from the relevance check
-   - Stop the command
+3. **如果为 NOT_RELEVANT**：
+   - 报告："草稿内容似乎与此仓库无关。"
+   - 显示相关性检查的原因
+   - 停止命令
 
-4. **If RELEVANT**: Create the output plan file by copying the template and appending the draft:
+4. **如果为 RELEVANT**：通过复制模板并追加草稿来创建输出计划文件：
    ```bash
    cp "$TEMPLATE_FILE" "$OUTPUT_FILE" && echo "" >> "$OUTPUT_FILE" && echo "--- Original Design Draft Start ---" >> "$OUTPUT_FILE" && echo "" >> "$OUTPUT_FILE" && cat "$INPUT_FILE" >> "$OUTPUT_FILE" && echo "" >> "$OUTPUT_FILE" && echo "--- Original Design Draft End ---" >> "$OUTPUT_FILE"
    ```
-   Then continue to Phase 3.
+   然后继续阶段 3。
 
 ---
 
-## Phase 3: Codex First-Pass Analysis
+## 阶段 3：Codex 首轮分析
 
-After relevance check, invoke Codex BEFORE Claude plan synthesis.
+相关性检查后，在 Claude 合成计划之前调用 Codex。
 
-This Codex pass is the first planning analysis before Claude synthesizes plan details.
+此 Codex 轮次是 Claude 合成计划详情之前的首次规划分析。
 
-1. Run:
+1. 运行：
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh" "<structured prompt>"
    ```
-2. The structured prompt MUST include:
-   - Repository context (project purpose, relevant files)
-   - Raw draft content
-   - Explicit request to critique assumptions, identify missing requirements, and propose stronger plan directions
-3. Require Codex output to follow this format:
-   - `CORE_RISKS:` highest-risk assumptions and potential failure modes
-   - `MISSING_REQUIREMENTS:` likely omitted requirements or edge cases
-   - `TECHNICAL_GAPS:` feasibility or architecture gaps
-   - `ALTERNATIVE_DIRECTIONS:` viable alternatives with tradeoffs
-   - `QUESTIONS_FOR_USER:` questions that need explicit human decisions
-   - `CANDIDATE_CRITERIA:` candidate acceptance criteria suggestions
-4. Preserve this output as **Codex Analysis v1** and feed it into Claude planning.
-5. Record a concise planning summary from this analysis.
+2. 结构化提示必须包含：
+   - 仓库上下文（项目目的、相关文件）
+   - 原始草稿内容
+   - 明确请求批判假设、识别缺失需求并提出更强的计划方向
+3. 要求 Codex 输出遵循以下格式：
+   - `CORE_RISKS:` 最高风险假设和潜在失败模式
+   - `MISSING_REQUIREMENTS:` 可能遗漏的需求或边缘情况
+   - `TECHNICAL_GAPS:` 可行性或架构差距
+   - `ALTERNATIVE_DIRECTIONS:` 可行的替代方案及其权衡
+   - `QUESTIONS_FOR_USER:` 需要明确人工决策的问题
+   - `CANDIDATE_CRITERIA:` 候选验收标准建议
+4. 将此输出保留为 **Codex Analysis v1** 并输入 Claude 规划。
+5. 从此分析中记录简洁的规划摘要。
 
-### Codex Availability Handling
+### Codex 可用性处理
 
-If `ask-codex.sh` fails (missing Codex CLI, timeout, or runtime error), use AskUserQuestion and let the user choose:
-- Retry with updated Codex settings/environment
-- Continue with Claude-only planning (explicitly note reduced cross-review confidence in plan output)
-
----
-
-## Phase 4: Claude Candidate Plan (v1)
-
-Use draft content + Codex Analysis v1 to produce an initial candidate plan and issue map.
-
-Deeply analyze the draft for potential issues. Use Explore agents to investigate the codebase.
-
-Alongside candidate plan v1, prepare a concise implementation summary covering scope, boundaries, dependencies, and known risks.
-
-### Analysis Dimensions
-
-1. **Clarity**: Is the draft's intent and goals clearly expressed?
-   - Are objectives well-defined?
-   - Is the scope clear?
-   - Are terms and concepts unambiguous?
-
-2. **Consistency**: Does the draft contradict itself?
-   - Are requirements internally consistent?
-   - Do different sections align with each other?
-
-3. **Completeness**: Are there missing considerations?
-   - Use Explore agents to investigate parts of the codebase the draft might affect
-   - Identify dependencies, side effects, or related components not mentioned
-   - Check if the draft overlooks important edge cases
-
-4. **Functionality**: Does the design have fundamental flaws?
-   - Would the proposed approach actually work?
-   - Are there technical limitations not addressed?
-   - Could the design negatively impact existing functionality?
-
-### Exploration Strategy
-
-Use the Task tool with `subagent_type: "Explore"` to investigate:
-- Components mentioned in the draft
-- Related files and directories
-- Existing patterns and conventions
-- Dependencies and integrations
+如果 `ask-codex.sh` 失败（缺少 Codex CLI、超时或运行时错误），使用 AskUserQuestion 让用户选择：
+- 使用更新的 Codex 设置/环境重试
+- 继续仅 Claude 规划（明确说明计划输出中交叉审查置信度降低）
 
 ---
 
-## Phase 5: Iterative Convergence Loop (Claude <-> Second Codex)
+## 阶段 4：Claude 候选计划（v1）
 
-If `GEN_PLAN_MODE=direct`, skip this entire phase. The plan proceeds directly from candidate plan v1 (Phase 4) to Phase 6 without convergence rounds. Since no convergence rounds or second-pass review occurred, set `PLAN_CONVERGENCE_STATUS=partially_converged` and `HUMAN_REVIEW_REQUIRED=true` (direct mode must NOT satisfy `--auto-start-rlcr-if-converged` conditions).
+使用草稿内容 + Codex Analysis v1 生成初始候选计划和问题映射。
 
-After Claude candidate plan v1 is ready, run iterative challenge/refine rounds with a SECOND Codex pass.
+深入分析草稿中的潜在问题。使用 Explore 代理调查代码库。
 
-### Convergence Round Steps
+与候选计划 v1 一起，准备涵盖范围、边界、依赖和已知风险的简洁实施摘要。
 
-1. **Second Codex Reasonability Review**
-   - Run:
+### 分析维度
+
+1. **清晰度**：草稿的意图和目标是否表达清楚？
+   - 目标是否明确定义？
+   - 范围是否清晰？
+   - 术语和概念是否明确？
+
+2. **一致性**：草稿是否自相矛盾？
+   - 需求是否内部一致？
+   - 不同部分是否相互对齐？
+
+3. **完整性**：是否有遗漏的考虑？
+   - 使用 Explore 代理调查草稿可能影响的代码库部分
+   - 识别未提及的依赖、副作用或相关组件
+   - 检查草稿是否忽略了重要的边缘情况
+
+4. **功能性**：设计是否有根本缺陷？
+   - 提议的方法是否真的可行？
+   - 是否有未解决的技术限制？
+   - 设计是否会对现有功能产生负面影响？
+
+### 探索策略
+
+使用 `subagent_type: "Explore"` 的 Task 工具进行调查：
+- 草稿中提到的组件
+- 相关文件和目录
+- 现有模式和惯例
+- 依赖和集成
+
+---
+
+## 阶段 5：迭代收敛循环（Claude <-> 第二个 Codex）
+
+如果 `GEN_PLAN_MODE=direct`，跳过此整个阶段。计划直接从候选计划 v1（阶段 4）进入阶段 6，不经过收敛轮次。由于没有收敛轮次或二轮审查发生，设置 `PLAN_CONVERGENCE_STATUS=partially_converged` 和 `HUMAN_REVIEW_REQUIRED=true`（direct 模式不得满足 `--auto-start-rlcr-if-converged` 条件）。
+
+Claude 候选计划 v1 就绪后，使用第二个 Codex 轮次运行迭代挑战/优化轮次。
+
+### 收敛轮次步骤
+
+1. **第二个 Codex 合理性审查**
+   - 运行：
      ```bash
      "${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh" "<review current candidate plan>"
      ```
-   - Prompt MUST include current candidate plan, prior disagreements, and unresolved items
-   - Require output format:
-     - `AGREE:` points accepted as reasonable
-     - `DISAGREE:` points considered unreasonable and why
-     - `REQUIRED_CHANGES:` must-fix items before convergence
-     - `OPTIONAL_IMPROVEMENTS:` non-blocking improvements
-     - `UNRESOLVED:` opposite opinions needing user decisions
-2. **Claude Revision**
-   - Claude updates the candidate plan to address `REQUIRED_CHANGES`
-   - Claude documents accepted/rejected suggestions with rationale
-3. **Convergence Assessment**
-   - Update a per-round convergence matrix:
-     - Topic
-     - Claude position
-     - Second Codex position
-     - Resolution status (`resolved`, `needs_user_decision`, `deferred`)
-     - Round-to-round delta
+   - 提示必须包含当前候选计划、先前的分歧和未解决的项目
+   - 要求输出格式：
+     - `AGREE:` 被接受为合理的要点
+     - `DISAGREE:` 被认为不合理的要点及原因
+     - `REQUIRED_CHANGES:` 收敛前必须修复的项目
+     - `OPTIONAL_IMPROVEMENTS:` 非阻塞的改进
+     - `UNRESOLVED:` 需要用户决策的相反意见
+2. **Claude 修订**
+   - Claude 更新候选计划以解决 `REQUIRED_CHANGES`
+   - Claude 记录接受/拒绝的建议及理由
+3. **收敛评估**
+   - 更新每轮收敛矩阵：
+     - 主题
+     - Claude 立场
+     - 第二个 Codex 立场
+     - 解决状态（`resolved`、`needs_user_decision`、`deferred`）
+     - 轮次间增量
 
-### Loop Termination Rules
+### 循环终止规则
 
-Repeat convergence rounds until one of the following is true:
-- No `REQUIRED_CHANGES` remain and no high-impact `DISAGREE` remains
-- Two consecutive rounds produce no material plan changes
-- Maximum 3 rounds reached
+重复收敛轮次直到以下之一为真：
+- 没有 `REQUIRED_CHANGES` 且没有高影响的 `DISAGREE`
+- 连续两轮未产生实质性计划变更
+- 达到最大 3 轮
 
-If max rounds are reached with unresolved opposite opinions, carry them to user decision phase explicitly.
+如果达到最大轮次时仍有未解决的相反意见，将它们明确携带到用户决策阶段。
 
-Set convergence state explicitly:
-- `PLAN_CONVERGENCE_STATUS=converged` when convergence conditions are met
-- `PLAN_CONVERGENCE_STATUS=partially_converged` otherwise
-
----
-
-## Phase 6: Issue and Disagreement Resolution
-
-> **Critical**: The draft document contains the most valuable human input. During issue resolution, NEVER discard or override any original draft content. All clarifications should be treated as incremental additions that supplement the draft, not replacements. Keep track of both the original draft statements and the clarified information.
-
-### Step 1: Manual Review Gate
-
-Decide if manual review can be skipped:
-- If `GEN_PLAN_MODE=direct`, set `HUMAN_REVIEW_REQUIRED=true`
-- Else if `AUTO_START_RLCR_IF_CONVERGED=true` **and** `PLAN_CONVERGENCE_STATUS=converged`, set `HUMAN_REVIEW_REQUIRED=false`
-- Otherwise set `HUMAN_REVIEW_REQUIRED=true`
-
-If `HUMAN_REVIEW_REQUIRED=false`, skip Step 2-4 and continue directly to Phase 7.
-
-### Step 1.5: Consolidate Pending User Decisions (runs unconditionally)
-
-Before proceeding (regardless of `HUMAN_REVIEW_REQUIRED`), consolidate all user-facing questions from prior phases into the plan's `## Pending User Decisions` section:
-
-1. Extract `QUESTIONS_FOR_USER` items from Codex Analysis v1 (Phase 3)
-2. Extract items with status `needs_user_decision` from the final convergence matrix (Phase 5) — use the last round's state, not intermediate rounds
-3. Deduplicate: if the same topic appears in both sources, merge into one entry
-4. For each collected item, check if it was substantively resolved during Phase 4-5 plan refinement (i.e., Claude addressed it and second Codex agreed in a subsequent round). Remove only items with clear evidence of resolution.
-5. Write all remaining unresolved items into the plan's `## Pending User Decisions` section. Use `DEC-N` identifiers. Set `Decision Status` to `PENDING`.
-   - For Claude-vs-Codex disagreements: fill `Claude Position`, `Codex Position`, and `Tradeoff Summary`
-   - For open questions (no opposing positions): set `Claude Position` to Claude's tentative answer (if any), `Codex Position` to `N/A - open question`, and `Tradeoff Summary` to the question's context
-
-This ensures:
-- When `HUMAN_REVIEW_REQUIRED=true`: items are visible for Steps 2-4 user resolution
-- When `HUMAN_REVIEW_REQUIRED=false`: items block auto-start via Phase 8 Step 5's `PENDING` check
-
-### Step 2: Resolve Analysis Issues (when manual review is required)
-
-If any issues are found during Codex-first analysis, Claude analysis, or convergence loop, use AskUserQuestion to clarify with the user.
-
-For each issue category that has problems, present:
-- What the issue is
-- Why it matters
-- Options for resolution (if applicable)
-
-Continue this dialogue until all significant issues are resolved or acknowledged by the user.
-
-### Step 3: Confirm Quantitative Metrics (when manual review is required)
-
-After all analysis issues are resolved, check the draft for any quantitative metrics or numeric thresholds, such as:
-- Performance targets: "less than 15GB/s", "under 100ms latency"
-- Size constraints: "below 300KB", "maximum 1MB"
-- Count limits: "more than 10 files", "at least 5 retries"
-- Percentage goals: "95% coverage", "reduce by 50%"
-
-For each quantitative metric found, use AskUserQuestion to explicitly confirm with the user:
-- Is this a **hard requirement** that must be achieved for the implementation to be considered successful?
-- Or is this describing an **optimization trend/direction** where improvement toward the target is acceptable even if the exact number is not reached?
-
-Document the user's answer for each metric, as this distinction significantly affects how acceptance criteria should be written in the plan.
+明确设置收敛状态：
+- 当满足收敛条件时 `PLAN_CONVERGENCE_STATUS=converged`
+- 否则 `PLAN_CONVERGENCE_STATUS=partially_converged`
 
 ---
 
-### Step 4: Resolve Unresolved Claude/Codex Disagreements (when manual review is required)
+## 阶段 6：问题和分歧解决
 
-For every item marked `needs_user_decision`, explicitly ask the user to decide.
+> **关键**：草稿文档包含最有价值的人工输入。在问题解决期间，绝不丢弃或覆盖任何原始草稿内容。所有澄清应被视为补充草稿的增量添加，而非替换。同时跟踪原始草稿陈述和澄清后的信息。
 
-For each unresolved disagreement, present:
-- The decision topic
-- Claude's position
-- Codex's position
-- Tradeoffs and risks of each option
-- A clear recommendation (if one option is materially safer)
+### 步骤 1：手动审查门控
 
-If the user does not decide immediately, keep the item in the plan as `PENDING` under a dedicated user-decision section.
+决定是否可以跳过手动审查：
+- 如果 `GEN_PLAN_MODE=direct`，设置 `HUMAN_REVIEW_REQUIRED=true`
+- 否则如果 `AUTO_START_RLCR_IF_CONVERGED=true` **且** `PLAN_CONVERGENCE_STATUS=converged`，设置 `HUMAN_REVIEW_REQUIRED=false`
+- 否则设置 `HUMAN_REVIEW_REQUIRED=true`
+
+如果 `HUMAN_REVIEW_REQUIRED=false`，跳过步骤 2-4 直接继续阶段 7。
+
+### 步骤 1.5：整合待处理的用户决策（无条件运行）
+
+在继续之前（无论 `HUMAN_REVIEW_REQUIRED`），将先前阶段中所有面向用户的问题整合到计划的 `## Pending User Decisions` 部分：
+
+1. 从 Codex Analysis v1（阶段 3）提取 `QUESTIONS_FOR_USER` 项目
+2. 从最终收敛矩阵（阶段 5）提取状态为 `needs_user_decision` 的项目 — 使用最后一轮的状态，而非中间轮次
+3. 去重：如果同一主题出现在两个来源中，合并为一个条目
+4. 对于每个收集的项目，检查它是否在阶段 4-5 计划优化期间得到实质性解决（即 Claude 处理了它且第二个 Codex 在后续轮次中同意）。仅删除有明确解决证据的项目。
+5. 将所有剩余未解决的项目写入计划的 `## Pending User Decisions` 部分。使用 `DEC-N` 标识符。设置 `Decision Status` 为 `PENDING`。
+   - 对于 Claude 与 Codex 的分歧：填写 `Claude Position`、`Codex Position` 和 `Tradeoff Summary`
+   - 对于开放问题（无对立立场）：设置 `Claude Position` 为 Claude 的暂定答案（如有），`Codex Position` 为 `N/A - open question`，`Tradeoff Summary` 为问题的上下文
+
+这确保：
+- 当 `HUMAN_REVIEW_REQUIRED=true`：项目对步骤 2-4 用户解决可见
+- 当 `HUMAN_REVIEW_REQUIRED=false`：项目通过阶段 8 步骤 5 的 `PENDING` 检查阻止自动启动
+
+### 步骤 2：解决分析问题（需要手动审查时）
+
+如果在 Codex 优先分析、Claude 分析或收敛循环期间发现任何问题，使用 AskUserQuestion 与用户澄清。
+
+对于每个有问题的问题类别，呈现：
+- 问题是什么
+- 为什么重要
+- 解决方案选项（如适用）
+
+继续此对话直到所有重要问题被解决或被用户确认。
+
+### 步骤 3：确认量化指标（需要手动审查时）
+
+所有分析问题解决后，检查草稿中的任何量化指标或数值阈值，例如：
+- 性能目标："低于 15GB/s"、"低于 100ms 延迟"
+- 大小约束："低于 300KB"、"最大 1MB"
+- 数量限制："超过 10 个文件"、"至少 5 次重试"
+- 百分比目标："95% 覆盖率"、"减少 50%"
+
+对于找到的每个量化指标，使用 AskUserQuestion 与用户明确确认：
+- 这是实施被视为成功必须达到的**硬性要求**？
+- 还是描述一个**优化趋势/方向**，即使未达到精确数字，向目标的改进也是可接受的？
+
+记录每个指标的用户答案，因为此区分显著影响计划中验收标准的编写方式。
 
 ---
 
-## Phase 7: Final Plan Generation
+### 步骤 4：解决未解决的 Claude/Codex 分歧（需要手动审查时）
 
-Deeply think and generate the plan.md following these rules:
+对于每个标记为 `needs_user_decision` 的项目，明确要求用户做出决定。
 
-### Plan Structure
+对于每个未解决的分歧，呈现：
+- 决策主题
+- Claude 的立场
+- Codex 的立场
+- 各选项的权衡和风险
+- 明确的建议（如果某个选项明显更安全）
+
+如果用户未立即决定，将项目保留在计划中作为 `PENDING`，放在专门的用户决策部分下。
+
+---
+
+## 阶段 7：最终计划生成
+
+深入思考并按以下规则生成 plan.md：
+
+### 计划结构
 
 ```markdown
-# <Plan Title>
+# <计划标题>
 
 ## Goal Description
-<Clear, direct description of what needs to be accomplished>
+<清晰、直接地描述需要完成的内容>
 
 ## Acceptance Criteria
 
-Following TDD philosophy, each criterion includes positive and negative tests for deterministic verification.
+遵循 TDD 理念，每个标准包含正向和反向测试以进行确定性验证。
 
-- AC-1: <First criterion>
+- AC-1: <第一个标准>
   - Positive Tests (expected to PASS):
-    - <Test case that should succeed when criterion is met>
-    - <Another success case>
+    - <标准满足时应成功的测试用例>
+    - <另一个成功用例>
   - Negative Tests (expected to FAIL):
-    - <Test case that should fail/be rejected when working correctly>
-    - <Another failure/rejection case>
-  - AC-1.1: <Sub-criterion if needed>
+    - <正常工作时应失败/被拒绝的测试用例>
+    - <另一个失败/拒绝用例>
+  - AC-1.1: <需要时的子标准>
     - Positive: <...>
     - Negative: <...>
-- AC-2: <Second criterion>
+- AC-2: <第二个标准>
   - Positive Tests: <...>
   - Negative Tests: <...>
 ...
 
 ## Path Boundaries
 
-Path boundaries define the acceptable range of implementation quality and choices.
+路径边界定义实施质量和选择的可接受范围。
 
 ### Upper Bound (Maximum Acceptable Scope)
-<Affirmative description of the most comprehensive acceptable implementation>
-<This represents completing the goal without over-engineering>
-Example: "The implementation includes X, Y, and Z features with full test coverage"
+<最全面可接受实施的肯定性描述>
+<这代表在不过度工程化的情况下完成目标>
+示例："实施包含 X、Y 和 Z 功能，具有完整测试覆盖"
 
 ### Lower Bound (Minimum Acceptable Scope)
-<Affirmative description of the minimum viable implementation>
-<This represents the least effort that still satisfies all acceptance criteria>
-Example: "The implementation includes core feature X with basic validation"
+<最小可行实施的肯定性描述>
+<这代表仍满足所有验收标准的最少工作量>
+示例："实施包含核心功能 X，具有基本验证"
 
 ### Allowed Choices
-<Options that are acceptable for implementation decisions>
-- Can use: <technologies, approaches, patterns that are allowed>
-- Cannot use: <technologies, approaches, patterns that are prohibited>
+<对实施决策可接受的选项>
+- 可以使用：<允许的技术、方法、模式>
+- 不可以使用：<禁止的技术、方法、模式>
 
-> **Note on Deterministic Designs**: If the draft specifies a highly deterministic design with no choices (e.g., "must use JSON format", "must use algorithm X"), then the path boundaries should reflect this narrow constraint. In such cases, upper and lower bounds may converge to the same point, and "Allowed Choices" should explicitly state that the choice is fixed per the draft specification.
+> **关于确定性设计的说明**：如果草稿指定了高度确定性的设计且无选择（例如，"必须使用 JSON 格式"、"必须使用算法 X"），则路径边界应反映此狭窄约束。在这种情况下，上限和下限可能收敛到同一点，"Allowed Choices" 应明确说明选择按草稿规范固定。
 
 ## Feasibility Hints and Suggestions
 
-> **Note**: This section is for reference and understanding only. These are conceptual suggestions, not prescriptive requirements.
+> **注意**：本部分仅供参考和理解。这些是概念性建议，而非规定性要求。
 
 ### Conceptual Approach
-<Text description, pseudocode, or diagrams showing ONE possible implementation path>
+<文本描述、伪代码或图表，展示一种可能的实施路径>
 
 ### Relevant References
-<Code paths and concepts that might be useful>
-- <path/to/relevant/component> - <brief description>
+<可能有用的代码路径和概念>
+- <path/to/relevant/component> - <简要描述>
 
 ## Dependencies and Sequence
 
 ### Milestones
-1. <Milestone 1>: <Description>
+1. <里程碑 1>: <描述>
    - Phase A: <...>
    - Phase B: <...>
-2. <Milestone 2>: <Description>
+2. <里程碑 2>: <描述>
    - Step 1: <...>
    - Step 2: <...>
 
-<Describe relative dependencies between components, not time estimates>
+<描述组件之间的相对依赖关系，而非时间估计>
 
 ## Task Breakdown
 
-Each task must include exactly one routing tag:
-- `coding`: implemented by Claude
-- `analyze`: executed via Codex (`/humanize:ask-codex`)
+每个任务必须包含恰好一个路由标签：
+- `coding`：由 Claude 实施
+- `analyze`：通过 Codex 执行（`/humanize:ask-codex`）
 
 | Task ID | Description | Target AC | Tag (`coding`/`analyze`) | Depends On |
 |---------|-------------|-----------|----------------------------|------------|
@@ -458,190 +458,190 @@ Each task must include exactly one routing tag:
 ## Claude-Codex Deliberation
 
 ### Agreements
-- <Point both sides agree on>
+- <双方同意的要点>
 
 ### Resolved Disagreements
-- <Topic>: Claude vs Codex summary, chosen resolution, and rationale
+- <主题>：Claude vs Codex 摘要、选择的解决方案和理由
 
 ### Convergence Status
-- Final Status: `converged` or `partially_converged`
+- Final Status: `converged` 或 `partially_converged`
 
 ## Pending User Decisions
 
-- DEC-1: <Decision topic>
+- DEC-1: <决策主题>
   - Claude Position: <...>
   - Codex Position: <...>
   - Tradeoff Summary: <...>
-  - Decision Status: `PENDING` or `<User's final decision>`
+  - Decision Status: `PENDING` 或 `<用户的最终决定>`
 
 ## Implementation Notes
 
 ### Code Style Requirements
-- Implementation code and comments must NOT contain plan-specific terminology such as "AC-", "Milestone", "Step", "Phase", or similar workflow markers
-- These terms are for plan documentation only, not for the resulting codebase
-- Use descriptive, domain-appropriate naming in code instead
+- 实施代码和注释不得包含计划特定术语，如 "AC-"、"Milestone"、"Step"、"Phase" 或类似工作流标记
+- 这些术语仅用于计划文档，不用于生成的代码库
+- 在代码中使用描述性的、领域适当的命名
 
 ## Output File Convention
 
-This template is used to produce the main output file (e.g., `plan.md`).
+此模板用于生成主输出文件（例如 `plan.md`）。
 
 ### Translated Language Variant
 
-When `alternative_plan_language` resolves to a supported language name through merged config loading, a translated variant of the output file is also written after the main file. Humanize loads config from merged layers in this order: default config, optional user config, then optional project config; `alternative_plan_language` may be set at any of those layers. The variant filename is constructed by inserting `_<code>` (the ISO 639-1 code from the built-in mapping table) immediately before the file extension:
+当 `alternative_plan_language` 通过合并配置加载解析为支持的语言名称时，主文件之后还会写入输出文件的翻译变体。Humanize 按以下顺序从合并层加载配置：默认配置、可选用户配置、然后可选项目配置；`alternative_plan_language` 可以在任何这些层中设置。变体文件名通过在文件扩展名之前插入 `_<code>`（来自内置映射表的 ISO 639-1 代码）来构建：
 
-- `plan.md` becomes `plan_<code>.md` (e.g. `plan_zh.md` for Chinese, `plan_ko.md` for Korean)
-- `docs/my-plan.md` becomes `docs/my-plan_<code>.md`
-- `output` (no extension) becomes `output_<code>`
+- `plan.md` 变为 `plan_<code>.md`（例如中文为 `plan_zh.md`，韩文为 `plan_ko.md`）
+- `docs/my-plan.md` 变为 `docs/my-plan_<code>.md`
+- `output`（无扩展名）变为 `output_<code>`
 
-The translated variant file contains a full translation of the main plan file's current content in the configured language. All identifiers (`AC-*`, task IDs, file paths, API names, command flags) remain unchanged, as they are language-neutral.
+翻译变体文件包含主计划文件当前内容的完整翻译，使用配置的语言。所有标识符（`AC-*`、任务 ID、文件路径、API 名称、命令标志）保持不变，因为它们是语言中性的。
 
-When `alternative_plan_language` is empty, absent, set to `"English"`, or set to an unsupported language, no translated variant is written. Humanize does not auto-create `.humanize/config.json` when no project config file is present.
+当 `alternative_plan_language` 为空、不存在、设置为 `"English"` 或设置为不支持的语言时，不写入翻译变体。当没有项目配置文件时，Humanize 不会自动创建 `.humanize/config.json`。
 ```
 
-### Generation Rules
+### 生成规则
 
-1. **Terminology**: Use Milestone, Phase, Step, Section. Never use Day, Week, Month, Year, or time estimates.
+1. **术语**：使用 Milestone、Phase、Step、Section。绝不使用 Day、Week、Month、Year 或时间估计。
 
-2. **No Line Numbers**: Reference code by path only (e.g., `src/utils/helpers.ts`), never by line ranges.
+2. **无行号**：仅通过路径引用代码（例如 `src/utils/helpers.ts`），绝不使用行范围。
 
-3. **No Time Estimates**: Do not estimate duration, effort, or code line counts.
+3. **无时间估计**：不要估计持续时间、工作量或代码行数。
 
-4. **Conceptual Not Prescriptive**: Path boundaries and suggestions guide without mandating.
+4. **概念性而非规定性**：路径边界和建议指导而非强制。
 
-5. **AC Format**: All acceptance criteria must use AC-X or AC-X.Y format.
+5. **AC 格式**：所有验收标准必须使用 AC-X 或 AC-X.Y 格式。
 
-6. **Clear Dependencies**: Show what depends on what, not when things happen.
+6. **清晰的依赖**：显示什么依赖什么，而非何时发生。
 
-7. **TDD-Style Tests**: Each acceptance criterion MUST include both positive tests (expected to pass) and negative tests (expected to fail). This follows Test-Driven Development philosophy and enables deterministic verification.
+7. **TDD 风格测试**：每个验收标准必须包含正向测试（预期通过）和反向测试（预期失败）。这遵循测试驱动开发理念并实现确定性验证。
 
-8. **Affirmative Path Boundaries**: Describe upper and lower bounds using affirmative language (what IS acceptable) rather than negative language (what is NOT acceptable).
+8. **肯定性路径边界**：使用肯定性语言描述上限和下限（什么是可接受的），而非否定性语言（什么是不可接受的）。
 
-9. **Respect Deterministic Designs**: If the draft specifies a fixed approach with no choices, reflect this in the plan by narrowing the path boundaries to match the user's specification.
+9. **尊重确定性设计**：如果草稿指定了无选择的固定方法，通过缩小路径边界以匹配用户规范来在计划中反映这一点。
 
-10. **Code Style Constraint**: The generated plan MUST include a section or note instructing that implementation code and comments should NOT contain plan-specific progress terminology such as "AC-", "Milestone", "Step", "Phase", or similar workflow markers. These terms belong in the plan document, not in the resulting codebase.
+10. **代码风格约束**：生成的计划必须包含一个部分或说明，指示实施代码和注释不得包含计划特定的进度术语，如 "AC-"、"Milestone"、"Step"、"Phase" 或类似工作流标记。这些术语属于计划文档，不属于生成的代码库。
 
-11. **Draft Completeness Requirement**: The generated plan MUST incorporate ALL information from the input draft document without omission. The draft represents the most valuable human input and must be fully preserved. Any clarifications obtained through Phase 6 should be added incrementally to the draft's original content, never replacing or losing any original requirements. The final plan must be a superset of the draft information plus all clarified details.
+11. **草稿完整性要求**：生成的计划必须纳入输入草稿文档中的所有信息，不得遗漏。草稿代表最有价值的人工输入，必须完全保留。通过阶段 6 获得的任何澄清应增量添加到草稿的原始内容，绝不替换或丢失任何原始要求。最终计划必须是草稿信息加上所有澄清细节的超集。
 
-12. **Debate Traceability**: The plan MUST include Codex-first findings, Claude/Codex agreements, resolved disagreements, and unresolved decisions. Unresolved opposite opinions MUST be recorded in `## Pending User Decisions` for explicit user decision.
+12. **辩论可追溯性**：计划必须包含 Codex 优先发现、Claude/Codex 协议、已解决的分歧和未解决的决策。未解决的相反意见必须记录在 `## Pending User Decisions` 中以供用户明确决策。
 
-13. **Convergence Requirement**: The plan MUST record Claude/Codex agreements, resolved disagreements, and final convergence status in `## Claude-Codex Deliberation`. Stop only when convergence conditions are met or max rounds reached with explicit carry-over decisions.
+13. **收敛要求**：计划必须在 `## Claude-Codex Deliberation` 中记录 Claude/Codex 协议、已解决的分歧和最终收敛状态。仅在满足收敛条件或达到最大轮次且有明确的携带决策时停止。
 
-14. **Task Tag Requirement**: The plan MUST include `## Task Breakdown`, and every task MUST be tagged as either `coding` or `analyze` (no untagged tasks, no other tag values).
+14. **任务标签要求**：计划必须包含 `## Task Breakdown`，每个任务必须标记为 `coding` 或 `analyze`（无未标记任务，无其他标签值）。
 
 ---
 
-## Phase 8: Write and Complete
+## 阶段 8：写入并完成
 
-The output file already contains the plan template structure and the original draft content (combined after the relevance check). Now complete the plan through the following steps:
+输出文件已包含计划模板结构和原始草稿内容（相关性检查后合并）。现在通过以下步骤完成计划：
 
-### Step 1: Update Plan Content
+### 步骤 1：更新计划内容
 
-Use the **Edit tool** (not Write) to update the plan file with the generated content:
-- Replace template placeholders with actual plan content
-- Keep the original draft section intact at the bottom of the file
-- The final file should contain both the structured plan AND the original draft for reference
+使用 **Edit 工具**（而非 Write）更新计划文件：
+- 用实际计划内容替换模板占位符
+- 保持原始草稿部分在文件底部完整
+- 最终文件应同时包含结构化计划和原始草稿以供参考
 
-### Step 2: Comprehensive Review
+### 步骤 2：全面审查
 
-After updating, **read the complete plan file** and verify:
-- The plan is complete and comprehensive
-- All sections are consistent with each other
-- The structured plan aligns with the original draft content
-- Claude/Codex disagreement handling is explicit and correctly reflected
-- No contradictions exist between different parts of the document
+更新后，**读取完整的计划文件**并验证：
+- 计划完整且全面
+- 所有部分相互一致
+- 结构化计划与原始草稿内容对齐
+- Claude/Codex 分歧处理明确且正确反映
+- 文档不同部分之间不存在矛盾
 
-If inconsistencies are found, fix them using the Edit tool.
+如果发现不一致，使用 Edit 工具修复。
 
-### Step 3: Language Unification
+### 步骤 3：语言统一
 
-Check if the updated plan file contains multiple languages (e.g., mixed English and Chinese content).
+检查更新后的计划文件是否包含多种语言（例如混合英文和中文内容）。
 
-If multiple languages are detected:
-1. Use **AskUserQuestion** to ask the user:
-   - Whether they want to unify the language
-   - Which language to use for unification
-2. If the user chooses to unify:
-   - Translate all content to the chosen language
-   - Ensure the meaning and intent remain unchanged
-   - Use the Edit tool to apply the translations
-3. If the user declines, leave the document as-is
+如果检测到多种语言：
+1. 使用 **AskUserQuestion** 询问用户：
+   - 是否要统一语言
+   - 使用哪种语言进行统一
+2. 如果用户选择统一：
+   - 将所有内容翻译为选定的语言
+   - 确保含义和意图保持不变
+   - 使用 Edit 工具应用翻译
+3. 如果用户拒绝，保持文档不变
 
-### Step 4: Write Translated Language Variant (Conditional)
+### 步骤 4：写入翻译语言变体（条件性）
 
-If `ALT_PLAN_LANGUAGE` is non-empty (translation enabled), write a translated variant of the output file.
+如果 `ALT_PLAN_LANGUAGE` 非空（启用了翻译），写入输出文件的翻译变体。
 
-**Language Unification guard**: If the main plan file was unified to `ALT_PLAN_LANGUAGE` in Step 3 (Language Unification), skip this step. Log: `Main plan file is already in <ALT_PLAN_LANGUAGE>; translated variant not needed.`
+**语言统一保护**：如果主计划文件在步骤 3（语言统一）中已统一为 `ALT_PLAN_LANGUAGE`，则跳过此步骤。记录日志：`Main plan file is already in <ALT_PLAN_LANGUAGE>; translated variant not needed.`
 
-**Filename construction rule** - insert `_<ALT_PLAN_LANG_CODE>` immediately before the file extension:
-- `plan.md` becomes `plan_<code>.md` (e.g. `plan_zh.md`, `plan_ko.md`)
-- `docs/my-plan.md` becomes `docs/my-plan_<code>.md`
-- `output` (no extension) becomes `output_<code>`
+**文件名构建规则** - 在文件扩展名之前插入 `_<ALT_PLAN_LANG_CODE>`：
+- `plan.md` 变为 `plan_<code>.md`（例如 `plan_zh.md`、`plan_ko.md`）
+- `docs/my-plan.md` 变为 `docs/my-plan_<code>.md`
+- `output`（无扩展名）变为 `output_<code>`
 
-Algorithm:
-1. Find the last `.` in the base filename.
-2. If a `.` is found, insert `_<ALT_PLAN_LANG_CODE>` before it: `<stem>_<code>.<extension>`.
-3. If no `.` is found (no extension), append `_<ALT_PLAN_LANG_CODE>` to the filename: `<filename>_<code>`.
-4. The variant file is placed in the same directory as the main output file.
+算法：
+1. 在基本文件名中找到最后一个 `.`。
+2. 如果找到 `.`，在其前面插入 `_<ALT_PLAN_LANG_CODE>`：`<stem>_<code>.<extension>`。
+3. 如果未找到 `.`（无扩展名），在文件名后追加 `_<ALT_PLAN_LANG_CODE>`：`<filename>_<code>`。
+4. 变体文件放置在与主输出文件相同的目录中。
 
-**Content of the variant file**:
-- Translate the main plan file's current content (after any Language Unification from Step 3) into `ALT_PLAN_LANGUAGE`. For Chinese, default to Simplified Chinese.
-- Section headings, AC labels, task IDs, file paths, API names, and command flags MUST remain unchanged (identifiers are language-neutral).
-- The variant file is a translated reading view of the same plan; it must not add new information not present in the main file.
-- The original draft section at the bottom should be kept as-is (not re-translated).
+**变体文件内容**：
+- 将主计划文件的当前内容（步骤 3 语言统一后）翻译为 `ALT_PLAN_LANGUAGE`。中文默认使用简体中文。
+- 部分标题、AC 标签、任务 ID、文件路径、API 名称和命令标志必须保持不变（标识符是语言中性的）。
+- 变体文件是同一计划的翻译阅读视图；不得添加主文件中不存在的新信息。
+- 底部的原始草稿部分应保持原样（不重新翻译）。
 
-If `ALT_PLAN_LANGUAGE` is empty (the default), do NOT create a translated variant file.
+如果 `ALT_PLAN_LANGUAGE` 为空（默认），不要创建翻译变体文件。
 
-### Step 5: Optional Direct Work Start
+### 步骤 5：可选直接工作启动
 
-If all of the following are true:
+如果以下全部为真：
 - `AUTO_START_RLCR_IF_CONVERGED=true`
 - `PLAN_CONVERGENCE_STATUS=converged`
 - `GEN_PLAN_MODE=discussion`
-- There are no pending decisions with status `PENDING`
+- 没有状态为 `PENDING` 的待处理决策
 
-Then start work immediately by running:
+则通过运行立即开始工作：
 
 ```bash
 /humanize:start-rlcr-loop --skip-quiz <output-plan-path>
 ```
 
-The `--skip-quiz` flag is passed because the user has already demonstrated understanding of the plan through the gen-plan convergence discussion.
+传递 `--skip-quiz` 标志是因为用户已通过 gen-plan 收敛讨论证明了对计划的理解。
 
-If the command invocation is not available in this context, fall back to the setup script:
+如果命令调用在此上下文中不可用，回退到设置脚本：
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/setup-rlcr-loop.sh" --skip-quiz --plan-file <output-plan-path>
 ```
 
-If the auto-start attempt fails, report the failure reason and provide the exact manual command for the user to run:
+如果自动启动尝试失败，报告失败原因并提供用户要运行的确切手动命令：
 
 ```bash
 /humanize:start-rlcr-loop <output-plan-path>
 ```
 
-### Step 6: Report Results
+### 步骤 6：报告结果
 
-Report to the user:
-- Path to the generated plan
-- Summary of what was included
-- Number of acceptance criteria defined
-- Number of convergence rounds executed
-- Number of unresolved user decisions (if any)
-- Whether language was unified (if applicable)
-- Whether direct work start was attempted, and its result
+向用户报告：
+- 生成的计划路径
+- 包含内容的摘要
+- 定义的验收标准数量
+- 执行的收敛轮次数
+- 未解决的用户决策数量（如有）
+- 是否统一了语言（如适用）
+- 是否尝试了直接工作启动及其结果
 
 ---
 
-## Error Handling
+## 错误处理
 
-If issues arise during plan generation that require user input:
-- Use AskUserQuestion to clarify
-- Document any user decisions in the plan's context
+如果在计划生成期间出现需要用户输入的问题：
+- 使用 AskUserQuestion 澄清
+- 在计划上下文中记录任何用户决策
 
-If auto-start mode is enabled but convergence conditions are not met:
-- Explain why direct start was skipped
-- Tell the user to either resolve pending decisions or run `/humanize:start-rlcr-loop <plan.md>` manually
+如果启用了自动启动模式但未满足收敛条件：
+- 解释为什么跳过了直接启动
+- 告诉用户要么解决待处理决策，要么手动运行 `/humanize:start-rlcr-loop <plan.md>`
 
-If unable to generate a complete plan:
-- Explain what information is missing
-- Suggest how the user can improve their draft
+如果无法生成完整计划：
+- 解释缺少什么信息
+- 建议用户如何改进他们的草稿

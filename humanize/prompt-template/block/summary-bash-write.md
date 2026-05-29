@@ -1,8 +1,8 @@
-# Bash Write Blocked: Use Write or Edit Tool
+# Bash 写入被阻止：请使用 Write 或 Edit 工具
 
-Do not use Bash commands to modify summary files.
+不要使用 Bash 命令修改摘要文件。
 
-**Use the Write or Edit tool instead**: `{{CORRECT_PATH}}`
+**请改用 Write 或 Edit 工具**：`{{CORRECT_PATH}}`
 
-Bash commands like cat, echo, sed, awk, etc. bypass the validation hooks.
-Please use the proper tools to ensure correct round number validation.
+cat、echo、sed、awk 等 Bash 命令会绕过验证钩子。
+请使用正确的工具以确保正确的轮次编号验证。

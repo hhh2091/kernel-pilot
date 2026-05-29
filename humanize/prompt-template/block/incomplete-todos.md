@@ -1,12 +1,12 @@
-# Incomplete Tasks Detected
+# 检测到未完成的任务
 
-You are trying to stop, but you still have **incomplete tasks**:
+您正在尝试停止，但您仍有**未完成的任务**：
 
 {{INCOMPLETE_LIST}}
 
-**Required Action**:
-1. Complete all remaining tasks before attempting to stop
-2. Mark each task as completed using the **TaskUpdate** tool (set status to "completed")
-3. Only after ALL tasks are completed, you may proceed to write your summary and stop
+**必需的操作**：
+1. 在尝试停止之前完成所有剩余任务
+2. 使用 **TaskUpdate** 工具将每个任务标记为已完成（将状态设置为 "completed"）
+3. 只有在所有任务完成后，您才可以继续编写摘要并停止
 
-Do NOT proceed to Codex review until all tasks are finished. This saves time and ensures thorough work.
+在所有任务完成之前，不要继续进行 Codex 审查。这可以节省时间并确保工作彻底。

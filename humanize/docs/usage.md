@@ -1,73 +1,73 @@
-# Humanize Usage Guide
+# Humanize 使用指南
 
-Detailed usage documentation for the Humanize plugin. For installation, see [Install for Claude Code](install-for-claude.md).
+Humanize 插件的详细使用文档。安装说明请参阅 [Install for Claude Code](install-for-claude.md)。
 
-## How It Works
+## 工作原理
 
-Humanize creates an iterative feedback loop with two phases:
+Humanize 创建一个包含两个阶段的迭代反馈循环：
 
-1. **Implementation Phase**: Claude works on your plan, Codex reviews summaries until COMPLETE
-2. **Review Phase**: `codex review --base <branch>` checks code quality with `[P0-9]` severity markers
+1. **实现阶段**：Claude 按照你的计划进行开发，Codex 审查摘要直到 COMPLETE
+2. **审查阶段**：`codex review --base <branch>` 使用 `[P0-9]` 严重性标记检查代码质量
 
-The loop continues until all acceptance criteria are met or no issues remain.
+该循环持续进行，直到所有验收标准都满足或没有遗留问题为止。
 
-## Begin with the End in Mind
+## 以终为始
 
-Before the RLCR loop starts any work, Humanize runs a **Plan Understanding Quiz** -- a brief pre-flight check that verifies you genuinely understand the plan you are about to execute.
+在 RLCR 循环开始任何工作之前，Humanize 会运行一个**计划理解测验** -- 一个简短的预检，验证你是否真正理解了即将执行的计划。
 
-### Why This Exists
+### 为什么需要这个
 
-The most expensive failure in AI-assisted development is not a bug. It is running a 40-round RLCR loop on a plan you never actually read. We call this **wishful coding**: treating a generated plan like a wish -- toss it in, hope for the best, check back later.
+在 AI 辅助开发中，代价最高的失败不是 bug，而是在一个你从未真正阅读过的计划上运行 40 轮 RLCR 循环。我们称之为**愿望式编码**：把生成的计划当作许愿池 -- 抛进去，然后祈祷好运，稍后再回来看。
 
-The problem is structural. An RLCR loop is an amplifier: it will faithfully execute whatever plan you give it. If the plan is wrong, the loop makes it wrong faster and at scale. If the plan is right but you do not understand it, you cannot course-correct when Codex raises questions, and the loop drifts.
+问题在于结构层面。RLCR 循环是一个放大器：它会忠实地执行你给它的任何计划。如果计划是错误的，循环会更快、更大规模地把它变成错误的。如果计划是正确的但你不理解它，当 Codex 提出问题时你就无法纠正方向，循环就会偏离轨道。
 
-Understanding your plan before execution is not optional overhead. It is the single highest-leverage thing you can do to ensure the loop succeeds.
+在执行之前理解你的计划不是可有可无的开销。它是你能做的最高杠杆的事情，以确保循环成功。
 
-### How the Quiz Works
+### 测验如何工作
 
-When you run `start-rlcr-loop`, an independent agent analyzes the plan and generates two multiple-choice questions about the plan's technical implementation details:
+当你运行 `start-rlcr-loop` 时，一个独立的 agent 会分析计划并生成两道关于计划技术实现细节的选择题：
 
-1. **What components are changing and how?** -- Tests whether you know the core mechanism.
-2. **How do the pieces connect?** -- Tests whether you understand the architecture being modified.
+1. **哪些组件在变化以及如何变化？** -- 测试你是否了解核心机制。
+2. **各个部分如何连接？** -- 测试你是否理解正在修改的架构。
 
-If you answer both correctly, the loop proceeds immediately. If you miss one or both, Humanize explains what the plan actually does and offers a choice: proceed anyway, or stop and review.
+如果你两道都答对了，循环会立即继续。如果你答错了一道或两道，Humanize 会解释计划的实际内容并提供选择：继续，或者停下来重新审视。
 
-The quiz is advisory, not a gate. You always have the option to proceed. But that moment of friction -- the two seconds it takes to read the question and realize you do not know the answer -- is the entire point.
+测验是建议性的，不是门槛。你始终可以选择继续。但那个摩擦的时刻 -- 读问题然后意识到你不知道答案的那两秒 -- 才是整个重点。
 
-### Skipping the Quiz
+### 跳过测验
 
-- `--skip-quiz` -- Skip the quiz only. The rest of the RLCR loop behaves normally.
-- `--yolo` -- Skip the quiz AND let Claude answer Codex's open questions directly (`--claude-answer-codex`). This is full automation mode for users who have already reviewed the plan and want to hand over complete control.
-- Plans started via `gen-plan --auto-start-rlcr-if-converged` skip the quiz automatically, because the gen-plan convergence discussion already verified the user's understanding.
+- `--skip-quiz` -- 仅跳过测验。RLCR 循环的其余部分正常运行。
+- `--yolo` -- 跳过测验并且让 Claude 直接回答 Codex 的开放问题（`--claude-answer-codex`）。这是为已经审查过计划并希望完全移交控制权的用户提供的全自动模式。
+- 通过 `gen-plan --auto-start-rlcr-if-converged` 启动的计划会自动跳过测验，因为 gen-plan 的收敛讨论已经验证了用户的理解。
 
-## Typical Planning Flow
+## 典型规划流程
 
-1. Generate the initial implementation plan:
+1. 生成初始实现计划：
    ```bash
    /humanize:gen-plan --input draft.md --output docs/plan.md
    ```
-2. If the plan is reviewed with comment annotations, refine it and generate a QA ledger:
+2. 如果计划带有注释批注，则进行精炼并生成 QA 账本：
    ```bash
    /humanize:refine-plan --input docs/plan.md
    ```
-3. Start the RLCR loop on the refined plan:
+3. 在精炼后的计划上启动 RLCR 循环：
    ```bash
    /humanize:start-rlcr-loop docs/plan.md
    ```
 
-## Commands
+## 命令
 
-| Command | Purpose |
+| 命令 | 用途 |
 |---------|---------|
-| `/gen-idea <idea-or-path>` | Generate a repo-grounded idea draft with N parallel directions |
-| `/explore-idea <draft-or-directions.json>` | Launch bounded parallel prototype workers and synthesize a two-tier report |
-| `/start-rlcr-loop <plan.md>` | Start iterative development with Codex review |
-| `/cancel-rlcr-loop` | Cancel active loop |
-| `/gen-plan --input <draft.md> --output <plan.md>` | Generate structured plan from draft |
-| `/refine-plan --input <annotated-plan.md>` | Refine an annotated plan and generate a QA ledger |
-| `/ask-codex [question]` | One-shot consultation with Codex |
+| `/gen-idea <idea-or-path>` | 生成基于仓库的创意草稿，包含 N 个并行方向 |
+| `/explore-idea <draft-or-directions.json>` | 启动有限并行原型工作器并综合生成两层报告 |
+| `/start-rlcr-loop <plan.md>` | 启动带有 Codex 审查的迭代开发 |
+| `/cancel-rlcr-loop` | 取消活跃的循环 |
+| `/gen-plan --input <draft.md> --output <plan.md>` | 从草稿生成结构化计划 |
+| `/refine-plan --input <annotated-plan.md>` | 精炼带批注的计划并生成 QA 账本 |
+| `/ask-codex [question]` | 与 Codex 的一次性咨询 |
 
-## Command Reference
+## 命令参考
 
 ### gen-idea
 
@@ -75,15 +75,15 @@ The quiz is advisory, not a gate. You always have the option to proceed. But tha
 /humanize:gen-idea <idea-text-or-path> [--n <int>] [--output <path>]
 ```
 
-Generates a repo-grounded idea draft using directed-diversity exploration. A lead agent picks N orthogonal directions, N parallel Explore subagents develop each direction with objective evidence from the repo, and the lead synthesizes a draft with one primary direction plus N-1 alternatives.
+使用定向多样性探索生成基于仓库的创意草稿。一个主导 agent 选取 N 个正交方向，N 个并行 Explore 子 agent 使用仓库中的客观证据开发每个方向，然后主导 agent 综合生成一个包含一个主要方向和 N-1 个替代方案的草稿。
 
-**Outputs:**
-- Draft file: `.humanize/ideas/<slug>-<timestamp>.md` (or `--output` path)
-- Companion JSON: `<draft-path-without-.md>.directions.json` — lossless record of all direction proposals, used as input to `explore-idea`
+**输出：**
+- 草稿文件：`.humanize/ideas/<slug>-<timestamp>.md`（或 `--output` 路径）
+- 配套 JSON：`<draft-path-without-.md>.directions.json` -- 所有方向提案的无损记录，用作 `explore-idea` 的输入
 
-**Options:**
-- `--n <int>` — number of parallel directions (default: 6)
-- `--output <path>` — custom output path for the draft (must have `.md` suffix)
+**选项：**
+- `--n <int>` -- 并行方向数量（默认：6）
+- `--output <path>` -- 草稿的自定义输出路径（必须以 `.md` 结尾）
 
 ### explore-idea
 
@@ -91,25 +91,25 @@ Generates a repo-grounded idea draft using directed-diversity exploration. A lea
 /humanize:explore-idea <draft.md | draft.directions.json> [--directions ids] [--concurrency N] [--max-worker-iterations N] [--worker-timeout-min N] [--codex-timeout-min N]
 ```
 
-Launches bounded parallel prototype workers — one per selected direction — each running in an isolated git worktree. After all workers complete, synthesizes an explore report plus a plan-ready final idea:
-- **Tier 1**: Best product direction (ranked by user value, evidence, strategic fit)
-- **Tier 2**: Most implementation-ready prototype (ranked by outcome: task status, Codex verdict, tests, commits)
+启动有限并行原型工作器 -- 每个选定方向一个 -- 每个都在隔离的 git worktree 中运行。所有工作器完成后，综合生成探索报告和可直接用于规划的最终创意：
+- **第 1 层**：最佳产品方向（按用户价值、证据、战略适配度排名）
+- **第 2 层**最具实现准备度的原型（按结果排名：任务状态、Codex 判定、测试、提交）
 
-**Options:**
-- `--directions <ids>` — comma-separated `direction_id` or `source_index` values to run (default: first 6 by display order)
-- `--concurrency <N>` — parallel worker count (default: 6, max: 10)
-- `--max-worker-iterations <N>` — per-worker iteration cap (default: 2, max: 3)
-- `--worker-timeout-min <N>` — worker timeout in minutes (default: 60, max: 60)
-- `--codex-timeout-min <N>` — Codex call timeout in minutes (default: 20, max: 20)
+**选项：**
+- `--directions <ids>` -- 逗号分隔的 `direction_id` 或 `source_index` 值（默认：按显示顺序取前 6 个）
+- `--concurrency <N>` -- 并行工作器数量（默认：6，最大：10）
+- `--max-worker-iterations <N>` -- 每个工作器的迭代上限（默认：2，最大：3）
+- `--worker-timeout-min <N>` -- 工作器超时时间，单位为分钟（默认：60，最大：60）
+- `--codex-timeout-min <N>` -- Codex 调用超时时间，单位为分钟（默认：20，最大：20）
 
-**Run artifacts** stored in `.humanize/explore/<RUN_ID>/`:
-- `manifest.json` — coordinator state and per-worker metadata
-- `dispatch-prompts/` — exact prompts sent to each worker
-- `worker-results.jsonl` — machine-readable result rows
-- `explore-report.md` — audit report with two-tier rankings, adoption paths, and cleanup guidance
-- `final-idea.md` — plan-ready synthesis artifact for `/humanize:gen-plan`
+**运行产物**存储在 `.humanize/explore/<RUN_ID>/` 中：
+- `manifest.json` -- 协调器状态和每个工作器的元数据
+- `dispatch-prompts/` -- 发送给每个工作器的确切提示
+- `worker-results.jsonl` -- 机器可读的结果行
+- `explore-report.md` -- 包含两层排名、采用路径和清理指导的审计报告
+- `final-idea.md` -- 可直接用于 `/humanize:gen-plan` 的综合产物
 
-Default follow-up:
+默认后续操作：
 ```bash
 /humanize:gen-plan --input .humanize/explore/<run-id>/final-idea.md --output docs/plan.md
 /humanize:start-rlcr-loop docs/plan.md
@@ -121,31 +121,31 @@ Default follow-up:
 /humanize:start-rlcr-loop [path/to/plan.md | --plan-file path/to/plan.md] [OPTIONS]
 
 OPTIONS:
-  --plan-file <path>     Explicit plan file path (alternative to positional arg)
-  --max <N>              Maximum iterations before auto-stop (default: 84)
-  --strict-success       Continue past max-iteration and stagnation STOP gates
+  --plan-file <path>     显式指定计划文件路径（替代位置参数）
+  --max <N>              自动停止前的最大迭代次数（默认：84）
+  --strict-success       超过最大迭代和停滞停止门槛后继续运行
   --codex-model <MODEL:EFFORT>
-                         Codex model and reasoning effort (default from config, fallback gpt-5.5:high)
+                         Codex 模型和推理力度（默认来自配置，回退 gpt-5.5:high）
   --codex-timeout <SECONDS>
-                         Timeout for each Codex review in seconds (default: 5400)
-  --track-plan-file      Indicate plan file should be tracked in git (must be clean)
-  --push-every-round     Require git push after each round (default: commits stay local)
-  --base-branch <BRANCH> Base branch for code review phase (default: auto-detect)
-                         Priority: user input > remote default > main > master
+                         每次 Codex 审查的超时时间，单位为秒（默认：5400）
+  --track-plan-file      指示计划文件应被 git 跟踪（必须是干净的）
+  --push-every-round     每轮结束后要求 git push（默认：提交保留在本地）
+  --base-branch <BRANCH> 代码审查阶段的基础分支（默认：自动检测）
+                         优先级：用户输入 > 远程默认 > main > master
   --full-review-round <N>
-                         Interval for Full Alignment Check rounds (default: 5, min: 2)
-                         Full Alignment Checks occur at rounds N-1, 2N-1, 3N-1, etc.
-  --skip-impl            Skip implementation phase, go directly to code review
-                         Plan file is optional when using this flag
-  --claude-answer-codex  When Codex finds Open Questions, let Claude answer them
-                         directly instead of asking user via AskUserQuestion
-  --agent-teams          Enable Claude Code Agent Teams mode for parallel development.
-                         Requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 environment variable.
-                         Claude acts as team leader, splitting tasks among team members.
-  --yolo                 Skip Plan Understanding Quiz and let Claude answer Codex Open
-                         Questions directly. Alias for --skip-quiz --claude-answer-codex.
-  --skip-quiz            Skip the Plan Understanding Quiz only (without other changes).
-  -h, --help             Show help message
+                         全面对齐检查轮次间隔（默认：5，最小：2）
+                         全面对齐检查在第 N-1、2N-1、3N-1 等轮次执行
+  --skip-impl            跳过实现阶段，直接进入代码审查
+                         使用此标志时计划文件是可选的
+  --claude-answer-codex  当 Codex 发现开放问题时，让 Claude 直接回答
+                         而不是通过 AskUserQuestion 询问用户
+  --agent-teams          启用 Claude Code Agent Teams 模式进行并行开发。
+                         需要设置 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 环境变量。
+                         Claude 作为团队领导，在团队成员之间分配任务。
+  --yolo                 跳过计划理解测验并让 Claude 直接回答 Codex 开放
+                         问题。等同于 --skip-quiz --claude-answer-codex。
+  --skip-quiz            仅跳过计划理解测验（不改变其他行为）。
+  -h, --help             显示帮助信息
 ```
 
 ### gen-plan
@@ -154,28 +154,28 @@ OPTIONS:
 /humanize:gen-plan --input <path/to/draft.md> --output <path/to/plan.md> [OPTIONS]
 
 OPTIONS:
-  --input   Path to the input draft file (required)
-  --output  Path to the output plan file (required)
+  --input   输入草稿文件路径（必需）
+  --output  输出计划文件路径（必需）
   --auto-start-rlcr-if-converged
-             Start the RLCR loop automatically when the plan is converged
-             (discussion mode only; ignored in --direct)
-  --discussion  Use discussion mode (iterative Claude/Codex convergence rounds)
-  --direct      Use direct mode (skip convergence rounds, proceed immediately to plan)
-  -h, --help             Show help message
+             当计划收敛时自动启动 RLCR 循环
+             （仅限讨论模式；在 --direct 模式下忽略）
+  --discussion  使用讨论模式（迭代 Claude/Codex 收敛轮次）
+  --direct      使用直接模式（跳过收敛轮次，立即生成计划）
+  -h, --help    显示帮助信息
 ```
 
-The gen-plan command transforms rough draft documents into structured implementation plans.
+gen-plan 命令将粗略的草稿文档转换为结构化的实现计划。
 
-Workflow:
-1. Validates input/output paths
-2. Checks if draft is relevant to the repository
-3. Analyzes draft for clarity, consistency, completeness, and functionality
-4. Engages user to resolve any issues found
-5. Generates a structured plan.md with acceptance criteria
-6. Optionally starts `/humanize:start-rlcr-loop` if `--auto-start-rlcr-if-converged` conditions are met
+工作流程：
+1. 验证输入/输出路径
+2. 检查草稿是否与仓库相关
+3. 分析草稿的清晰度、一致性、完整性和功能性
+4. 与用户交互解决发现的任何问题
+5. 生成带有验收标准的结构化 plan.md
+6. 如果满足 `--auto-start-rlcr-if-converged` 条件，可选启动 `/humanize:start-rlcr-loop`
 
-If reviewers later annotate the generated plan with comment blocks, run
-`/humanize:refine-plan --input <plan.md>` before starting or resuming implementation.
+如果审查者后来在生成的计划上添加了批注块，请在开始或恢复实现之前运行
+`/humanize:refine-plan --input <plan.md>`。
 
 ### refine-plan
 
@@ -183,43 +183,42 @@ If reviewers later annotate the generated plan with comment blocks, run
 /humanize:refine-plan --input <path/to/annotated-plan.md> [OPTIONS]
 
 OPTIONS:
-  --input <path>        Path to the annotated plan file (required)
-  --output <path>       Path to the refined plan output file
-                        Defaults to refining --input in place
-  --qa-dir <path>       Directory for QA document output
-                        Default: .humanize/plan_qa
+  --input <path>        带批注的计划文件路径（必需）
+  --output <path>       精炼计划输出文件路径
+                        默认就地精炼 --input 指定的文件
+  --qa-dir <path>       QA 文档输出目录
+                        默认：.humanize/plan_qa
   --alt-language <LANG>
-                        Generate translated plan and QA variants
-                        Supported: zh, ko, ja, es, fr, de, pt, ru, ar
-                        Full language names are also accepted; en/English is a no-op
-  --discussion          Interactive mode for ambiguous comment classification
-  --direct              Non-interactive mode; makes minimal safe assumptions
-  -h, --help            Show help message
+                        生成翻译后的计划和 QA 变体
+                        支持的语言：zh, ko, ja, es, fr, de, pt, ru, ar
+                        也接受完整的语言名称；en/English 无效
+  --discussion          用于模糊注释分类的交互模式
+  --direct              非交互模式；采用最小安全假设
+  -h, --help            显示帮助信息
 ```
 
-The refine-plan command reads an annotated `gen-plan` document, processes embedded review
-comments, removes those comment blocks from the final plan, and writes a QA ledger that records
-how each comment was handled.
+refine-plan 命令读取带批注的 `gen-plan` 文档，处理内嵌的审查注释，
+从最终计划中移除这些注释块，并写入一个 QA 账本记录每条注释的处理方式。
 
-**Usage examples:**
+**使用示例：**
 
 ```bash
-# Refine a plan in place and write QA output to the default directory
+# 就地精炼计划并将 QA 输出写入默认目录
 /humanize:refine-plan --input docs/plan.md
 
-# Write the refined plan to a new file and store QA output in a custom directory
+# 将精炼后的计划写入新文件，并将 QA 输出存储在自定义目录中
 /humanize:refine-plan --input docs/plan.annotated.md --output docs/plan.refined.md --qa-dir docs/plan-qa
 
-# Run in direct mode and generate translated variants
+# 以直接模式运行并生成翻译变体
 /humanize:refine-plan --input docs/plan.md --direct --alt-language zh
 ```
 
-**Annotated comment block format:**
+**批注注释块格式：**
 
-`refine-plan` supports three comment formats for reviewer annotations. Both inline
-and multi-line comment blocks are supported in all formats:
+`refine-plan` 支持三种注释格式用于审查者批注。所有格式都支持内联和
+多行注释块：
 
-**Classic format (CMT:/ENDCMT):**
+**经典格式（CMT:/ENDCMT）：**
 ```markdown
 Text before CMT: clarify why AC-3 is split here ENDCMT text after
 ```
@@ -231,7 +230,7 @@ If the dependency is unclear, add a pending decision instead of guessing.
 ENDCMT
 ```
 
-**Short tag format (<cmt></cmt>):**
+**短标签格式（<cmt></cmt>）：**
 ```markdown
 Text before <cmt>clarify why AC-3 is split here</cmt> text after
 ```
@@ -243,7 +242,7 @@ If the dependency is unclear, add a pending decision instead of guessing.
 </cmt>
 ```
 
-**Long tag format (<comment></comment>):**
+**长标签格式（<comment></comment>）：**
 ```markdown
 Text before <comment>clarify why AC-3 is split here</comment> text after
 ```
@@ -255,32 +254,31 @@ If the dependency is unclear, add a pending decision instead of guessing.
 </comment>
 ```
 
-Rules:
-- At least one non-empty comment block must exist in the input file.
-- Comment markers inside fenced code blocks or HTML comments are ignored.
-- Empty comment blocks are removed but do not create QA ledger entries.
-- The input plan must still follow the `gen-plan` section schema.
-- All three formats can be mixed within the same file.
+规则：
+- 输入文件中必须存在至少一个非空注释块。
+- 围栏代码块或 HTML 注释内的注释标记会被忽略。
+- 空注释块会被移除但不会创建 QA 账本条目。
+- 输入计划仍须遵循 `gen-plan` 的章节结构。
+- 三种格式可以在同一文件中混合使用。
 
-**QA output structure:**
+**QA 输出结构：**
 
-For an input plan named `plan.md`, the default QA output path is `.humanize/plan_qa/plan-qa.md`.
-The generated QA document includes:
+对于名为 `plan.md` 的输入计划，默认 QA 输出路径为 `.humanize/plan_qa/plan-qa.md`。
+生成的 QA 文档包括：
 
-- `## Summary`: overall refinement outcome and comment counts
-- `## Comment Ledger`: one row per raw `CMT-N` block with classification, location, excerpt, and disposition
-- `## Answers`: responses to question comments and any clarifying edits
-- `## Research Findings`: repository research performed for `research_request` comments
-- `## Plan Changes Applied`: changes made for `change_request` comments and cross-reference updates
-- `## Remaining Decisions`: unresolved items or assumption-heavy decisions that still need user input
-- `## Refinement Metadata`: input/output paths, QA path, classification counts, modified sections, convergence status, and date
+- `## Summary`：整体精炼结果和注释计数
+- `## Comment Ledger`：每个原始 `CMT-N` 块的一行记录，包含分类、位置、摘录和处置方式
+- `## Answers`：对问题类注释的回复以及任何澄清性编辑
+- `## Research Findings`：为 `research_request` 类注释执行的仓库调研
+- `## Plan Changes Applied`：为 `change_request` 类注释所做的更改和交叉引用更新
+- `## Remaining Decisions`：仍需用户输入的未解决事项或依赖假设的决策
+- `## Refinement Metadata`：输入/输出路径、QA 路径、分类计数、修改的章节、收敛状态和日期
 
-Disposition values in the ledger are `answered`, `applied`, `researched`, `deferred`, or
-`resolved`.
+账本中的处置值为 `answered`、`applied`、`researched`、`deferred` 或
+`resolved`。
 
-If `--alt-language` is set to a supported non-English language, the command also generates
-translated plan and QA variants by inserting `_<code>` before the file extension, such as
-`plan_zh.md` and `plan-qa_zh.md`.
+如果 `--alt-language` 设置为支持的非英语语言，该命令还会通过在文件扩展名前插入 `_<code>` 来生成
+翻译后的计划和 QA 变体，例如 `plan_zh.md` 和 `plan-qa_zh.md`。
 
 ### ask-codex
 
@@ -289,49 +287,49 @@ translated plan and QA variants by inserting `_<code>` before the file extension
 
 OPTIONS:
   --codex-model <MODEL:EFFORT>
-                         Codex model and reasoning effort (default from config, fallback gpt-5.5:high)
+                         Codex 模型和推理力度（默认来自配置，回退 gpt-5.5:high）
   --codex-timeout <SECONDS>
-                         Timeout for the Codex query in seconds (default: 3600)
-  -h, --help             Show help message
+                         Codex 查询的超时时间，单位为秒（默认：3600）
+  -h, --help             显示帮助信息
 ```
 
-The ask-codex skill sends a one-shot question or task to Codex and returns the response
-inline. Unlike the RLCR loop, this is a single consultation without iteration -- useful
-for getting a second opinion, reviewing a design, or asking domain-specific questions.
+ask-codex 技能向 Codex 发送一次性问题或任务并内联返回响应。
+与 RLCR 循环不同，这是没有迭代的单次咨询 -- 适用于
+获取第二意见、审查设计或询问领域特定问题。
 
-Responses are saved to `.humanize/skill/<timestamp>/` with `input.md`, `output.md`,
-and `metadata.md` for reference.
+响应保存在 `.humanize/skill/<timestamp>/` 中，包含 `input.md`、`output.md`
+和 `metadata.md` 以供参考。
 
-## Configuration
+## 配置
 
-Humanize uses a 4-layer config hierarchy (lowest to highest priority):
-1. **Plugin defaults**: `config/default_config.json`
-2. **User config**: `~/.config/humanize/config.json`
-3. **Project config**: `.humanize/config.json`
-4. **CLI flags**: Command-line arguments (where available)
+Humanize 使用 4 层配置层级（优先级从低到高）：
+1. **插件默认值**：`config/default_config.json`
+2. **用户配置**：`~/.config/humanize/config.json`
+3. **项目配置**：`.humanize/config.json`
+4. **CLI 标志**：命令行参数（如可用）
 
-Current built-in keys:
+当前内置键：
 
-| Key | Default | Description |
+| 键 | 默认值 | 说明 |
 |-----|---------|-------------|
-| `codex_model` | `gpt-5.5` | Shared default model for Codex-backed review and analysis |
-| `codex_effort` | `high` | Shared default reasoning effort (`xhigh`, `high`, `medium`, `low`) |
-| `bitlesson_model` | `haiku` | Model used by the BitLesson selector agent |
-| `provider_mode` | unset | Optional runtime mode hint such as `codex-only` |
-| `agent_teams` | `false` | Project-level default for agent teams workflow |
-| `alternative_plan_language` | `""` | Optional translated plan variant language; supported values include `Chinese`, `Korean`, `Japanese`, `Spanish`, `French`, `German`, `Portuguese`, `Russian`, `Arabic`, or ISO codes like `zh` |
-| `gen_plan_mode` | `discussion` | Default plan-generation mode |
+| `codex_model` | `gpt-5.5` | Codex 支持的审查和分析的共享默认模型 |
+| `codex_effort` | `high` | 共享默认推理力度（`xhigh`、`high`、`medium`、`low`） |
+| `bitlesson_model` | `haiku` | BitLesson 选择器 agent 使用的模型 |
+| `provider_mode` | 未设置 | 可选的运行时模式提示，例如 `codex-only` |
+| `agent_teams` | `false` | agent teams 工作流的项目级默认值 |
+| `alternative_plan_language` | `""` | 可选的翻译计划变体语言；支持的值包括 `Chinese`、`Korean`、`Japanese`、`Spanish`、`French`、`German`、`Portuguese`、`Russian`、`Arabic` 或 ISO 代码如 `zh` |
+| `gen_plan_mode` | `discussion` | 默认计划生成模式 |
 
-### Codex Model Configuration
+### Codex 模型配置
 
-All Codex-using features (RLCR loop, ask-codex) share the same model configuration:
+所有使用 Codex 的功能（RLCR 循环、ask-codex）共享相同的模型配置：
 
-| Key | Default | Description |
+| 键 | 默认值 | 说明 |
 |-----|---------|-------------|
-| `codex_model` | `gpt-5.5` | Model used for Codex operations (reviews, analysis, queries) |
-| `codex_effort` | `high` | Reasoning effort (`xhigh`, `high`, `medium`, `low`) |
+| `codex_model` | `gpt-5.5` | 用于 Codex 操作（审查、分析、查询）的模型 |
+| `codex_effort` | `high` | 推理力度（`xhigh`、`high`、`medium`、`low`） |
 
-To override, add to `.humanize/config.json`:
+要覆盖，请添加到 `.humanize/config.json`：
 
 ```json
 {
@@ -341,153 +339,143 @@ To override, add to `.humanize/config.json`:
 }
 ```
 
-On Codex installs, Humanize also seeds `${XDG_CONFIG_HOME:-~/.config}/humanize/config.json`
-with a Codex/OpenAI `bitlesson_model` and `provider_mode: "codex-only"` when those keys
-are unset, so BitLesson selection stays on the Codex/OpenAI path without probing Claude.
+在 Codex 安装上，Humanize 还会在这些键未设置时，将 `${XDG_CONFIG_HOME:-~/.config}/humanize/config.json` 中的
+`bitlesson_model` 和 `provider_mode: "codex-only"` 预设为 Codex/OpenAI 路径，以便 BitLesson 选择
+保持在 Codex/OpenAI 路径上，无需探测 Claude。
 
-Codex model is resolved with this precedence:
-1. CLI `--codex-model` flag (highest priority)
-2. Feature-specific defaults
-3. Config-backed defaults from the 4-layer hierarchy above
-4. Hardcoded fallback (`gpt-5.5:high`)
+Codex 模型按以下优先级解析：
+1. CLI `--codex-model` 标志（最高优先级）
+2. 功能特定默认值
+3. 来自上述 4 层层级的配置默认值
+4. 硬编码回退值（`gpt-5.5:high`）
 
-**Migration note**: If your `.humanize/config.json` contains the legacy keys
-`loop_reviewer_model` or `loop_reviewer_effort`, they are silently ignored.
-Use `codex_model` and `codex_effort` instead.
+**迁移说明**：如果你的 `.humanize/config.json` 包含旧版键
+`loop_reviewer_model` 或 `loop_reviewer_effort`，它们会被静默忽略。
+请使用 `codex_model` 和 `codex_effort` 替代。
 
 
-## Monitoring
+## 监控
 
-Set up the monitoring helper for real-time progress tracking:
+设置监控助手以进行实时进度跟踪：
 
 ```bash
-# Add to your .bashrc or .zshrc
+# 添加到你的 .bashrc 或 .zshrc
 source ~/.claude/plugins/cache/PolyArch/humanize/<LATEST.VERSION>/scripts/humanize.sh
 
-# Terminal monitors (one project per terminal):
-humanize monitor rlcr        # latest RLCR loop log
-humanize monitor skill       # all skill invocations (codex + gemini)
-humanize monitor codex       # ask-codex skill invocations only
-humanize monitor gemini      # ask-gemini skill invocations only
+# 终端监控器（每个终端一个项目）：
+humanize monitor rlcr        # 最新的 RLCR 循环日志
+humanize monitor skill       # 所有技能调用（codex + gemini）
+humanize monitor codex       # 仅 ask-codex 技能调用
+humanize monitor gemini      # 仅 ask-gemini 技能调用
 
-# Browser dashboard (multiple loops at once, foreground default):
+# 浏览器仪表盘（同时查看多个循环，默认前台运行）：
 humanize monitor web --project /path/to/project
 ```
 
-Progress data is stored in `.humanize/rlcr/<timestamp>/` for each loop session.
+进度数据存储在 `.humanize/rlcr/<timestamp>/` 中，每个循环会话一个目录。
 
-### Browser dashboard (`humanize monitor web`)
+### 浏览器仪表盘（`humanize monitor web`）
 
-The web dashboard layers on top of the same `.humanize/rlcr/<session>/`
-metadata and `~/.cache/humanize/<sanitized-project>/<session>/round-*-codex-{run,review}.log`
-cache logs that the terminal monitors read. There is no parallel
-capture pipeline; the dashboard is a reader, not a writer.
+Web 仪表盘构建在终端监控器读取的相同 `.humanize/rlcr/<session>/`
+元数据和 `~/.cache/humanize/<sanitized-project>/<session>/round-*-codex-{run,review}.log`
+缓存日志之上。没有并行捕获管道；仪表盘是读取器，不是写入器。
 
-Lifecycle (per DEC-1, DEC-3):
+生命周期（依据 DEC-1、DEC-3）：
 
-- Foreground default (`humanize monitor web --project <path>`). Press
-  Ctrl+C to stop. The server is CLI-fixed to one project at startup;
-  to monitor several projects simultaneously, run multiple instances
-  (one per project) with different `--port` values.
-- `--daemon` runs the same server inside a per-project tmux session
-  (`humanize-viz-<8-hex>`); use `viz-stop.sh --project <path>` or
-  the project's own tmux kill command to stop it.
+- 默认前台运行（`humanize monitor web --project <path>`）。按
+  Ctrl+C 停止。服务器在启动时由 CLI 固定到一个项目；
+  要同时监控多个项目，请使用不同的 `--port` 值运行多个实例
+  （每个项目一个）。
+- `--daemon` 在每个项目的 tmux 会话（`humanize-viz-<8-hex>`）中运行相同的服务器；
+  使用 `viz-stop.sh --project <path>` 或项目的 tmux kill 命令来停止它。
 
-Per-session inline live log panes appear on the home page for every
-active session, driven by Server-Sent Events from
-`/api/sessions/<session_id>/logs/<basename>`. Multiple loops stream
-in parallel without leaving the home page.
+每个活跃会话的内联实时日志窗格会出现在主页上，由
+`/api/sessions/<session_id>/logs/<basename>` 的 Server-Sent Events 驱动。多个循环
+并行流式传输，无需离开主页。
 
-### Remote browser access
+### 远程浏览器访问
 
-The dashboard binds to `127.0.0.1` by default. To expose it over the
-network, supply `--host` and an authentication token. The token is
-required for any non-loopback host; the server refuses to start
-otherwise.
+仪表盘默认绑定到 `127.0.0.1`。要通过网络暴露它，请提供 `--host` 和认证令牌。对于任何非回环地址，令牌是必需的；否则服务器拒绝启动。
 
-Token-aware endpoints honor `Authorization: Bearer <tok>` for normal
-fetch requests and `?token=<tok>` query parameters for the SSE stream
-(per DEC-4: browsers cannot set arbitrary headers on EventSource).
-WebSocket transport is rejected entirely in remote mode.
+支持令牌的端点对普通 fetch 请求使用 `Authorization: Bearer <tok>`，对 SSE 流使用 `?token=<tok>` 查询参数
+（依据 DEC-4：浏览器无法在 EventSource 上设置任意请求头）。
+远程模式下完全拒绝 WebSocket 传输。
 
-#### Pattern 1 (recommended): SSH tunnel
+#### 方式 1（推荐）：SSH 隧道
 
-The safest remote pattern keeps the server bound to localhost and
-forwards the port over SSH:
+最安全的远程方式是将服务器绑定到 localhost 并通过 SSH 转发端口：
 
 ```bash
-# On the server machine:
+# 在服务器机器上：
 humanize monitor web --project /path/to/project --port 18000
 
-# On your laptop:
+# 在你的笔记本上：
 ssh -N -L 18000:localhost:18000 user@server.example.com
-# Then open http://localhost:18000 in the local browser.
+# 然后在本地浏览器中打开 http://localhost:18000。
 ```
 
-No token is required because the server still binds to loopback. The
-SSH tunnel provides authentication and encryption.
+无需令牌，因为服务器仍然绑定到回环地址。SSH 隧道提供认证和加密。
 
-#### Pattern 2: Direct LAN bind
+#### 方式 2：直接局域网绑定
 
-For trusted-network deployments where SSH tunneling is impractical:
+对于 SSH 隧道不可行的可信网络部署：
 
 ```bash
-# Generate a strong random token (one-time):
+# 生成强随机令牌（一次性）：
 TOKEN="$(openssl rand -hex 32)"
 
-# Start the dashboard:
+# 启动仪表盘：
 humanize monitor web \
     --project /path/to/project \
     --host 0.0.0.0 \
     --port 18000 \
     --auth-token "$TOKEN"
 
-# Or supply the token via env var instead of CLI:
+# 或者通过环境变量提供令牌，而不是 CLI：
 HUMANIZE_VIZ_TOKEN="$TOKEN" humanize monitor web \
     --project /path/to/project --host 0.0.0.0 --port 18000
 ```
 
-Open the dashboard with `http://server:18000/?token=<TOKEN>` once;
-the browser caches the token in `sessionStorage` and propagates it
-on subsequent fetches and SSE reconnects.
+使用 `http://server:18000/?token=<TOKEN>` 打开仪表盘；
+浏览器会将令牌缓存到 `sessionStorage` 中，并在后续 fetch 和 SSE 重连时自动传播。
 
-## Cancellation
+## 取消
 
-- **RLCR loop**: `/humanize:cancel-rlcr-loop`
+- **RLCR 循环**：`/humanize:cancel-rlcr-loop`
 
-## Environment Variables
+## 环境变量
 
 ### HUMANIZE_CODEX_BYPASS_SANDBOX
 
-**WARNING: This is a dangerous option that disables security protections. Use only if you understand the implications.**
+**警告：这是一个禁用安全保护的危险选项。仅在你理解其影响的情况下使用。**
 
-- **Purpose**: Controls whether Codex runs with sandbox protection
-- **Default**: Not set (uses `--full-auto` with sandbox protection)
-- **Values**:
-  - `true` or `1`: Bypasses Codex sandbox and approvals (uses `--dangerously-bypass-approvals-and-sandbox`)
-  - Any other value or unset: Uses safe mode with sandbox
+- **用途**：控制 Codex 是否在沙箱保护下运行
+- **默认值**：未设置（使用带沙箱保护的 `--full-auto`）
+- **值**：
+  - `true` 或 `1`：绕过 Codex 沙箱和审批（使用 `--dangerously-bypass-approvals-and-sandbox`）
+  - 任何其他值或未设置：使用带沙箱的安全模式
 
-**When to use this**:
-- Linux servers without landlock kernel support (where Codex sandbox fails)
-- Automated CI/CD pipelines in trusted environments
-- Development environments where you have full control
+**何时使用**：
+- 没有 landlock 内核支持的 Linux 服务器（Codex 沙箱会失败的情况）
+- 可信环境中的自动化 CI/CD 流水线
+- 你拥有完全控制权的开发环境
 
-**When NOT to use this**:
-- Public or shared development servers
-- When reviewing untrusted code or pull requests
-- Production systems
-- Any environment where unauthorized system access could cause damage
+**何时不应使用**：
+- 公共或共享开发服务器
+- 审查不受信任的代码或拉取请求时
+- 生产系统
+- 任何未经授权的系统访问可能造成损害的环境
 
-**Security implications**:
-- Codex will have unrestricted access to your filesystem
-- Codex can execute arbitrary commands without approval prompts
-- Review all code changes carefully when using this mode
+**安全影响**：
+- Codex 将拥有对你文件系统的不受限制的访问权限
+- Codex 可以在没有审批提示的情况下执行任意命令
+- 使用此模式时请仔细审查所有代码更改
 
-**Usage example**:
+**使用示例**：
 ```bash
-# Export before starting Claude Code
+# 在启动 Claude Code 之前导出
 export HUMANIZE_CODEX_BYPASS_SANDBOX=true
 
-# Or set for a single session
+# 或为单个会话设置
 HUMANIZE_CODEX_BYPASS_SANDBOX=true claude --plugin-dir /path/to/humanize
 ```

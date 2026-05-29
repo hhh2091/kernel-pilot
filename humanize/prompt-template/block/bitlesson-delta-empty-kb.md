@@ -1,5 +1,5 @@
-# BitLesson Recording Required
+# 需要记录 BitLesson
 
-`Action: none` is not allowed for this round because `.humanize/bitlesson.md` still has no concrete lesson entries.
+本轮不允许使用 `Action: none`，因为 `.humanize/bitlesson.md` 中仍然没有具体的课程条目。
 
-If this round resolves issues discovered in previous rounds, add/update at least one reusable lesson entry and report `Action: add` or `Action: update`.
+如果本轮解决了前几轮发现的问题，请添加/更新至少一个可复用的课程条目，并报告 `Action: add` 或 `Action: update`。

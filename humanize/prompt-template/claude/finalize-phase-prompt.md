@@ -1,52 +1,52 @@
-# Finalize Phase
+# 收尾阶段
 
-Codex review has passed. The implementation is complete and all acceptance criteria have been met.
+Codex 审查已通过。实现已完成，所有验收标准均已满足。
 
-You are now in the **Finalize Phase**. This is your opportunity to simplify and refactor the code before final completion.
+你现在处于**收尾阶段**。这是你在最终完成之前简化和重构代码的机会。
 
-## Your Task
+## 你的任务
 
-Use the `code-simplifier:code-simplifier` agent via the Task tool to review and simplify the recent code changes.
+通过 Task 工具使用 `code-simplifier:code-simplifier` agent 来审查和简化最近的代码更改。
 
-Example invocation:
+调用示例：
 ```
 Task tool with subagent_type="code-simplifier:code-simplifier"
 ```
 
-## Constraints
+## 约束条件
 
-These constraints are **non-negotiable**:
+这些约束条件**不可协商**：
 
-1. **Must NOT change existing functionality** - All features must work exactly as before
-2. **Must NOT fail existing tests** - Run tests to verify nothing is broken
-3. **Must NOT introduce new bugs** - Be careful with refactoring
-4. **Only perform functionality-equivalent changes** - Simplification and cleanup only
+1. **不得更改现有功能** - 所有功能必须与之前完全一致
+2. **不得使现有测试失败** - 运行测试以验证没有破坏任何内容
+3. **不得引入新错误** - 重构时要小心
+4. **仅执行功能等效的更改** - 仅限简化和清理
 
-## Focus Areas
+## 重点关注领域
 
-The code-simplifier agent should focus on:
-- Code that was recently added or modified
-- Focus more on changes between branch from `{{BASE_BRANCH}}` to `{{START_BRANCH}}`
-- Removing unnecessary complexity
-- Improving readability and maintainability
-- Consolidating duplicate code
-- Simplifying control flow where possible
-- Removing dead code or unused variables
+code-simplifier agent 应重点关注：
+- 最近添加或修改的代码
+- 更多关注从 `{{BASE_BRANCH}}` 到 `{{START_BRANCH}}` 分支之间的更改
+- 移除不必要的复杂性
+- 提高可读性和可维护性
+- 合并重复代码
+- 在可能的情况下简化控制流
+- 移除死代码或未使用的变量
 
-## Reference Files
+## 参考文件
 
-- Original plan: @{{PLAN_FILE}}
-- Goal tracker: @{{GOAL_TRACKER_FILE}}
+- 原始计划：@{{PLAN_FILE}}
+- 目标跟踪器：@{{GOAL_TRACKER_FILE}}
 
-## Before Exiting
+## 退出前
 
-1. Complete all `[mainline]` and `[blocking]` tasks (mark them as completed using TaskUpdate with status "completed")
-2. `[queued]` tasks may remain only if they are documented as non-blocking follow-up work
-3. Commit your changes with a descriptive message
-4. Write your finalize summary to: **{{FINALIZE_SUMMARY_FILE}}**
+1. 完成所有 `[mainline]` 和 `[blocking]` 任务（使用 TaskUpdate 将状态标记为 "completed"）
+2. `[queued]` 任务仅在被记录为非阻塞后续工作时才可以保留
+3. 使用描述性消息提交你的更改
+4. 将收尾摘要写入：**{{FINALIZE_SUMMARY_FILE}}**
 
-Your summary should include:
-- What simplifications were made
-- Files modified during the Finalize Phase
-- Confirmation that tests still pass
-- Any notes about the refactoring decisions
+你的摘要应包含：
+- 进行了哪些简化
+- 收尾阶段修改的文件
+- 确认测试仍然通过
+- 关于重构决策的任何说明

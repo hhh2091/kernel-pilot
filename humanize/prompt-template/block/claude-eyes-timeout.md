@@ -1,18 +1,18 @@
-# Claude Bot Not Responding
+# Claude Bot 未响应
 
-The Claude bot did not respond with an 'eyes' reaction after **{{RETRY_COUNT}} retries** ({{TOTAL_WAIT_SECONDS}} seconds total).
+Claude bot 在 **{{RETRY_COUNT}} 次重试**（总计 {{TOTAL_WAIT_SECONDS}} 秒）后仍未响应 'eyes' 表情。
 
-**Possible causes**:
-1. The remote repository does not have the Claude bot configured
-2. The Claude bot is experiencing issues or downtime
-3. The bot does not have permissions on this repository
+**可能的原因**：
+1. 远程仓库未配置 Claude bot
+2. Claude bot 正在经历问题或停机
+3. bot 对此仓库没有权限
 
-**Required Actions**:
-1. Verify the Claude bot is installed on the remote repository
-2. Check that the bot has appropriate permissions
-3. Ensure the PR is in a state where the bot can respond
+**必需的操作**：
+1. 验证 Claude bot 已安装在远程仓库上
+2. 检查 bot 是否具有适当的权限
+3. 确保 PR 处于 bot 可以响应的状态
 
-**To configure Claude bot**:
-Visit the repository settings and ensure the Claude GitHub App is installed and has access to this repository.
+**配置 Claude bot**：
+访问仓库设置，确保 Claude GitHub App 已安装并有权访问此仓库。
 
-Once the bot is properly configured, post a new trigger comment to restart the review.
+正确配置 bot 后，发布新的触发评论以重新启动审查。

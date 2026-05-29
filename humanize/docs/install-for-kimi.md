@@ -1,47 +1,47 @@
-# Install Humanize for Kimi CLI
+# 为 Kimi CLI 安装 Humanize
 
-This guide explains how to install the Humanize skills for [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli).
+本指南说明如何为 [Kimi Code CLI](https://github.com/MoonshotAI/kimi-cli) 安装 Humanize skill。
 
-## Overview
+## 概述
 
-Humanize provides four Agent Skills for kimi:
+Humanize 为 Kimi 提供四个 Agent Skill：
 
-| Skill | Type | Purpose |
+| Skill | 类型 | 用途 |
 |-------|------|---------|
-| `humanize` | Standard | General guidance for all workflows |
-| `humanize-gen-plan` | Flow | Generate structured plan from draft |
-| `humanize-refine-plan` | Flow | Refine annotated plan with CMT blocks |
-| `humanize-rlcr` | Flow | Iterative development with Codex review |
+| `humanize` | 标准 | 所有工作流的通用指导 |
+| `humanize-gen-plan` | 流程 | 从草稿生成结构化计划 |
+| `humanize-refine-plan` | 流程 | 使用 CMT 块优化带注释的计划 |
+| `humanize-rlcr` | 流程 | 带 Codex 审查的迭代开发 |
 
-## Installation
+## 安装
 
-### Quick Install (Recommended)
+### 快速安装（推荐）
 
-From the Humanize repo root, run:
+在 Humanize 仓库根目录下运行：
 
 ```bash
 ./scripts/install-skills-kimi.sh
 ```
 
-This command will:
-- Sync `humanize`, `humanize-gen-plan`, `humanize-refine-plan`, and `humanize-rlcr` into `~/.config/agents/skills`
-- Copy runtime dependencies into `~/.config/agents/skills/humanize`
+此命令将：
+- 将 `humanize`、`humanize-gen-plan`、`humanize-refine-plan` 和 `humanize-rlcr` 同步到 `~/.config/agents/skills`
+- 将运行时依赖复制到 `~/.config/agents/skills/humanize`
 
-Common installer script (all targets):
+通用安装脚本（所有目标）：
 
 ```bash
 ./scripts/install-skill.sh --target kimi
 ```
 
-### Manual Install
+### 手动安装
 
-### 1. Clone or navigate to the humanize repository
+### 1. 克隆或导航到 humanize 仓库
 
 ```bash
 cd /path/to/humanize
 ```
 
-### 2. Copy skills and runtime bundle to kimi's skills directory
+### 2. 将 skill 和运行时包复制到 Kimi 的 skills 目录
 
 ```bash
 # Create the skills directory if it doesn't exist
@@ -53,12 +53,11 @@ cp -r skills/humanize-gen-plan ~/.config/agents/skills/
 cp -r skills/humanize-refine-plan ~/.config/agents/skills/
 cp -r skills/humanize-rlcr ~/.config/agents/skills/
 
-# Kimi does not use Codex native Stop hooks, so install the gate-based
-# RLCR entrypoint used by scripts/install-skill.sh --target kimi.
+# Kimi 不使用 Codex 原生 Stop hook，因此安装 scripts/install-skill.sh --target kimi 使用的基于门控的 RLCR 入口点
 cp skills/humanize-rlcr/SKILL-kimi.md ~/.config/agents/skills/humanize-rlcr/SKILL.md
 
-# Copy runtime dependencies used by the skills
-# (must match install-skill.sh's install_runtime_bundle)
+# 复制 skill 使用的运行时依赖
+# （必须与 install-skill.sh 的 install_runtime_bundle 匹配）
 cp -r scripts ~/.config/agents/skills/humanize/
 cp -r hooks ~/.config/agents/skills/humanize/
 cp -r prompt-template ~/.config/agents/skills/humanize/
@@ -66,14 +65,14 @@ cp -r templates ~/.config/agents/skills/humanize/
 cp -r config ~/.config/agents/skills/humanize/
 cp -r agents ~/.config/agents/skills/humanize/
 
-# Hydrate runtime root placeholders inside SKILL.md files
+# 注入 SKILL.md 文件中的运行时根路径占位符
 for skill in humanize humanize-gen-plan humanize-refine-plan humanize-rlcr; do
   sed -i.bak "s|{{HUMANIZE_RUNTIME_ROOT}}|$HOME/.config/agents/skills/humanize|g" \
     "$HOME/.config/agents/skills/$skill/SKILL.md"
 done
 
-# Strip user-invocable flag from SKILL.md files for runtime visibility
-# (This matches the behavior of scripts/install-skill.sh)
+# 从 SKILL.md 文件中移除 user-invocable 标志以适配运行时可见性
+# （与 scripts/install-skill.sh 的行为一致）
 for skill in humanize humanize-gen-plan humanize-refine-plan humanize-rlcr; do
   awk '
     BEGIN { in_fm = 0; fm_done = 0 }
@@ -94,112 +93,112 @@ for skill in humanize humanize-gen-plan humanize-refine-plan humanize-rlcr; do
 done
 ```
 
-### 3. Verify installation
+### 3. 验证安装
 
 ```bash
-# List installed skills
+# 列出已安装的 skill
 ls -la ~/.config/agents/skills/
 
-# Should show:
+# 应显示：
 # humanize/
 # humanize-gen-plan/
 # humanize-refine-plan/
 # humanize-rlcr/
 ```
 
-### 4. Restart kimi (if already running)
+### 4. 重启 Kimi（如果已在运行）
 
-Skills are loaded at startup. Restart kimi to pick up the new skills:
+Skill 在启动时加载。重启 Kimi 以加载新的 skill：
 
 ```bash
-# Exit current kimi session
+# 退出当前 Kimi 会话
 /exit
 
-# Or press Ctrl-D
+# 或按 Ctrl-D
 
-# Start kimi again
+# 重新启动 Kimi
 kimi
 ```
 
-## Usage
+## 使用
 
-### List available skills
+### 列出可用 skill
 
 ```bash
 /help
 ```
 
-Look for the "Skills" section in the help output.
+在帮助输出中查找 "Skills" 部分。
 
-### Use the skills
+### 使用 skill
 
-#### 1. Generate plan from draft
+#### 1. 从草稿生成计划
 
 ```bash
-# Start the flow (will ask for input/output paths)
+# 启动流程（会询问输入/输出路径）
 /flow:humanize-gen-plan
 
-# Or load as standard skill
+# 或作为标准 skill 加载
 /skill:humanize-gen-plan
 ```
 
-#### 2. Start RLCR development loop
+#### 2. 启动 RLCR 开发循环
 
 ```bash
-# Start with plan file
+# 使用计划文件启动
 /flow:humanize-rlcr path/to/plan.md
 
-# With options
+# 带选项
 /flow:humanize-rlcr path/to/plan.md --max 20 --push-every-round
 
-# Skip implementation, go directly to code review
+# 跳过实现阶段，直接进入代码审查
 /flow:humanize-rlcr --skip-impl
 
-# Load as standard skill (no auto-execution)
+# 作为标准 skill 加载（不自动执行）
 /skill:humanize-rlcr
 ```
 
-#### 3. Get general guidance
+#### 3. 获取通用指导
 
 ```bash
 /skill:humanize
 ```
 
-## Command Options
+## 命令选项
 
-### RLCR Loop Options
+### RLCR 循环选项
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `path/to/plan.md` | Plan file path | Required (unless --skip-impl) |
-| `--max N` | Maximum iterations | 84 |
-| `--codex-model MODEL:EFFORT` | Codex model | gpt-5.5:high |
-| `--codex-timeout SECONDS` | Review timeout | 5400 |
-| `--base-branch BRANCH` | Base for code review | auto-detect |
-| `--full-review-round N` | Full alignment check interval | 5 |
-| `--skip-impl` | Skip to code review | false |
-| `--push-every-round` | Push after each round | false |
+| 选项 | 描述 | 默认值 |
+|------|------|--------|
+| `path/to/plan.md` | 计划文件路径 | 必需（除非 --skip-impl） |
+| `--max N` | 最大迭代次数 | 84 |
+| `--codex-model MODEL:EFFORT` | Codex 模型 | gpt-5.5:high |
+| `--codex-timeout SECONDS` | 审查超时时间 | 5400 |
+| `--base-branch BRANCH` | 代码审查的基础分支 | 自动检测 |
+| `--full-review-round N` | 全面对齐检查间隔 | 5 |
+| `--skip-impl` | 跳到代码审查 | false |
+| `--push-every-round` | 每轮后推送 | false |
 
-### Generate Plan Options
+### 生成计划选项
 
-| Option | Description | Required |
-|--------|-------------|----------|
-| `--input <path>` | Draft file path | Yes |
-| `--output <path>` | Plan output path | Yes |
+| 选项 | 描述 | 必需 |
+|------|------|------|
+| `--input <path>` | 草稿文件路径 | 是 |
+| `--output <path>` | 计划输出路径 | 是 |
 
-## Prerequisites
+## 前提条件
 
-Ensure you have `codex` CLI installed:
+确保已安装 `codex` CLI：
 
 ```bash
 codex --version
 ```
 
-The skills will use `gpt-5.5` with `high` effort level by default.
+Skill 默认使用 `gpt-5.5` 和 `high` 推理强度。
 
-## Uninstall
+## 卸载
 
-To remove the skills:
+要移除 skill：
 
 ```bash
 rm -rf ~/.config/agents/skills/humanize
@@ -208,69 +207,69 @@ rm -rf ~/.config/agents/skills/humanize-refine-plan
 rm -rf ~/.config/agents/skills/humanize-rlcr
 ```
 
-## Troubleshooting
+## 故障排除
 
-### Skills not showing up
+### Skill 未显示
 
-1. Check the skills directory exists:
+1. 检查 skills 目录是否存在：
    ```bash
    ls ~/.config/agents/skills/
    ```
 
-2. Ensure SKILL.md files are present:
+2. 确保 SKILL.md 文件存在：
    ```bash
    cat ~/.config/agents/skills/humanize/SKILL.md | head -5
    ```
 
-3. Restart kimi completely
+3. 完全重启 Kimi
 
-### Codex not found
+### 找不到 Codex
 
-The skills expect `codex` to be in your PATH. If using a proxy, ensure `~/.zprofile` is configured:
+Skill 期望 `codex` 在你的 PATH 中。如果使用代理，确保 `~/.zprofile` 已配置：
 
 ```bash
-# Add to ~/.zprofile if needed
+# 如果需要，添加到 ~/.zprofile
 export OPENAI_API_KEY="your-api-key"
-# or other proxy settings
+# 或其他代理设置
 ```
 
-### Scripts not found
+### 找不到脚本
 
-If skills report missing scripts like `setup-rlcr-loop.sh`, verify:
+如果 skill 报告缺少 `setup-rlcr-loop.sh` 等脚本，请验证：
 
 ```bash
 ls -la ~/.config/agents/skills/humanize/scripts
 ```
 
-### Installer options
+### 安装程序选项
 
-The installer supports:
+安装程序支持：
 
 ```bash
 ./scripts/install-skill.sh --help
 ```
 
-Common examples:
+常用示例：
 
 ```bash
-# Preview only
+# 仅预览
 ./scripts/install-skills-kimi.sh --dry-run
 
-# Custom skills directory
+# 自定义 skills 目录
 ./scripts/install-skills-kimi.sh --skills-dir /custom/skills/dir
 ```
 
-### Output files not found
+### 找不到输出文件
 
-The skills save output to:
-- Cache: `~/.cache/humanize/<project>/<timestamp>/`
-- Loop data: `.humanize/rlcr/<timestamp>/`
+Skill 将输出保存到：
+- 缓存：`~/.cache/humanize/<project>/<timestamp>/`
+- 循环数据：`.humanize/rlcr/<timestamp>/`
 
-Ensure these directories are writable.
+确保这些目录可写。
 
-## See Also
+## 另请参阅
 
-- [Kimi CLI Documentation](https://moonshotai.github.io/kimi-cli/)
-- [Agent Skills Format](https://agentskills.io/)
-- [Install for Codex](./install-for-codex.md)
+- [Kimi CLI 文档](https://moonshotai.github.io/kimi-cli/)
+- [Agent Skills 格式](https://agentskills.io/)
+- [为 Codex 安装](./install-for-codex.md)
 - [Humanize README](../README.md)

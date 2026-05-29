@@ -1,13 +1,13 @@
-# Round Contract Missing
+# 缺少轮次合同
 
-Before you try to exit this round, write the current round contract to:
+在尝试退出本轮之前，请将当前轮次合同写入：
 `{{ROUND_CONTRACT_FILE}}`
 
-The round contract must restate:
-- The single **mainline objective** for this round
-- The target ACs
-- Which issues are truly **blocking**
-- Which issues are **queued** and out of scope
-- The concrete success criteria for this round
+轮次合同必须重申：
+- 本轮的单一**主线目标**
+- 目标验收标准
+- 哪些问题是真正的**阻塞**问题
+- 哪些问题是**排队中**且超出范围的
+- 本轮的具体成功标准
 
-Do not continue without a round contract. The loop uses it to prevent goal drift.
+不要在没有轮次合同的情况下继续。循环使用它来防止目标漂移。

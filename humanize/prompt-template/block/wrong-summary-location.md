@@ -1,5 +1,5 @@
-# Wrong Summary Location
+# 错误的摘要位置
 
-Summary files MUST be in the loop directory.
+摘要文件必须在循环目录中。
 
-**Correct path**: `{{CORRECT_PATH}}`
+**正确路径**：`{{CORRECT_PATH}}`

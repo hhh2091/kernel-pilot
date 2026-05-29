@@ -1,241 +1,187 @@
-# B200 FA4 MHA KernelPilot Prompt
+# B200 FA4 MHA KernelPilot 提示词
 
-Copy this as one end-to-end prompt.
+将此内容作为一个端到端提示词复制使用。
 
 ```text
 /humanize:humanize-kernel-agent-loop
 
-Use the ion-b200 remote GPU environment for all B200 work. All CUDA, Python,
-pip, nvcc, build, test, benchmark, and Nsight Compute commands must run inside
-the existing sglang_bbuf Docker container on ion-b200, with GPU0 selected.
+所有 B200 工作请使用 ion-b200 远程 GPU 环境。所有 CUDA、Python、
+pip、nvcc、构建、测试、基准测试和 Nsight Compute 命令必须在
+ion-b200 上现有的 sglang_bbuf Docker 容器内运行，并选择 GPU0。
 
-Use this command pattern for remote execution:
+远程执行请使用以下命令模式：
 
 ssh ion-b200 'docker exec sglang_bbuf bash -lc "CUDA_VISIBLE_DEVICES=0 <command>"'
 
-Do not run Python, pip, nvcc, builds, tests, benchmarks, or profiling directly
-on the ion-b200 host. Do not pip install flash-attn on the host. The container
-already has FlashAttention-4 installed; use it as the main baseline.
+不要直接在 ion-b200 主机上运行 Python、pip、nvcc、构建、测试、基准测试或性能分析。
+不要在主机上 pip install flash-attn。容器中已经安装了 FlashAttention-4；将其作为主要基线使用。
 
-Task contract:
-- Task name: B200 FA4-comparable BF16 MHA forward kernel
-- Objective: implement a FA4-comparable BF16 MHA forward-only attention kernel
-  for NVIDIA B200 in a standalone optimization workspace.
-- "Standalone" means the candidate has its own build, harness, ledger, and
-  dispatch path in this workspace. It does not mean clean-room or from-scratch.
-  Do not call official FlashAttention-4 from the candidate execution path, but
-  you may study, copy, port, adapt, or simplify public/reference kernel source
-  when license-compatible and recorded in the ledger.
-- Comparison target: official FlashAttention-4 installed in the same
-  ion-b200 container.
-- Promotion criterion: the final correct implementation must beat official
-  FlashAttention-4 by at least 5% geometric-mean TFLOPS across the configured
-  B200 cases.
+任务契约：
+- 任务名称：B200 FA4 可比的 BF16 MHA 纯前向内核
+- 目标：在 NVIDIA B200 的独立优化工作区中实现一个 FA4 可比的 BF16 MHA 纯前向注意力内核。
+- "独立"意味着候选方案在此工作区中有自己的构建、测试框架、记录簿和调度路径。它不意味着干净室或从零开始。
+  不要从候选执行路径中调用官方 FlashAttention-4，但
+  你可以在许可证兼容且记录在记录簿中的情况下研究、复制、移植、改编或简化公开/参考内核源码。
+- 比较目标：同一 ion-b200 容器中安装的官方 FlashAttention-4。
+- 提升标准：最终正确的实现必须在配置的 B200 用例上以至少 5% 的几何平均 TFLOPS 击败官方 FlashAttention-4。
 
-Loop bootstrap:
-- Before implementing kernel candidates or running long benchmarks, ensure the
-  Humanize RLCR loop is active in the chosen workspace.
-- The workspace must be a git repository with one clean scaffold commit.
-- Confirm that `.humanize/rlcr/<timestamp>/state.md` exists and that the loop
-  was started with `--strict-success`. If RLCR did not start, stop and report
-  the setup failure instead of continuing outside the loop.
+循环引导：
+- 在实现内核候选方案或运行长时间基准测试之前，确保
+  Humanize RLCR 循环在选定的工作区中处于活动状态。
+- 工作区必须是一个具有一个干净脚手架提交的 git 仓库。
+- 确认 `.humanize/rlcr/<timestamp>/state.md` 存在，并且
+  循环是使用 `--strict-success` 启动的。如果 RLCR 未启动，请停止并报告
+  设置失败，而不是在循环外继续。
 
-Kernel information:
-- Operation type: dense multi-head attention forward
-- Baseline solution name: official FlashAttention-4 in the container
-- Workload count: 8 configured cases
-- Constant axes:
+内核信息：
+- 操作类型：稠密多头注意力前向
+- 基线方案名称：容器中的官方 FlashAttention-4
+- 工作负载数量：8 个配置用例
+- 固定轴：
   - dtype: BF16
   - head_dim: 128
   - num_heads: 16
   - total tokens: 32768
-- Variable axes:
+- 可变轴：
   - batch
   - seqlen
   - causal
 
-Scope:
-- Forward pass only
-- No backward
-- No GQA
-- No serving or framework integration
+范围：
+- 仅前向传播
+- 无反向传播
+- 无 GQA
+- 无服务或框架集成
 
-Implementation-source policy:
-- This run is baseline-aware kernel evolution, not blind kernel synthesis.
-- Treat official FlashAttention-4, CUTLASS/CuTe SM100 examples, TileLang
-  kernels, and other public Blackwell attention kernels as reference and
-  porting materials. They may be studied or used as sources for
-  license-compatible CUDA/C++/CUTLASS/CuTe ports and canonical helper code.
-  Record the exact source path, commit or installed version, and what was
-  adapted.
-- The final candidate implementation must be a native CUDA kernel built from
-  workspace-owned C++/CUDA source, such as `.cu`, `.cuh`, `.cpp`, or `.h`
-  files compiled with nvcc or an equivalent CUDA extension build. Python is
-  allowed for harnesses, bindings, benchmark scripts, and dispatch glue, but
-  not as the primary kernel implementation.
-- Do not use official FlashAttention-4, `flash_attn.cute.flash_attn_func`,
-  `FlashAttentionForwardSm100`, Python `cute.compile` over the FA4 CuTe DSL
-  kernel class, TileLang, Triton, torch SDPA, or any other prebuilt attention
-  op as the candidate execution path. These sources may only be inspected or
-  ported into native C++/CUDA/CUTLASS/CuTe code owned by this workspace.
-- The first performance-oriented candidate should be baseline-derived or
-  canonical-helper-derived unless there is a measured reason not to. A naive
-  kernel is acceptable only as a harness/correctness smoke test, not as the
-  main optimization lineage.
-- Do not hand-derive tcgen05 SmemDescriptor encodings, TMEM layouts, TMA
-  swizzles, warpgroup synchronization protocols, or Blackwell MMA instruction
-  wrappers when an official or de facto canonical helper exists. Prefer porting
-  the helper and validating it with a microcase.
-- Use CUDA C++, CUTLASS/CuTe C++ templates, generated CUDA helper code, and
-  optional inline PTX when they make the Blackwell-specific details more
-  reliable.
-- If a correct candidate is more than 3x slower than official FlashAttention-4
-  after one tensor-core-capable attempt, stop local micro-tuning of that lineage
-  and reset to a stronger native CUDA/CUTLASS/CuTe porting parent.
-- If a tensor-core/TMEM/tcgen05 microcase remains incorrect for two focused
-  iterations, stop hand-deriving that path and switch to canonical helper
-  extraction or a different parent implementation.
+实现源策略：
+- 此次运行为基线感知的内核演化，而非盲目内核合成。
+- 将官方 FlashAttention-4、CUTLASS/CuTe SM100 示例、TileLang
+  内核和其他公开 Blackwell 注意力内核视为参考和移植材料。可以在许可证兼容的情况下研究或用作
+  CUDA/C++/CUTLASS/CuTe 移植和规范辅助代码的源码。
+  请记录确切的源路径、提交或安装版本，以及改编了什么。
+- 最终候选实现必须是从工作区自有的 C++/CUDA 源码构建的原生 CUDA 内核，
+  例如使用 nvcc 或等效 CUDA 扩展构建编译的 `.cu`、`.cuh`、`.cpp` 或 `.h`
+  文件。Python 允许用于测试框架、绑定、基准测试脚本和调度粘合代码，但
+  不能作为主要内核实现。
+- 不要使用官方 FlashAttention-4、`flash_attn.cute.flash_attn_func`、
+  `FlashAttentionForwardSm100`、在 FA4 CuTe DSL 内核类上使用 Python `cute.compile`、
+  TileLang、Triton、torch SDPA 或任何其他预构建注意力算子
+  作为候选执行路径。这些源码只能被检查或移植到本工作区拥有的原生 C++/CUDA/CUTLASS/CuTe 代码中。
+- 第一个面向性能的候选方案应为基线派生或规范辅助派生，除非有测量依据表明不应如此。
+  原始内核仅可作为测试框架/正确性冒烟测试，而不能作为主要优化谱系。
+- 当存在官方或事实上的规范辅助时，不要手工推导 tcgen05 SmemDescriptor 编码、TMEM 布局、TMA
+  重排、warpgroup 同步协议或 Blackwell MMA 指令包装器。优先移植辅助并通过微用例验证。
+- 使用 CUDA C++、CUTLASS/CuTe C++ 模板、生成的 CUDA 辅助代码和
+  可选内联 PTX，当它们使 Blackwell 特定细节更可靠时。
+- 如果一个正确的候选方案在一次具备张量核心能力的尝试后比官方 FlashAttention-4 慢 3 倍以上，
+  请停止对该谱系的局部微调，并重置为更强的原生 CUDA/CUTLASS/CuTe 移植父版本。
+- 如果一个张量核心/TMEM/tcgen05 微用例在两次聚焦迭代后仍不正确，
+  请停止手工推导该路径，转而使用规范辅助提取或不同的父实现。
 
-Benchmark cases:
+基准测试用例：
 - batch=8, seqlen=4096
 - batch=4, seqlen=8192
 - batch=2, seqlen=16384
 - batch=1, seqlen=32768
-- Test both causal=false and causal=true
+- 同时测试 causal=false 和 causal=true
 
-Target:
-Beat official FlashAttention-4 by at least 5% geometric-mean TFLOPS across the
-configured B200 cases.
+目标：
+在配置的 B200 用例上以至少 5% 的几何平均 TFLOPS 击败官方 FlashAttention-4。
 
-Reference computation:
-- Match standard scaled dot-product attention forward semantics for BF16 Q, K,
-  and V with head_dim=128.
-- Apply causal masking only when `causal=true`.
-- Use a numerically stable online softmax/LSE-compatible formulation in the
-  kernel. Correctness may be checked against PyTorch and/or official
-  FlashAttention-4.
+参考计算：
+- 匹配 BF16 Q、K 和 V 在 head_dim=128 下的标准缩放点积注意力前向语义。
+- 仅在 `causal=true` 时应用因果掩码。
+- 在内核中使用数值稳定的在线 softmax/LSE 兼容公式。正确性可通过 PyTorch 和/或官方
+  FlashAttention-4 进行检查。
 
-Correctness:
-- Compare against PyTorch reference and/or official FlashAttention-4 output.
-- Report explicit max error and relative error tolerances.
-- The final candidate must pass correctness before benchmark claims count.
-- Preserve explicit NaN/Inf checks in every validator. Do not weaken the
-  correctness harness or redefine the reference to make a candidate pass.
+正确性：
+- 与 PyTorch 参考和/或官方 FlashAttention-4 输出进行比较。
+- 报告显式的最大误差和相对误差容差。
+- 最终候选方案必须通过正确性检查，基准测试声明才有效。
+- 在每个验证器中保留显式的 NaN/Inf 检查。不要削弱正确性测试框架或重新定义参考以使候选方案通过。
 
-FA4 numerical cross-check:
-- Treat PyTorch/FP32 attention as the semantic correctness oracle. Official
-  FlashAttention-4 is the performance baseline and a useful cross-check, but it
-  is also a tiled BF16 implementation with its own reduction order.
-- Do not use a fixed `5e-3` absolute difference against FA4 as a hard
-  correctness gate for all cases. SGLang's FA4 unit tests use dynamic numerical
-  bounds relative to PyTorch BF16/reordered-reference error, not a universal
-  fixed FA4-vs-reference threshold.
-- Use an SGLang-style dynamic bound when practical: compare the candidate's
-  error against the PyTorch/FP32 oracle to the error of a PyTorch BF16 or
-  reordered BF16 reference, and require the candidate to stay within a small
-  multiple of that numerical-error scale while also passing NaN/Inf checks.
-- If the harness cannot cheaply compute a dynamic bound, use the FA4 comparison
-  as diagnostic evidence and keep the semantic pass/fail gate on the
-  PyTorch/FP32 oracle. A relaxed FA4 cross-check such as `abs <= 2e-2` and
-  `rel <= 0.10` may be used to catch gross divergence, but it should be recorded
-  as methodology rather than confused with the semantic oracle.
-- If a candidate passes the PyTorch/FP32 oracle but only fails a too-strict
-  fixed FA4 cross-check, do not stall the loop on numerical mimicry. Record the
-  per-case FA4 diff, explain the reduction-order/tile-structure source, and
-  continue toward the Phase 2/Phase 3 performance work.
+FA4 数值交叉检查：
+- 将 PyTorch/FP32 注意力作为语义正确性预言机。官方
+  FlashAttention-4 是性能基线和有用的交叉检查，但它也是一个具有自己归约顺序的分片 BF16 实现。
+- 不要对所有用例使用固定的 `5e-3` 绝对差异作为 FA4 的硬正确性门槛。SGLang 的 FA4 单元测试使用相对于 PyTorch BF16/重排序参考误差的动态数值边界，
+  而不是通用的固定 FA4 对参考阈值。
+- 在可行时使用 SGLang 风格的动态边界：将候选方案相对于 PyTorch/FP32 预言机的误差
+  与 PyTorch BF16 或重排序 BF16 参考的误差进行比较，并要求候选方案保持在该数值误差规模的小倍数内，
+  同时通过 NaN/Inf 检查。
+- 如果测试框架无法廉价计算动态边界，请将 FA4 比较用作诊断证据，并将语义通过/失败门槛保持在
+  PyTorch/FP32 预言机上。可以使用放松的 FA4 交叉检查（如 `abs <= 2e-2` 和
+  `rel <= 0.10`）来捕获严重偏差，但应将其记录为方法论，而非与语义预言机混淆。
+- 如果候选方案通过了 PyTorch/FP32 预言机但仅因过于严格的固定 FA4 交叉检查而失败，
+  不要因数值模仿而停滞循环。记录每个用例的 FA4 差异，解释归约顺序/分片结构来源，并
+  继续推进 Phase 2/Phase 3 性能工作。
 
-Benchmarking:
-- Follow Dao-AILab/flash-attention benchmarks/benchmark_attn.py methodology as
-  closely as practical, including warmup and repeat logic.
-- Report per-case mean latency, std, TFLOPS, and geometric mean TFLOPS.
-- Include FlashAttention-4 baseline numbers from the same B200 GPU0 container
-  environment.
-- Keep benchmark scripts and raw result logs in the workspace.
-- Do not change the FlashAttention-4 baseline, benchmark formula, warmup/repeat
-  policy, or target cases after the first baseline is recorded unless the user
-  explicitly asks for a methodology change. If a benchmark bug is found, record
-  the before/after methodology in the ledger.
+基准测试：
+- 尽可能遵循 Dao-AILab/flash-attention benchmarks/benchmark_attn.py 方法论，
+  包括预热和重复逻辑。
+- 报告每个用例的平均延迟、标准差、TFLOPS 和几何平均 TFLOPS。
+- 包含来自同一 B200 GPU0 容器环境的 FlashAttention-4 基线数值。
+- 将基准测试脚本和原始结果日志保存在工作区中。
+- 在记录第一个基线后，不要更改 FlashAttention-4 基线、基准测试公式、预热/重复策略或目标用例，
+  除非用户明确要求更改方法论。如果发现基准测试 bug，请在记录簿中记录前后方法论。
 
-Shape specialization:
-- You may write multiple specialized kernels or template/config variants for
-  different benchmark cases, including separate non-causal and causal paths,
-  when the evidence suggests this is the right tradeoff.
-- A shape dispatcher or autotune table is allowed when one kernel cannot
-  dominate all cases; it is not required if one correct implementation is best
-  across the workload distribution.
-- The final score may use the fastest correct variant per configured case, but
-  every dispatched variant must pass correctness for its assigned case.
-- Record the dispatcher decision table with per-case baseline, candidate,
-  latency, TFLOPS, and promote/reject reason.
-- Do not force a single universal kernel if evidence shows that different
-  sequence lengths or causal modes need different CTA, warpgroup, TMEM, or
-  register-pressure tradeoffs.
+形状特化：
+- 你可以为不同的基准测试用例编写多个特化内核或模板/配置变体，
+  包括独立的非因果和因果路径，当证据表明这是正确的权衡时。
+- 当一个内核无法主导所有用例时，允许使用形状调度器或自动调优表；
+  如果一个正确的实现在整个工作负载分布上都是最佳的，则不需要。
+- 最终评分可以使用每个配置用例的最快正确变体，但
+  每个调度的变体必须通过其分配用例的正确性检查。
+- 将调度器决策表记录为每个用例的基线、候选方案、延迟、TFLOPS 和提升/拒绝原因。
+- 如果证据表明不同的序列长度或因果模式需要不同的 CTA、warpgroup、TMEM 或
+  寄存器压力权衡，不要强制使用单一通用内核。
 
-Workflow requirements:
-- Round 0 must produce a short implementation plan before kernel edits. The
-  plan should identify the baseline command, correctness command, benchmark
-  command, first candidate direction, major risks, and promotion evidence.
-- Round 0 must also identify the concrete native CUDA/CUTLASS/CuTe source
-  lineage for the first performance-oriented candidate: official FA4 source
-  path/version and at least one canonical Blackwell helper source such as
-  CUTLASS/CuTe C++ examples or an equivalent public SM100 attention kernel to
-  inspect and port from.
-- Record every candidate in the attempt ledger with: name, parent candidate,
-  changed files, hypothesis, correctness result, per-case benchmark result,
-  profiler evidence if any, and promote/reject reason.
-- Keep `benchmarks/performance-map.json` or an equivalent table updated with
-  per-case baseline and candidate numbers.
-- Keep `ledgers/lineage.jsonl` updated so a future engineer can reconstruct
-  which candidate became the selected lineage and why.
-- Record rejected ideas instead of silently discarding them, especially when a
-  branch fails correctness, regresses a shape, or only wins one regime.
-- A partial per-shape win may be retained as dispatcher evidence even if it is
-  not the final universal lineage.
+工作流要求：
+- Round 0 必须在内核编辑之前产生一个简短的实现计划。该
+  计划应确定基线命令、正确性命令、基准测试命令、第一个候选方向、主要风险和提升证据。
+- Round 0 还必须确定第一个面向性能候选方案的具体原生 CUDA/CUTLASS/CuTe 源码谱系：
+  官方 FA4 源路径/版本和至少一个规范 Blackwell 辅助源，如
+  CUTLASS/CuTe C++ 示例或等效的公开 SM100 注意力内核，用于检查和移植。
+- 将每个候选方案记录在尝试记录簿中，包括：名称、父候选方案、
+  更改的文件、假设、正确性结果、每个用例的基准测试结果、
+  性能分析证据（如有）和提升/拒绝原因。
+- 保持 `benchmarks/performance-map.json` 或等效表更新，
+  记录每个用例的基线和候选方案数值。
+- 保持 `ledgers/lineage.jsonl` 更新，以便未来的工程师可以重建
+  哪个候选方案成为选定谱系以及原因。
+- 记录被拒绝的想法，而不是静默丢弃，特别是当一个分支失败正确性、
+  退化某个形状或仅在一个区间获胜时。
+- 部分按形状获胜可以作为调度器证据保留，即使它不是最终的通用谱系。
 
-Phase strategy:
-- Phase 1: establish the immutable FlashAttention-4 baseline, implement the
-  smallest correctness smoke-test needed to prove the harness, then immediately
-  move to a baseline-derived or canonical-helper-derived performance candidate.
-  Do not spend multiple rounds optimizing a naive lineage that is structurally
-  incapable of approaching FA4.
-- Phase 2: start from the best correct Phase 1 candidate and run
-  profiling-guided exploration. List candidate optimization directions, rank
-  them by expected benefit and risk, then explore them systematically.
-- For each Phase 2 optimization direction, try at most five focused iterations
-  before deciding whether to keep, revise, or reject that direction. If a
-  direction cannot be implemented cleanly, fails correctness, or has no
-  credible path to improvement after those iterations, record the evidence and
-  move to the next ranked direction.
-- Phase 3: analyze the full configured workload distribution and decide whether
-  shape-specialized dispatch or autotuning is justified by measured wins.
-  Evaluate the promoted candidate or dispatcher on all 8 configured cases, not
-  only on a convenient subset.
+阶段策略：
+- Phase 1：建立不可变的 FlashAttention-4 基线，实现证明测试框架所需的最小正确性冒烟测试，
+  然后立即转向基线派生或规范辅助派生的性能候选方案。
+  不要花费多轮优化一个结构上无法接近 FA4 的原始谱系。
+- Phase 2：从最佳正确的 Phase 1 候选方案开始，运行分析引导的探索。列出候选优化方向，
+  按预期收益和风险排序，然后系统地探索。
+- 对于每个 Phase 2 优化方向，最多尝试五次聚焦迭代，
+  然后决定保留、修订还是拒绝该方向。如果一个
+  方向无法干净地实现、失败正确性或在这些迭代后没有可信的改进路径，
+  请记录证据并转向下一个排序方向。
+- Phase 3：分析完整的配置工作负载分布，并决定形状特化调度或自动调优
+  是否由测量的获胜证明合理。在所有 8 个配置用例上评估提升的候选方案或调度器，
+  而不仅仅是在方便的子集上。
 
-Optimization guidance:
-- Use KernelWiki when prior B200, SM100, FlashAttention-4, CUTLASS, CuTe, or
-  attention-kernel evidence is useful.
-- Before attempting a hand-written Blackwell primitive, inspect the relevant
-  upstream/reference implementation and write down whether the run will port,
-  simplify, or deliberately avoid it. Wrapping or importing the upstream
-  Python/DSL kernel object is not a valid candidate implementation.
-- Use Nsight Compute evidence when a candidate is correct but not clearly
-  target-complete.
-- Consider B200/SM100-specific features and attention patterns such as TMA,
-  TMEM where useful, tcgen05/tensor-core MMA choices, warp specialization,
-  persistent scheduling, split-Q or split-K scheduling, online softmax/LSE,
-  causal masking efficiency, vectorized BF16 memory traffic, and occupancy vs
-  register-pressure tradeoffs.
-- Prefer evidence-backed edits over broad rewrites. Keep a performance map of
-  tested variants and rejected ideas.
+优化指导：
+- 当先前的 B200、SM100、FlashAttention-4、CUTLASS、CuTe 或注意力内核证据有用时使用 KernelWiki。
+- 在尝试手写 Blackwell 原语之前，检查相关的上游/参考实现
+  并记录此次运行为移植、简化还是刻意避免。包装或导入上游
+  Python/DSL 内核对象不是有效的候选实现。
+- 当候选方案正确但目标未完全达成时使用 Nsight Compute 证据。
+- 考虑 B200/SM100 特定特性和注意力模式，如 TMA、
+  有用的 TMEM、tcgen05/张量核心 MMA 选择、warp 特化、
+  持久调度、split-Q 或 split-K 调度、在线 softmax/LSE、
+  因果掩码效率、向量化 BF16 内存流量以及占用率与寄存器压力权衡。
+- 优先使用证据支持的编辑而非广泛重写。保留已测试变体和被拒绝想法的性能图。
 
-Completion:
-- Continue iterating until the final correct candidate beats FlashAttention-4
-  by at least 5% geometric-mean TFLOPS across all configured cases.
-- Do not stop with a "target blocked" or "best effort" final report. If a
-  lineage stalls, use the evidence to replan or rewrite the kernel path and
-  continue. Only user cancellation or verified target completion may end the
-  loop.
-- The final report must include FlashAttention-4 baseline numbers, final
-  numbers, geometric mean TFLOPS, correctness tolerances, build/test/benchmark
-  commands, and key design decisions.
+完成：
+- 继续迭代，直到最终正确的候选方案在所有配置用例上以至少 5% 的几何平均 TFLOPS 击败 FlashAttention-4。
+- 不要在"目标受阻"或"尽力而为"的最终报告时停止。如果一个
+  谱系停滞，使用证据重新规划或重写内核路径并继续。只有用户取消或已验证的目标完成才能结束循环。
+- 最终报告必须包含 FlashAttention-4 基线数值、最终数值、
+  几何平均 TFLOPS、正确性容差、构建/测试/基准测试命令和关键设计决策。
 ```

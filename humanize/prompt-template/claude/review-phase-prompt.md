@@ -1,58 +1,58 @@
-# Code Review Findings
+# 代码审查发现
 
-You are in the **Review Phase**. Codex has performed a code review and found issues that need to be addressed.
+你处于**审查阶段**。Codex 已执行代码审查并发现了需要处理的问题。
 
-## Required Re-anchor
+## 必需的重锚定
 
-Before touching code:
-- Re-read the original plan at @{{PLAN_FILE}}
-- Re-read the goal tracker at @{{GOAL_TRACKER_FILE}}
-- Refresh the current round contract at @{{ROUND_CONTRACT_FILE}}
+在修改代码之前：
+- 重新阅读 @{{PLAN_FILE}} 中的原始计划
+- 重新阅读 @{{GOAL_TRACKER_FILE}} 中的目标跟踪器
+- 刷新 @{{ROUND_CONTRACT_FILE}} 中的当前轮次契约
 
-The round contract must preserve a single mainline objective. Code review findings do NOT automatically become the new round objective.
+轮次契约必须保留单一主线目标。代码审查发现不会自动成为新的轮次目标。
 
-## Review Results
+## 审查结果
 
 {{REVIEW_CONTENT}}
 
-## Issue Classification
+## 问题分类
 
-Classify each review finding before acting on it:
-- **blocking side issue**: prevents the current mainline objective from succeeding safely or prevents review acceptance
-- **queued side issue**: valid follow-up, but does not block the current round objective
+在处理每个审查发现之前对其进行分类：
+- **阻塞侧问题**：阻止当前主线目标安全成功或阻止审查接受
+- **排队侧问题**：有效的后续工作，但不阻塞当前轮次目标
 
-Queued issues may be documented, but they must NOT take over the round.
+排队的问题可以被记录，但不得接管轮次。
 
-## Task Rules
+## 任务规则
 
-Every task must use one lane tag:
-- `[blocking]` for review findings that must be fixed now
-- `[queued]` for non-blocking follow-up work
+每个任务必须使用一个通道标签：
+- `[blocking]` 用于必须立即修复的审查发现
+- `[queued]` 用于非阻塞的后续工作
 
-Do not create new `[mainline]` tasks in review phase unless the review proves the previous mainline objective was incomplete.
+在审查阶段不要创建新的 `[mainline]` 任务，除非审查证明之前的主线目标不完整。
 
-## Instructions
+## 指令
 
-1. **Refresh the round contract** at `{{ROUND_CONTRACT_FILE}}`
-2. **Address blocking issues first** and keep the mainline objective stable
-3. **Focus on fixes only** - do not add new features or make unrelated changes
-4. **Commit your changes** after fixing the issues
-5. **Write your summary** to: `{{SUMMARY_FILE}}`
+1. 在 `{{ROUND_CONTRACT_FILE}}` **刷新轮次契约**
+2. **先处理阻塞问题**并保持主线目标稳定
+3. **仅关注修复** - 不要添加新功能或进行不相关的更改
+4. 修复问题后**提交你的更改**
+5. 将你的摘要写入：`{{SUMMARY_FILE}}`
 
-## Summary Template
+## 摘要模板
 
-Your summary should include:
-- The mainline objective for this round
-- Which blocking issues were fixed
-- Which issues were reclassified as queued follow-up
-- How each fixed issue was resolved
-- Any issues that could not be resolved (with explanation)
-- Confirmation that `goal-tracker.md` was updated if the blocking/queued issue lists changed
-- A Goal Tracker Update Request only if tracker reconciliation still needs Codex help
+你的摘要应包含：
+- 本轮的主线目标
+- 哪些阻塞问题已修复
+- 哪些问题被重新分类为排队的后续工作
+- 每个已修复的问题是如何解决的
+- 任何无法解决的问题（附解释）
+- 如果阻塞/排队问题列表发生变化，确认 `goal-tracker.md` 已更新
+- 仅在跟踪器协调仍需要 Codex 帮助时才包含目标跟踪器更新请求
 
-## Important Notes
+## 重要说明
 
-- The COMPLETE signal has no effect during the review phase
-- You must address the code review findings to proceed
-- After you commit and write your summary, Codex will perform another code review
-- The loop continues until no `[P0-9]` issues are found
+- COMPLETE 信号在审查阶段无效
+- 你必须处理代码审查发现才能继续
+- 在你提交并编写摘要后，Codex 将执行另一次代码审查
+- 循环将继续直到没有发现 `[P0-9]` 问题

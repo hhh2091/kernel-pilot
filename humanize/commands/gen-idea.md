@@ -1,5 +1,5 @@
 ---
-description: "Generate a repo-grounded idea draft via directed-swarm exploration"
+description: "通过定向群集探索生成基于仓库的想法草稿"
 argument-hint: "<idea-text-or-path> [--n <int>] [--output <path>]"
 allowed-tools:
   - "Bash(${CLAUDE_PLUGIN_ROOT}/scripts/validate-gen-idea-io.sh:*)"
@@ -12,192 +12,192 @@ allowed-tools:
   - "Write"
 ---
 
-# Generate Idea Draft from Loose Input
+# 从松散输入生成想法草稿
 
-Read and execute below with ultrathink.
+请仔细阅读并执行以下内容。
 
-## Hard Constraint: Draft-Only Output
+## 硬性约束：仅草稿输出
 
-This command MUST NOT implement features, modify source code, or create commits while producing the draft. Permitted writes are limited to the output draft file and its companion `directions.json` artifact produced in Phase 4; prerequisite directory creation for the default `.humanize/ideas/` path by the validation script is permitted. `rm` is permitted solely to delete those two just-written files when companion JSON validation fails (no-partial-output cleanup). All exploration subagents run read-only.
+本命令在生成草稿期间不得实现功能、修改源代码或创建提交。允许的写入仅限于输出草稿文件和阶段 4 生成的配套 `directions.json` 产物；允许验证脚本为默认 `.humanize/ideas/` 路径创建前置目录。`rm` 仅在配套 JSON 验证失败时用于删除这两个刚写入的文件（无部分输出清理）。所有探索子代理以只读方式运行。
 
-This command transforms a loose idea into a repo-grounded draft suitable as input to `/humanize:gen-plan`. It applies directed-diversity exploration: a lead picks N orthogonal directions, N parallel `Explore` subagents develop each, the lead synthesizes a draft with one primary direction plus N-1 alternatives. Each direction carries objective evidence from the repo.
+本命令将松散的想法转换为适合作为 `/humanize:gen-plan` 输入的基于仓库的草稿。它应用定向多样性探索：一个主导者选择 N 个正交方向，N 个并行 `Explore` 子代理分别开发每个方向，主导者合成一个包含一个主要方向和 N-1 个替代方向的草稿。每个方向都携带来自仓库的客观证据。
 
-## Workflow Overview
+## 工作流程概览
 
-> **Sequential Execution Constraint**: All phases MUST execute strictly in order. Each phase fully completes before the next.
+> **顺序执行约束**：所有阶段必须严格按顺序执行。每个阶段必须完全完成后才能进入下一个。
 
-1. Parse Input
-2. IO Validation
-3. Direction Generation
-4. Parallel Exploration
-5. Synthesis, Write Draft, and Write Companion JSON
-
----
-
-## Phase 0: Parse Input
-
-Extract from `$ARGUMENTS`:
-- First positional: inline idea text or path to a `.md` file (required).
-- `--n <int>`: number of directions. Default 6.
-- `--output <path>`: target draft path. Default resolved by the validation script.
-
-Do not interpret or rewrite the idea text here. Pass `$ARGUMENTS` through to Phase 1 unchanged.
+1. 解析输入
+2. IO 验证
+3. 方向生成
+4. 并行探索
+5. 合成、写入草稿并写入配套 JSON
 
 ---
 
-## Phase 1: IO Validation
+## 阶段 0：解析输入
 
-Run:
+从 `$ARGUMENTS` 提取：
+- 第一个位置参数：内联想法文本或 `.md` 文件路径（必填）。
+- `--n <int>`：方向数量。默认为 6。
+- `--output <path>`：目标草稿路径。默认由验证脚本解析。
+
+不要在此处解释或重写想法文本。将 `$ARGUMENTS` 原封不动地传递到阶段 1。
+
+---
+
+## 阶段 1：IO 验证
+
+运行：
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/validate-gen-idea-io.sh" $ARGUMENTS
 ```
 
-Handle exit codes:
-- `0`: Parse stdout to extract `INPUT_MODE`, `OUTPUT_FILE`, `DIRECTIONS_JSON_FILE`, `SLUG`, `TEMPLATE_FILE`, `N` (each appears on its own `KEY: value` line). When `INPUT_MODE` is `file`, stdout additionally contains an `IDEA_BODY_FILE: <path>` line; extract that too. Continue to Phase 2. (`SLUG` is informational — the script has already incorporated it into `OUTPUT_FILE`, so later phases do not need to use `SLUG` directly.)
-- `1`: Report "Missing or empty idea input" and stop.
-- `2`: Report "Input looks like a file path but is missing, not readable, or not `.md`" and stop.
-- `3`: Report "Output directory does not exist — please create it or choose a different path" and stop.
-- `4`: Report "Output file already exists — choose a different path" and stop.
-- `5`: Report "No write permission to output directory" and stop.
-- `6`: Report "Invalid arguments — output path must have `.md` suffix" with the stdout usage text and stop.
-- `7`: Report "Template file missing — plugin configuration error" and stop.
-- `8`: Report "Companion directions.json already exists — choose a different output path or remove the existing companion file" and stop.
+处理退出码：
+- `0`：解析标准输出以提取 `INPUT_MODE`、`OUTPUT_FILE`、`DIRECTIONS_JSON_FILE`、`SLUG`、`TEMPLATE_FILE`、`N`（每个出现在自己的 `KEY: value` 行上）。当 `INPUT_MODE` 为 `file` 时，标准输出还包含 `IDEA_BODY_FILE: <path>` 行；也需要提取。继续阶段 2。（`SLUG` 是信息性的 — 脚本已将其纳入 `OUTPUT_FILE`，因此后续阶段不需要直接使用 `SLUG`。）
+- `1`：报告"缺少或空的想法输入"并停止。
+- `2`：报告"输入看起来像文件路径但缺失、不可读或不是 `.md`"并停止。
+- `3`：报告"输出目录不存在 — 请创建它或选择不同的路径"并停止。
+- `4`：报告"输出文件已存在 — 请选择不同的路径"并停止。
+- `5`：报告"没有输出目录的写入权限"并停止。
+- `6`：报告"参数无效 — 输出路径必须具有 `.md` 后缀"并附带标准输出使用文本，然后停止。
+- `7`：报告"模板文件缺失 — 插件配置错误"并停止。
+- `8`：报告"配套的 directions.json 已存在 — 请选择不同的输出路径或删除现有的配套文件"并停止。
 
-Before `VALIDATION_SUCCESS`, stdout may contain one or more lines starting with `WARNING:` (for example, `WARNING: short idea (<N> chars); proceeding` when an inline idea is under 10 characters). Surface these warnings to the user in your final report but continue Phase 2 normally. `WARNING:` lines are informational, not errors.
+在 `VALIDATION_SUCCESS` 之前，标准输出可能包含一个或多个以 `WARNING:` 开头的行（例如，当内联想法少于 10 个字符时出现 `WARNING: short idea (<N> chars); proceeding`）。在最终报告中向用户显示这些警告，但正常继续阶段 2。`WARNING:` 行是信息性的，不是错误。
 
-Obtain the idea body into memory as `IDEA_BODY`, based on `INPUT_MODE`:
-- `inline`: stdout contains a sentinel block at the end of the success output; extract all text between the `=== IDEA_BODY_BEGIN ===` and `=== IDEA_BODY_END ===` lines (exclusive). The script emits a trailing newline after the last body line.
-- `file`: read the full contents of `IDEA_BODY_FILE` using the `Read` tool.
+根据 `INPUT_MODE` 将想法主体获取到内存中作为 `IDEA_BODY`：
+- `inline`：标准输出在成功输出的末尾包含一个哨兵块；提取 `=== IDEA_BODY_BEGIN ===` 和 `=== IDEA_BODY_END ===` 行之间的所有文本（不包括标记行）。脚本在最后一行主体之后发出尾随换行符。
+- `file`：使用 `Read` 工具读取 `IDEA_BODY_FILE` 的完整内容。
 
-Preserve byte-identical content in memory for later phases. No on-disk tempfile is created in inline mode — the stdout sentinel block is the authoritative source.
-
----
-
-## Phase 2: Direction Generation
-
-Generate exactly `N` orthogonal directions for exploring the idea.
-
-### Context to Gather
-
-Before generating directions, read (paths relative to the project root, which is `$(git rev-parse --show-toplevel)`):
-- `README.md` at the project root.
-- `CLAUDE.md` at the project root (if it exists).
-- `.claude/CLAUDE.md` (if it exists).
-- Top-level directory listing via `Glob` with pattern `*` (one level, no recursion).
-
-This context grounds the directions in the actual repo rather than generic brainstorming.
-
-### Generation Rules
-
-Produce exactly `N` direction entries. Each entry has:
-- `name`: a 2-5 word short label.
-- `rationale`: a single sentence explaining why this angle is distinct from the other directions.
-
-Hard constraint: **orthogonality**. Two near-duplicate directions defeat the directed-diversity premise. Before returning:
-- If two directions feel like dupes, replace one with a genuinely different angle.
-- If a direction collapses to "just do X better" with no angle distinction, replace it.
-- Do not emit directions that merely restate the idea in different words.
-
-### Retry and Degradation
-
-- If the first pass returns fewer than `N` entries, regenerate once with an explicit "you MUST produce `N` orthogonal directions" instruction.
-- If the second pass still returns fewer than `N` but at least 2, proceed with the reduced count and emit a warning to the user: `Warning: direction generation returned <count> of <N> requested directions; proceeding with reduced count.`
-- If fewer than 2 directions are produced, stop with error: `direction generation degraded; retry.`
-
-Store the final direction list as `DIRECTIONS` (ordered; index 0..len-1).
+在内存中保留逐字节相同的内容供后续阶段使用。内联模式下不会在磁盘上创建临时文件 — 标准输出哨兵块是权威来源。
 
 ---
 
-## Phase 3: Parallel Exploration
+## 阶段 2：方向生成
 
-Dispatch all directions in a **single Task-tool message** containing one Task invocation per direction. This is the W2S parallel-swarm step.
+生成恰好 `N` 个正交方向用于探索想法。
 
-### Subagent Invocation
+### 需要收集的上下文
 
-For each direction in `DIRECTIONS`, launch one `Explore` subagent. Each invocation prompt MUST include:
+在生成方向之前，读取（路径相对于项目根目录，即 `$(git rev-parse --show-toplevel)`）：
+- 项目根目录的 `README.md`。
+- 项目根目录的 `CLAUDE.md`（如果存在）。
+- `.claude/CLAUDE.md`（如果存在）。
+- 通过 `Glob` 使用模式 `*` 获取顶级目录列表（一级，无递归）。
 
-1. A verbatim copy of the idea body (`IDEA_BODY`) captured in Phase 1.
-2. The assigned direction (name + rationale).
-3. The following instruction block (reproduce verbatim in the subagent prompt):
+此上下文将方向定位在实际仓库中，而非通用头脑风暴。
 
-> Explore this direction within the current repo. Gather OBJECTIVE EVIDENCE:
-> - Specific repo paths with existing patterns worth extending.
-> - Prior art or precedent in the codebase or adjacent tooling.
-> - Measurable considerations (approximate complexity, LOC surface, performance implications) where discoverable from reading the code.
->
-> Read-only. Do not write any files.
->
-> If no concrete evidence exists for this direction, report the literal string `exploratory, no concrete precedent` once in OBJECTIVE_EVIDENCE and stop exploring further. Fabrication of references is forbidden.
->
-> Return a structured proposal with exactly these fields:
-> - `APPROACH_SUMMARY`: concrete design description (what to build, core mechanism, affected components).
-> - `OBJECTIVE_EVIDENCE`: bullet list of repo paths, prior art, or the `exploratory, no concrete precedent` sentinel.
-> - `KNOWN_RISKS`: short bullet list.
-> - `CONFIDENCE`: one of `high`, `medium`, `low`.
+### 生成规则
 
-### Collection and Degradation
+生成恰好 `N` 个方向条目。每个条目包含：
+- `name`：2-5 个词的简短标签。
+- `rationale`：一句话解释为什么此角度与其他方向不同。
 
-Collect all subagent responses. For each response:
-- Parse the four required fields. If a field is missing, mark that proposal as degraded and drop it.
-- If fewer than 2 proposals survive, stop with error: `exploration phase degraded; retry.`
-- Otherwise continue with the surviving proposals.
+硬性约束：**正交性**。两个近乎重复的方向违背了定向多样性的前提。在返回之前：
+- 如果两个方向感觉像重复的，将其中一个替换为真正不同的角度。
+- 如果一个方向退化为"只是把 X 做得更好"而没有角度区分，则替换它。
+- 不要发出仅仅用不同措辞重述想法的方向。
 
-Associate each surviving proposal with its originating direction (so Phase 4 can label it with the original direction name). When numbering alternatives in Phase 4 after any drops, renumber survivors sequentially as Alt-1..Alt-K (where K is the count of surviving non-primary directions). Do not preserve gaps from dropped proposals.
+### 重试和降级
+
+- 如果第一轮返回少于 `N` 个条目，使用明确的"你必须生成 `N` 个正交方向"指令重新生成一次。
+- 如果第二轮仍然返回少于 `N` 个但至少 2 个，则以减少的数量继续并向用户发出警告：`Warning: direction generation returned <count> of <N> requested directions; proceeding with reduced count.`
+- 如果产生的方向少于 2 个，则以错误停止：`direction generation degraded; retry.`
+
+将最终方向列表存储为 `DIRECTIONS`（有序；索引 0..len-1）。
 
 ---
 
-## Phase 4: Synthesis and Write
+## 阶段 3：并行探索
 
-### Step 4.1: Pick the Primary Direction
+在**单个 Task 工具消息**中调度所有方向，每个方向包含一个 Task 调用。这是 W2S 并行群集步骤。
 
-Review all surviving proposals. Choose the strongest as the primary based on:
-1. Evidence density — more concrete repo references outranks fewer.
-2. Fit with existing repo patterns — extending patterns outranks introducing unfamiliar paradigms.
-3. Implementation surface area — prefer smaller surface where quality is otherwise comparable.
-4. Declared `CONFIDENCE` — `high` > `medium` > `low` as tiebreaker.
+### 子代理调用
 
-Record the chosen direction as `PRIMARY`; the remaining surviving directions become the Alt-1..Alt-K list (where K is the number of non-primary survivors, K ≤ N-1), numbered sequentially in their original direction order with no gaps for any dropped proposals.
+对于 `DIRECTIONS` 中的每个方向，启动一个 `Explore` 子代理。每个调用提示必须包含：
 
-### Step 4.2: Infer Title
+1. 阶段 1 中捕获的想法主体（`IDEA_BODY`）的逐字副本。
+2. 分配的方向（名称 + 理由）。
+3. 以下指令块（在子代理提示中逐字复制）：
 
-Generate a 4-10 word Title Case title that captures the primary direction, not the original input phrasing verbatim. Example: idea `add undo/redo` with primary direction `command-pattern history` yields title `Command-Pattern Undo Stack For The Editor`.
+> 在当前仓库中探索此方向。收集客观证据：
+> - 值得扩展的现有模式的具体仓库路径。
+> - 代码库或相邻工具中的现有技术或先例。
+> - 可从代码阅读中发现的可衡量考虑因素（大致复杂度、LOC 范围、性能影响）。
+>
+> 只读。不要写入任何文件。
+>
+> 如果此方向不存在具体证据，请在 OBJECTIVE_EVIDENCE 中报告一次字面字符串 `exploratory, no concrete precedent` 并停止进一步探索。禁止编造引用。
+>
+> 返回一个结构化提案，包含以下字段：
+> - `APPROACH_SUMMARY`：具体的设计描述（要构建什么、核心机制、受影响的组件）。
+> - `OBJECTIVE_EVIDENCE`：仓库路径、现有技术或 `exploratory, no concrete precedent` 哨兵的项目符号列表。
+> - `KNOWN_RISKS`：简短的项目符号列表。
+> - `CONFIDENCE`：`high`、`medium`、`low` 之一。
 
-### Step 4.3: Populate the Template
+### 收集和降级
 
-Read the template file located at `TEMPLATE_FILE` (from Phase 1 stdout).
+收集所有子代理响应。对于每个响应：
+- 解析四个必需字段。如果缺少字段，将该提案标记为降级并丢弃。
+- 如果存活的提案少于 2 个，则以错误停止：`exploration phase degraded; retry.`
+- 否则继续使用存活的提案。
 
-Produce the finalized draft content in memory by replacing placeholders:
-- `<TITLE>` — the inferred title.
-- `<ORIGINAL_IDEA>` — byte-identical value of `IDEA_BODY` captured in Phase 1. Preserve line breaks, trailing newline, and all formatting. Do NOT paraphrase or re-indent.
-- `<PRIMARY_NAME>` — primary direction's short name.
-- `<PRIMARY_RATIONALE>` — primary direction's rationale (from Phase 2).
-- `<PRIMARY_APPROACH_SUMMARY>` — primary proposal's `APPROACH_SUMMARY`.
-- `<PRIMARY_OBJECTIVE_EVIDENCE>` — primary proposal's `OBJECTIVE_EVIDENCE`, rendered as a bullet list. If the subagent returned only the literal sentinel `exploratory, no concrete precedent`, render it as a single bullet: `- exploratory, no concrete precedent`.
-- `<PRIMARY_KNOWN_RISKS>` — primary proposal's `KNOWN_RISKS`, rendered as a bullet list.
-- `<ALTERNATIVES>` — for each non-primary survivor at its Alt index `i` (1-based, sequential per Step 4.1), emit:
+将每个存活的提案与其原始方向关联（以便阶段 4 可以用原始方向名称标记它）。在阶段 4 中对丢弃后的替代方案进行编号时，将存活者按顺序重新编号为 Alt-1..Alt-K（其中 K 是存活的非主要方向的数量）。不要保留已丢弃提案的间隔。
+
+---
+
+## 阶段 4：合成和写入
+
+### 步骤 4.1：选择主要方向
+
+审查所有存活的提案。根据以下标准选择最强的作为主要方向：
+1. 证据密度 — 更多具体的仓库引用优先于较少的。
+2. 与现有仓库模式的契合度 — 扩展模式优先于引入不熟悉的范式。
+3. 实施范围 — 在质量相当的情况下，优先选择较小的范围。
+4. 声明的 `CONFIDENCE` — `high` > `medium` > `low` 作为决胜因素。
+
+将选定的方向记录为 `PRIMARY`；其余存活的方向成为 Alt-1..Alt-K 列表（其中 K 是非主要存活者的数量，K ≤ N-1），按其原始方向顺序编号，不为已丢弃的提案保留间隔。
+
+### 步骤 4.2：推断标题
+
+生成一个 4-10 个词的标题大写标题，捕捉主要方向，而非逐字使用原始输入措辞。例如：想法 `add undo/redo` 配合主要方向 `command-pattern history` 生成标题 `Command-Pattern Undo Stack For The Editor`。
+
+### 步骤 4.3：填充模板
+
+读取位于 `TEMPLATE_FILE` 的模板文件（来自阶段 1 标准输出）。
+
+通过替换占位符在内存中生成最终草稿内容：
+- `<TITLE>` — 推断的标题。
+- `<ORIGINAL_IDEA>` — 阶段 1 中捕获的 `IDEA_BODY` 的逐字节相同值。保留换行符、尾随换行符和所有格式。不要转述或重新缩进。
+- `<PRIMARY_NAME>` — 主要方向的简短名称。
+- `<PRIMARY_RATIONALE>` — 主要方向的理由（来自阶段 2）。
+- `<PRIMARY_APPROACH_SUMMARY>` — 主要提案的 `APPROACH_SUMMARY`。
+- `<PRIMARY_OBJECTIVE_EVIDENCE>` — 主要提案的 `OBJECTIVE_EVIDENCE`，渲染为项目符号列表。如果子代理仅返回字面哨兵 `exploratory, no concrete precedent`，则将其渲染为单个项目符号：`- exploratory, no concrete precedent`。
+- `<PRIMARY_KNOWN_RISKS>` — 主要提案的 `KNOWN_RISKS`，渲染为项目符号列表。
+- `<ALTERNATIVES>` — 对于每个非主要存活者在其 Alt 索引 `i`（从 1 开始，按步骤 4.1 顺序），发出：
 
   ```markdown
   ### Alt-<i>: <name>
-  - Gist: <one-paragraph summary derived from APPROACH_SUMMARY>
-  - Objective Evidence:
-    - <bullet from OBJECTIVE_EVIDENCE>
+  - 摘要：<从 APPROACH_SUMMARY 派生的一段摘要>
+  - 客观证据：
+    - <来自 OBJECTIVE_EVIDENCE 的项目符号>
     - ...
-  - Why not primary: <one sentence stating the tradeoff vs PRIMARY>
+  - 未选为主要的原因：<一句话说明与 PRIMARY 的权衡>
   ```
 
-  Separate consecutive Alt entries with a single blank line.
+  用一个空行分隔连续的 Alt 条目。
 
-- `<SYNTHESIS_NOTES>` — one paragraph describing which elements from the alternatives could fold into the primary if the user chose a different direction. This is the lead's own synthesis note, not a subagent output.
+- `<SYNTHESIS_NOTES>` — 一段描述替代方案中的哪些元素可以在用户选择不同方向时融入主要方向的文字。这是主导者自己的合成笔记，不是子代理输出。
 
-### Step 4.4: Write the Draft File
+### 步骤 4.4：写入草稿文件
 
-Write the finalized content to `OUTPUT_FILE` using the `Write` tool. Single write; no progressive edits.
+使用 `Write` 工具将最终内容写入 `OUTPUT_FILE`。单次写入；无渐进编辑。
 
-### Step 4.5: Build and Write Companion JSON
+### 步骤 4.5：构建并写入配套 JSON
 
-Construct the companion `directions.json` in memory using all surviving direction proposals from Phase 3, then write it to `DIRECTIONS_JSON_FILE` (from Phase 1 stdout).
+使用阶段 3 中所有存活的方向提案在内存中构建配套 `directions.json`，然后将其写入 `DIRECTIONS_JSON_FILE`（来自阶段 1 标准输出）。
 
-**JSON structure (schema version 1):**
+**JSON 结构（模式版本 1）：**
 
 ```json
 {
@@ -230,44 +230,44 @@ Construct the companion `directions.json` in memory using all surviving directio
 }
 ```
 
-**Field derivation rules:**
-- `direction_id`: `"dir-" + zero-padded source_index (2 digits) + "-" + dir_slug`. Example: `"dir-00-command-history"`.
-- `dir_slug`: Derived from direction name — lowercase, replace non-alphanumeric with hyphens, collapse consecutive hyphens, strip leading/trailing hyphens. Must match `^[a-z0-9-]+$`.
-- `dir_slug` collision handling: if two direction names slugify to the same value, append `-2`, `-3`, etc. by original `source_index` order until every `dir_slug` is unique.
-- `source_index`: The 0-based index of this direction in the original `DIRECTIONS` list from Phase 2 (before any degradation drops).
-- `display_order`: 0 for the primary direction, 1 through K for alternatives in their sequential order.
-- `is_primary`: `true` for exactly one direction (PRIMARY), `false` for all others.
-- `objective_evidence`: Each bullet item from the subagent's `OBJECTIVE_EVIDENCE` field as a string array element.
-- `known_risks`: Each bullet item from the subagent's `KNOWN_RISKS` field as a string array element.
-- `metadata.n_returned` must equal `directions.length`.
+**字段派生规则：**
+- `direction_id`：`"dir-" + 零填充的 source_index（2 位数字）+ "-" + dir_slug`。示例：`"dir-00-command-history"`。
+- `dir_slug`：从方向名称派生 — 小写，将非字母数字字符替换为连字符，折叠连续连字符，去除前导/尾随连字符。必须匹配 `^[a-z0-9-]+$`。
+- `dir_slug` 冲突处理：如果两个方向名称 slugify 为相同的值，按原始 `source_index` 顺序追加 `-2`、`-3` 等，直到每个 `dir_slug` 都唯一。
+- `source_index`：此方向在阶段 2 原始 `DIRECTIONS` 列表中的从 0 开始的索引（在任何降级丢弃之前）。
+- `display_order`：主要方向为 0，替代方案按顺序从 1 到 K。
+- `is_primary`：恰好一个方向（PRIMARY）为 `true`，所有其他为 `false`。
+- `objective_evidence`：子代理 `OBJECTIVE_EVIDENCE` 字段中的每个项目符号项作为字符串数组元素。
+- `known_risks`：子代理 `KNOWN_RISKS` 字段中的每个项目符号项作为字符串数组元素。
+- `metadata.n_returned` 必须等于 `directions.length`。
 
-After writing `DIRECTIONS_JSON_FILE`, validate it:
+写入 `DIRECTIONS_JSON_FILE` 后，验证它：
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/validate-directions-json.sh" "$DIRECTIONS_JSON_FILE"
 ```
 
-If validation fails, delete both `OUTPUT_FILE` and `DIRECTIONS_JSON_FILE` and stop with error: `companion JSON validation failed — this is a bug in the command; please report it`.
+如果验证失败，删除 `OUTPUT_FILE` 和 `DIRECTIONS_JSON_FILE` 并以错误停止：`companion JSON validation failed — this is a bug in the command; please report it`。
 
-### Step 4.6: Report
+### 步骤 4.6：报告
 
-Report to the user:
-- Draft path written: `OUTPUT_FILE`
-- Companion JSON path written: `DIRECTIONS_JSON_FILE`
-- Primary direction name.
-- Requested `N` and the actual direction count (note if reduced due to degradation).
-- Next-step hints:
+向用户报告：
+- 写入的草稿路径：`OUTPUT_FILE`
+- 写入的配套 JSON 路径：`DIRECTIONS_JSON_FILE`
+- 主要方向名称。
+- 请求的 `N` 和实际方向数量（如果因降级而减少则注明）。
+- 下一步提示：
   ```
-  To explore directions as parallel prototypes, run: /humanize:explore-idea <DIRECTIONS_JSON_FILE>
-  To turn this draft into a plan, run: /humanize:gen-plan --input <OUTPUT_FILE> --output <plan-path>
+  要将方向作为并行原型探索，请运行：/humanize:explore-idea <DIRECTIONS_JSON_FILE>
+  要将此草稿转换为计划，请运行：/humanize:gen-plan --input <OUTPUT_FILE> --output <plan-path>
   ```
 
 ---
 
-## Error Handling
+## 错误处理
 
-- Phase 1 validation errors stop the command with a clear message. No partial output.
-- Phase 2 degradation follows the retry-once + ≥2 minimum rule stated above.
-- Phase 3 degradation follows the drop-and-continue + ≥2 minimum rule stated above.
-- Never fabricate repo references or prior art. The `exploratory, no concrete precedent` sentinel from subagents is preserved verbatim in the draft.
-- If any phase stops with an error, do not write a partial `OUTPUT_FILE` or `DIRECTIONS_JSON_FILE`.
-- If companion JSON validation fails after writing both files, delete both files and stop.
+- 阶段 1 验证错误以明确消息停止命令。无部分输出。
+- 阶段 2 降级遵循上述重试一次 + 最少 2 个规则。
+- 阶段 3 降级遵循上述丢弃并继续 + 最少 2 个规则。
+- 绝不编造仓库引用或现有技术。子代理的 `exploratory, no concrete precedent` 哨兵在草稿中逐字保留。
+- 如果任何阶段因错误停止，不要写入部分的 `OUTPUT_FILE` 或 `DIRECTIONS_JSON_FILE`。
+- 如果在写入两个文件后配套 JSON 验证失败，删除两个文件并停止。

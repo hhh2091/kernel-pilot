@@ -1,7 +1,7 @@
-# Direct Execution of Hook Scripts Blocked
+# 直接执行钩子脚本被阻止
 
-You are attempting to directly execute a hook script via Bash. This is not allowed during an active loop.
+您正在尝试通过 Bash 直接执行钩子脚本。在活动循环期间不允许这样做。
 
-Hook scripts are managed by the hooks system and are triggered automatically at the appropriate time. You should NOT execute them manually.
+钩子脚本由钩子系统管理，并在适当的时间自动触发。您不应手动执行它们。
 
-Simply complete your work and end your response. The hooks system will handle the rest automatically.
+只需完成您的工作并结束您的响应。钩子系统将自动处理其余部分。

@@ -1,10 +1,10 @@
-# Git Status Failed
+# Git Status 失败
 
-Git status operation failed or timed out (exit code {{GIT_STATUS_EXIT}}).
+Git status 操作失败或超时（退出代码 {{GIT_STATUS_EXIT}}）。
 
-Cannot verify repository state. This may indicate:
-- Git is not responding (possible lock contention)
-- Repository is in an invalid state
-- Large repository causing slow operations
+无法验证仓库状态。这可能表示：
+- Git 未响应（可能存在锁争用）
+- 仓库处于无效状态
+- 大型仓库导致操作缓慢
 
-Please check git status manually and try again.
+请手动检查 git status 并重试。

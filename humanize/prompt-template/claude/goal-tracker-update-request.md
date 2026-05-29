@@ -1,17 +1,17 @@
 
-**Optional fallback**: if you could not safely update the mutable section of `goal-tracker.md` directly, include this section in your summary:
+**可选后备方案**：如果你无法安全地直接更新 `goal-tracker.md` 的可变部分，请在摘要中包含此部分：
 ```markdown
-## Goal Tracker Update Request
+## 目标跟踪器更新请求
 
-### Requested Changes:
-- [E.g., "Mark Task X as completed with evidence: tests pass"]
-- [E.g., "Add to Blocking Side Issues: bug Y blocks AC-2"]
-- [E.g., "Add to Queued Side Issues: cleanup Z is non-blocking"]
-- [E.g., "Plan Evolution: changed approach from A to B because..."]
-- [E.g., "Defer Task Z because... (impact on AC: none/minimal)"]
+### 请求的更改：
+- [例如，"将 Task X 标记为已完成，证据：测试通过"]
+- [例如，"添加到阻塞侧问题：bug Y 阻塞 AC-2"]
+- [例如，"添加到排队侧问题：清理 Z 是非阻塞的"]
+- [例如，"计划演进：将方法从 A 更改为 B，因为..."]
+- [例如，"推迟 Task Z，因为...（对 AC 的影响：无/最小）"]
 
-### Justification:
-[Explain why these changes are needed and how they serve the Ultimate Goal]
+### 理由：
+[解释为什么需要这些更改以及它们如何服务于最终目标]
 ```
 
-Codex will review your request and reconcile the Goal Tracker if justified.
+Codex 将审查你的请求，并在有充分理由时协调目标跟踪器。

@@ -1,9 +1,9 @@
-# Methodology Analysis State File Modification Blocked
+# 方法论分析状态文件修改被阻止
 
-You cannot modify `methodology-analysis-state.md`. This file is managed by the loop system during the Methodology Analysis Phase.
+您无法修改 `methodology-analysis-state.md`。此文件由循环系统在方法论分析阶段管理。
 
-The Methodology Analysis Phase runs before the loop fully exits. Focus on:
-1. Spawning an Opus agent to analyze development records
-2. Reviewing the sanitized analysis report
-3. Optionally helping the user file a GitHub issue with improvement suggestions
-4. Writing your completion marker to `methodology-analysis-done.md`
+方法论分析阶段在循环完全退出之前运行。请专注于：
+1. 生成一个 Opus 代理来分析开发记录
+2. 审查经过清理的分析报告
+3. 可选地帮助用户提交包含改进建议的 GitHub issue
+4. 将完成标记写入 `methodology-analysis-done.md`

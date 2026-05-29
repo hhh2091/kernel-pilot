@@ -1,56 +1,56 @@
 ---
 name: ask-codex
-description: Consult Codex as an independent expert. Sends a question or task to codex exec and returns the response.
+description: 以独立专家身份咨询 Codex。将问题或任务发送给 codex exec 并返回响应。
 argument-hint: "[--codex-model MODEL:EFFORT] [--codex-timeout SECONDS] [question or task]"
 allowed-tools: "Bash(${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh:*)"
 ---
 
-# Ask Codex
+# 咨询 Codex
 
-Send a question or task to Codex and return the response.
+将问题或任务发送给 Codex 并返回响应。
 
-## How to Use
+## 使用方法
 
-Do not pass free-form user text to the shell unquoted. The question or task may contain spaces or shell metacharacters such as `(`, `)`, `;`, `#`, `*`, or `[`.
+不要将自由格式的用户文本不加引号地传递给 shell。问题或任务可能包含空格或 shell 元字符，例如 `(`、`)`、`;`、`#`、`*` 或 `[`。
 
-If the user only supplied a question or task, execute:
+如果用户仅提供了问题或任务，执行：
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh" "$ARGUMENTS"
 ```
 
-If the user supplied flags such as `--codex-model` or `--codex-timeout`, reconstruct the command so those flags remain separate shell arguments and the remaining free-form question is passed as one quoted final argument.
+如果用户提供了 `--codex-model` 或 `--codex-timeout` 等标志，请重新构造命令，使这些标志作为独立的 shell 参数，其余的自由格式问题作为一个带引号的最终参数传递。
 
-Example:
+示例：
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh" --codex-model gpt-5.5:high "Review the following round summary (M4)..."
 ```
 
-Never run this unsafe form:
+切勿运行以下不安全形式：
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/ask-codex.sh" $ARGUMENTS
 ```
 
-because the shell will re-parse the question text and can fail before `ask-codex.sh` starts.
+因为 shell 会重新解析问题文本，可能在 `ask-codex.sh` 启动之前就失败。
 
-## Interpreting Output
+## 解读输出
 
-- The script outputs Codex's response to **stdout** and status info to **stderr**
-- Read the stdout output carefully and incorporate Codex's response into your answer
-- If the script exits with a non-zero code, report the error to the user
+- 脚本将 Codex 的响应输出到 **stdout**，将状态信息输出到 **stderr**
+- 仔细阅读 stdout 输出，并将 Codex 的响应整合到你的回答中
+- 如果脚本以非零代码退出，向用户报告错误
 
-## Error Handling
+## 错误处理
 
-| Exit Code | Meaning |
+| 退出代码 | 含义 |
 |-----------|---------|
-| 0 | Success - Codex response is in stdout |
-| 1 | Validation error (missing codex, empty question, invalid flags) |
-| 124 | Timeout - suggest using `--codex-timeout` with a larger value |
-| Other | Codex process error - report the exit code and any stderr output |
+| 0 | 成功 - Codex 响应在 stdout 中 |
+| 1 | 验证错误（缺少 codex、问题为空、标志无效） |
+| 124 | 超时 - 建议使用更大的 `--codex-timeout` 值 |
+| 其他 | Codex 进程错误 - 报告退出代码和任何 stderr 输出 |
 
-## Notes
+## 备注
 
-- The response is saved to `.humanize/skill/<timestamp>/output.md` for reference
-- Default model is `gpt-5.5:high` with a 3600-second timeout
+- 响应保存到 `.humanize/skill/<timestamp>/output.md` 供参考
+- 默认模型为 `gpt-5.5:high`，超时时间为 3600 秒

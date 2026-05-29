@@ -1,12 +1,12 @@
-# Unpushed Commits Detected
+# 检测到未推送的提交
 
-You are trying to stop, but you have **{{AHEAD_COUNT}} unpushed commit(s)** on branch `{{CURRENT_BRANCH}}`.
+您正在尝试停止，但您在分支 `{{CURRENT_BRANCH}}` 上有 **{{AHEAD_COUNT}} 个未推送的提交**。
 
-Since `--push-every-round` is enabled, you must push your commits before exiting.
+由于启用了 `--push-every-round`，您必须在退出前推送提交。
 
-**Required Action**:
+**必需的操作**：
 ```bash
 git push origin {{CURRENT_BRANCH}}
 ```
 
-After pushing all commits, you may attempt to exit again.
+推送所有提交后，您可以再次尝试退出。

@@ -1,62 +1,62 @@
 # <Plan Title>
 
-## Goal Description
-<Clear, direct description of what needs to be accomplished>
+## 目标描述
+<清晰、直接地描述需要完成的内容>
 
-## Acceptance Criteria
+## 验收标准
 
-Following TDD philosophy, each criterion includes positive and negative tests for deterministic verification.
+遵循 TDD 哲学，每个标准都包含用于确定性验证的正向和反向测试。
 
 - AC-1: <First criterion>
-  - Positive Tests (expected to PASS):
+  - 正向测试（预期通过）：
     - <Test case that should succeed when criterion is met>
     - <Another success case>
-  - Negative Tests (expected to FAIL):
+  - 反向测试（预期失败）：
     - <Test case that should fail/be rejected when working correctly>
     - <Another failure/rejection case>
   - AC-1.1: <Sub-criterion if needed>
-    - Positive: <...>
-    - Negative: <...>
+    - 正向: <...>
+    - 反向: <...>
 - AC-2: <Second criterion>
-  - Positive Tests: <...>
-  - Negative Tests: <...>
+  - 正向测试: <...>
+  - 反向测试: <...>
 ...
 
-## Path Boundaries
+## 路径边界
 
-Path boundaries define the acceptable range of implementation quality and choices.
+路径边界定义了实施质量和选择的可接受范围。
 
-### Upper Bound (Maximum Acceptable Scope)
-<Affirmative description of the most comprehensive acceptable implementation>
-<This represents completing the goal without over-engineering>
-Example: "The implementation includes X, Y, and Z features with full test coverage"
+### 上界（最大可接受范围）
+<对最全面可接受实施的正面描述>
+<这代表在不过度工程化的情况下完成目标>
+示例："The implementation includes X, Y, and Z features with full test coverage"
 
-### Lower Bound (Minimum Acceptable Scope)
-<Affirmative description of the minimum viable implementation>
-<This represents the least effort that still satisfies all acceptance criteria>
-Example: "The implementation includes core feature X with basic validation"
+### 下界（最小可接受范围）
+<对最小可行实施的正面描述>
+<这代表仍然满足所有验收标准的最少工作量>
+示例："The implementation includes core feature X with basic validation"
 
-### Allowed Choices
-<Options that are acceptable for implementation decisions>
-- Can use: <technologies, approaches, patterns that are allowed>
-- Cannot use: <technologies, approaches, patterns that are prohibited>
+### 允许的选择
+<对实施决策可接受的选项>
+- 可以使用: <technologies, approaches, patterns that are allowed>
+- 不可使用: <technologies, approaches, patterns that are prohibited>
 
-> **Note on Deterministic Designs**: If the draft specifies a highly deterministic design with no choices (e.g., "must use JSON format", "must use algorithm X"), then the path boundaries should reflect this narrow constraint. In such cases, upper and lower bounds may converge to the same point, and "Allowed Choices" should explicitly state that the choice is fixed per the draft specification.
+> **关于确定性设计的说明**：如果草案指定了没有选择空间的高度确定性设计（例如"必须使用 JSON 格式"、"必须使用算法 X"），则路径边界应反映此狭窄约束。在这种情况下，上下界可能收敛到同一点，"允许的选择"应明确说明选择已按草案规范固定。
 
-## Feasibility Hints and Suggestions
+## 可行性提示和建议
 
-> **Note**: This section is for reference and understanding only. These are conceptual suggestions, not prescriptive requirements.
+> **注意**：此部分仅供参考和理解。这些是概念性建议，而非规范性要求。
 
-### Conceptual Approach
+### 概念方法
 <Text description, pseudocode, or diagrams showing ONE possible implementation path>
 
-### Relevant References
+### 相关参考
 <Code paths and concepts that might be useful>
 - <path/to/relevant/component> - <brief description>
 
-## Dependencies and Sequence
+## 依赖和顺序
 
-### Milestones
+### 里程碑
 1. <Milestone 1>: <Description>
    - Phase A: <...>
    - Phase B: <...>
@@ -64,57 +64,57 @@ Example: "The implementation includes core feature X with basic validation"
    - Step 1: <...>
    - Step 2: <...>
 
-<Describe relative dependencies between components, not time estimates>
+<描述组件之间的相对依赖关系，而非时间估计>
 
-## Task Breakdown
+## 任务分解
 
-Each task must include exactly one routing tag:
-- `coding`: implemented by Claude
-- `analyze`: executed via Codex (`/humanize:ask-codex`)
+每个任务必须包含恰好一个路由标签：
+- `coding`：由 Claude 实施
+- `analyze`：通过 Codex 执行（`/humanize:ask-codex`）
 
 | Task ID | Description | Target AC | Tag (`coding`/`analyze`) | Depends On |
 |---------|-------------|-----------|----------------------------|------------|
 | task1 | <...> | AC-1 | coding | - |
 | task2 | <...> | AC-2 | analyze | task1 |
 
-## Claude-Codex Deliberation
+## Claude-Codex 协商
 
-### Agreements
+### 共识
 - <Point both sides agree on>
 
-### Resolved Disagreements
+### 已解决的分歧
 - <Topic>: Claude vs Codex summary, chosen resolution, and rationale
 
-### Convergence Status
-- Final Status: `converged` or `partially_converged`
+### 收敛状态
+- 最终状态: `converged` 或 `partially_converged`
 
-## Pending User Decisions
+## 待用户决策
 
 - DEC-1: <Decision topic>
-  - Claude Position: <...>
-  - Codex Position: <...>
-  - Tradeoff Summary: <...>
-  - Decision Status: `PENDING` or `<User's final decision>`
+  - Claude 立场: <...>
+  - Codex 立场: <...>
+  - 权衡摘要: <...>
+  - 决策状态: `PENDING` 或 `<User's final decision>`
 
-## Implementation Notes
+## 实施说明
 
-### Code Style Requirements
-- Implementation code and comments must NOT contain plan-specific terminology such as "AC-", "Milestone", "Step", "Phase", or similar workflow markers
-- These terms are for plan documentation only, not for the resulting codebase
-- Use descriptive, domain-appropriate naming in code instead
+### 代码风格要求
+- 实施代码和注释不得包含计划特定术语，如 "AC-"、"Milestone"、"Step"、"Phase" 或类似的工作流标记
+- 这些术语仅用于计划文档，不用于生成的代码库
+- 在代码中使用描述性的、领域适当的命名
 
-## Output File Convention
+## 输出文件约定
 
-This template is used to produce the main output file (e.g., `plan.md`).
+此模板用于生成主输出文件（例如 `plan.md`）。
 
-### Translated Language Variant
+### 翻译语言变体
 
-When `alternative_plan_language` resolves to a supported language name through merged config loading, a translated variant of the output file is also written after the main file. Humanize loads config from merged layers in this order: default config, optional user config, then optional project config; `alternative_plan_language` may be set at any of those layers. The variant filename is constructed by inserting `_<code>` (the ISO 639-1 code from the built-in mapping table) immediately before the file extension:
+当 `alternative_plan_language` 通过合并配置加载解析为支持的语言名称时，主文件之后还会写入输出文件的翻译变体。Humanize 按以下顺序从合并层加载配置：默认配置、可选用户配置，然后是可选项目配置；`alternative_plan_language` 可以在任何层设置。变体文件名通过在文件扩展名之前插入 `_<code>`（来自内置映射表的 ISO 639-1 代码）来构建：
 
-- `plan.md` becomes `plan_<code>.md` (e.g. `plan_zh.md` for Chinese, `plan_ko.md` for Korean)
-- `docs/my-plan.md` becomes `docs/my-plan_<code>.md`
-- `output` (no extension) becomes `output_<code>`
+- `plan.md` 变为 `plan_<code>.md`（例如中文为 `plan_zh.md`，韩文为 `plan_ko.md`）
+- `docs/my-plan.md` 变为 `docs/my-plan_<code>.md`
+- `output`（无扩展名）变为 `output_<code>`
 
-The translated variant file contains a full translation of the main plan file's current content in the configured language. All identifiers (`AC-*`, task IDs, file paths, API names, command flags) remain unchanged, as they are language-neutral.
+翻译变体文件包含主计划文件当前内容的完整翻译，使用配置的语言。所有标识符（`AC-*`、任务 ID、文件路径、API 名称、命令标志）保持不变，因为它们是语言中性的。
 
-When `alternative_plan_language` is empty, absent, set to `"English"`, or set to an unsupported language, no translated variant is written. Humanize does not auto-create `.humanize/config.json` when no project config file is present.
+当 `alternative_plan_language` 为空、不存在、设置为 `"English"` 或设置为不支持的语言时，不会写入翻译变体。当不存在项目配置文件时，Humanize 不会自动创建 `.humanize/config.json`。

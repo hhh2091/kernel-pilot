@@ -1,28 +1,22 @@
 ---
 name: humanize-kernel-agent-loop
-description: "Run a Humanize kernel optimization loop: recover K/R/W, use one clean standalone workspace, iterate with correctness and benchmark evidence, use KernelWiki when prior art is useful, and use ncu-report-skill when profiling is needed."
+description: "运行 Humanize 内核优化循环：恢复 K/R/W，使用一个干净的独立工作区，基于正确性和基准证据进行迭代，在先验知识有用时使用 KernelWiki，在需要性能分析时使用 ncu-report-skill。"
 type: flow
 ---
 
-# Humanize Kernel Agent Loop
+# Humanize 内核代理循环
 
-Use this flow when the user wants an autonomous GPU kernel optimization run,
-not a generic software feature loop. The skill gives the agent a kernel-shaped
-workspace and review loop, while keeping research and profiling tools
-available on demand.
+当用户需要自主 GPU 内核优化运行时使用此流程，而非通用软件功能循环。该技能为代理提供内核形态的工作区和审查循环，同时按需提供研究和性能分析工具。
 
-The style is intentionally lightweight:
+风格刻意保持轻量：
 
-- Use `KernelWiki` when upstream PRs, wiki notes, docs, or prior kernels would
-  help the current design choice.
-- Use `ncu-report-skill` when profiler evidence is needed to explain a
-  baseline, regression, plateau, surprising win, or next optimization edit.
-- Do not run knowledge or profiling steps just to satisfy a ritual. Record the
-  reason when a tool meaningfully changes the next step.
+- 当上游 PR、wiki 笔记、文档或已有内核有助于当前设计选择时，使用 `KernelWiki`。
+- 当需要性能分析证据来解释基线、回归、平台期、意外提升或下一次优化编辑时，使用 `ncu-report-skill`。
+- 不要仅为满足流程仪式而运行知识或性能分析步骤。当工具实质性地改变了下一步时，记录原因。
 
-## Input Shape
+## 输入形态
 
-Recover or define these before starting the loop:
+在开始循环之前恢复或定义以下内容：
 
 ```text
 K: kernel definition and semantics
@@ -30,15 +24,13 @@ R: correctness reference or oracle
 W: workload distribution or focused benchmark case
 ```
 
-Ask the user only when `K`, `R`, `W`, target GPU, comparison target, or a hard
-scope constraint is missing and cannot be inferred safely.
+仅在 `K`、`R`、`W`、目标 GPU、比较目标或硬性范围约束缺失且无法安全推断时才询问用户。
 
-If `W` contains multiple regimes, optimize and report them as a distribution.
-If `W` is one focused shape, say so and keep dispatcher/tuning decisions simple.
+如果 `W` 包含多种模式，将它们作为分布进行优化和报告。如果 `W` 是一个聚焦的 shape，说明这一点并保持调度/调优决策简单。
 
-## Installed Paths
+## 已安装路径
 
-The installer hydrates these paths:
+安装程序注入以下路径：
 
 ```text
 Humanize runtime: {{HUMANIZE_RUNTIME_ROOT}}
@@ -47,50 +39,36 @@ KernelWiki root: {{KERNELWIKI_ROOT}}
 ncu-report-skill root: {{NCU_REPORT_SKILL_ROOT}}
 ```
 
-If `{{KERNELWIKI_ROOT}}` or `{{NCU_REPORT_SKILL_ROOT}}` was not hydrated,
-locate sibling skills named `KernelWiki` and `ncu-report-skill`, or use the
-KernelPilot checkout defaults under `external/KernelWiki` and
-`external/ncu-report-skill`.
+如果 `{{KERNELWIKI_ROOT}}` 或 `{{NCU_REPORT_SKILL_ROOT}}` 未被注入，查找名为 `KernelWiki` 和 `ncu-report-skill` 的同级技能，或使用 KernelPilot 检出默认值 `external/KernelWiki` 和 `external/ncu-report-skill`。
 
-## What The Loop Should Do
+## 循环应执行的操作
 
-Run the Humanize setup inside this skill. The user should not need to manually
-run `gen-plan`, `refine-plan`, or `humanize-rlcr`.
+在此技能内部运行 Humanize 设置。用户不应需要手动运行 `gen-plan`、`refine-plan` 或 `humanize-rlcr`。
 
-1. Turn the user's request into a small kernel-specific plan with acceptance
-   checks.
-2. Select or create exactly one clean standalone optimization workspace.
-3. Bootstrap only the minimal scaffold, harness placeholders, ledgers, and
-   refined plan needed to start RLCR.
-4. Ensure the workspace is a git repository with one clean scaffold commit.
-5. Start RLCR with `--strict-success` and verify that an active
-   `.humanize/rlcr/<timestamp>/state.md` exists.
-6. Read `.humanize/rlcr/<timestamp>/round-0-prompt.md`.
-7. Only then iterate on candidate kernels with correctness and benchmark
-   evidence under Humanize review.
-8. Use KernelWiki or live upstream sources when prior art can guide a design.
-9. Use ncu-report-skill when profile evidence can answer the current question.
-10. Autotune or dispatch by shape only when `W` actually needs it.
+1. 将用户请求转换为一个小型内核特定计划，包含验收检查。
+2. 选择或创建恰好一个干净的独立优化工作区。
+3. 仅引导启动 RLCR 所需的最小脚手架、测试占位文件、账本和精炼计划。
+4. 确保工作区是一个 git 仓库，包含一个干净的脚手架提交。
+5. 使用 `--strict-success` 启动 RLCR，并验证存在活跃的 `.humanize/rlcr/<timestamp>/state.md`。
+6. 读取 `.humanize/rlcr/<timestamp>/round-0-prompt.md`。
+7. 然后才在 Humanize 审查下基于正确性和基准证据迭代候选内核。
+8. 当先验知识可以指导设计时，使用 KernelWiki 或实时上游源。
+9. 当性能分析证据可以回答当前问题时，使用 ncu-report-skill。
+10. 仅在 `W` 确实需要时才按 shape 进行自动调优或调度。
 
-This is a loop, not a fixed research checklist. A good round may be a tiny
-correctness fix, a benchmark cleanup, a KernelWiki-informed redesign, an NCU
-profile digest, or an autotuning pass, depending on what the evidence says.
+这是一个循环，而不是固定的研究清单。一个好的轮次可能是一个微小的正确性修复、基准清理、基于 KernelWiki 的重新设计、NCU 性能分析摘要或一次自动调优，取决于证据所说。
 
-## Pre-RLCR Bootstrap Gate
+## RLCR 前引导门控
 
-This skill has a hard ordering requirement: before RLCR is active, do not
-implement candidate kernels, run long benchmarks, collect NCU reports, or write
-a final report. Pre-RLCR work is limited to:
+此技能有严格的顺序要求：在 RLCR 激活之前，不要实现候选内核、运行长时间基准测试、收集 NCU 报告或编写最终报告。RLCR 前的工作限于：
 
-- Choosing the workspace root.
-- Writing the scaffold, refined plan, empty or placeholder harness files, and
-  ledgers.
-- Creating `.gitignore` entries that keep `.humanize*` untracked.
-- Initializing git and committing the scaffold.
-- Running `setup-rlcr-loop.sh`.
+- 选择工作区根目录。
+- 编写脚手架、精炼计划、空或占位测试文件和账本。
+- 创建 `.gitignore` 条目以保持 `.humanize*` 不被跟踪。
+- 初始化 git 并提交脚手架。
+- 运行 `setup-rlcr-loop.sh`。
 
-If the workspace has no git repository, initialize it before the scaffold
-commit:
+如果工作区没有 git 仓库，在脚手架提交之前初始化它：
 
 ```bash
 git init
@@ -98,42 +76,29 @@ git add .gitignore README.md workloads/ src/ bindings/ tests/ benchmarks/ dispat
 git commit -m "Initialize kernel optimization workspace"
 ```
 
-Adjust the path list to match the scaffold that actually exists, and add
-optional build files such as `setup.py` or `python/` only if they exist, but do
-not add `.humanize/`. If git has no user identity configured, set a local
-identity such as `git config user.name KernelPilot` and `git config user.email
-kernelpilot@example.invalid`.
+调整路径列表以匹配实际存在的脚手架，并仅在存在时添加可选构建文件如 `setup.py` 或 `python/`，但不要添加 `.humanize/`。如果 git 未配置用户身份，设置本地身份如 `git config user.name KernelPilot` 和 `git config user.email kernelpilot@example.invalid`。
 
-After `setup-rlcr-loop.sh` succeeds, immediately verify that RLCR is active:
+`setup-rlcr-loop.sh` 成功后，立即验证 RLCR 是否活跃：
 
 ```bash
 find .humanize/rlcr -maxdepth 2 -name state.md -print
 ```
 
-If no `state.md` is present, stop and report that RLCR did not start. Do not
-continue into kernel implementation outside the Humanize loop.
+如果没有 `state.md`，停止并报告 RLCR 未启动。不要在 Humanize 循环之外继续进行内核实现。
 
-## Workspace Root
+## 工作区根目录
 
-Use one workspace root for the whole loop. This is the directory that contains
-`README.md`, `src/`, `tests/`, `benchmarks/`, `ledgers/`, and `.humanize/`.
+整个循环使用一个工作区根目录。这是包含 `README.md`、`src/`、`tests/`、`benchmarks/`、`ledgers/` 和 `.humanize/` 的目录。
 
-Selection rules:
+选择规则：
 
-- If the current directory is already an empty or intended optimization
-  workspace, use the current directory directly.
-- If the current directory is a large framework checkout such as SGLang, vLLM,
-  or PyTorch, create a sibling standalone workspace for the experiment.
-- If the current directory already contains `.humanize/`, `ledgers/`, `src/`,
-  or a prior scaffold for this task, do not create another nested repo. Continue
-  from that root unless the user explicitly asks for a fresh workspace.
-- Never create a git repository inside another optimization repository. If a
-  nested repo already exists, stop and report the split before continuing.
-- Run Humanize/RLCR from the same workspace root that contains the kernel code
-  and ledgers. Do not keep RLCR state in one repo while committing code in
-  another.
+- 如果当前目录已经是空的或预期的优化工作区，直接使用当前目录。
+- 如果当前目录是大型框架检出（如 SGLang、vLLM 或 PyTorch），为实验创建一个同级的独立工作区。
+- 如果当前目录已包含 `.humanize/`、`ledgers/`、`src/` 或此任务的先前脚手架，不要创建另一个嵌套仓库。除非用户明确要求新工作区，否则从该根目录继续。
+- 切勿在另一个优化仓库内创建 git 仓库。如果嵌套仓库已存在，在继续之前停止并报告分支情况。
+- 从包含内核代码和账本的同一工作区根目录运行 Humanize/RLCR。不要在一个仓库中保持 RLCR 状态而在另一个仓库中提交代码。
 
-Create this skeleton in the chosen workspace root:
+在选定的工作区根目录创建以下骨架：
 
 ```text
 .gitignore
@@ -154,17 +119,15 @@ benchmarks/performance-map.json
 profile-artifacts/README.md
 ```
 
-Keep the source framework checkout read-only unless the user explicitly asks
-for an in-place framework patch.
+保持源框架检出为只读，除非用户明确要求就地框架补丁。
 
-Before the first scaffold commit, `.gitignore` should protect local Humanize
-state:
+在第一次脚手架提交之前，`.gitignore` 应保护本地 Humanize 状态：
 
 ```gitignore
 .humanize*
 ```
 
-The refined plan file should exist for RLCR but remain untracked by default:
+精炼计划文件应为 RLCR 存在但默认不被跟踪：
 
 ```bash
 git check-ignore .humanize/kernel-agent/refined-plan.md
@@ -173,39 +136,30 @@ if git ls-files --error-unmatch .humanize/kernel-agent/refined-plan.md >/dev/nul
 fi
 ```
 
-Commit the scaffold and harness files from the workspace root, not
-`.humanize/` loop state. This commit must exist before running RLCR setup.
+从工作区根目录提交脚手架和测试文件，而非 `.humanize/` 循环状态。此提交必须在运行 RLCR 设置之前存在。
 
-## Lightweight Acceptance Checks
+## 轻量验收检查
 
-The refined plan should keep these checks visible without turning them into a
-large ceremony:
+精炼计划应保持这些检查可见，而不将它们变成大型仪式：
 
-- `K`, `R`, `W`, target GPU, comparison baseline, and hard exclusions are
-  explicit.
-- Correctness tests compare candidate outputs with `R` over the relevant cases.
-- Benchmarks report per-case latency and enough environment metadata to compare
-  attempts fairly.
-- Attempt ledger records tested versions, including failed correctness,
-  regressions, and abandoned ideas.
-- Optimization ledger records only correct versions with measured improvement.
-- Lineage records why the selected candidate changed.
-- External code or source-level borrowing records URL/path, commit or version,
-  license/notice when relevant, and what was adapted.
-- Final output names the selected kernel, benchmark result, known fallback, and
-  unsupported regimes.
+- `K`、`R`、`W`、目标 GPU、比较基线和硬性排除项是明确的。
+- 正确性测试在相关用例上比较候选输出与 `R`。
+- 基准测试报告每用例延迟和足够的环境元数据以公平比较各次尝试。
+- 尝试账本记录已测试的版本，包括失败的正确性、回归和放弃的想法。
+- 优化账本仅记录具有可测量改进的正确版本。
+- 谱系记录选定候选发生变化的原因。
+- 外部代码或源码级借用记录 URL/路径、提交或版本、相关时的许可证/通知以及适配内容。
+- 最终输出命名选定的内核、基准结果、已知回退和不支持的模式。
 
-## Using KernelWiki
+## 使用 KernelWiki
 
-Use the `KernelWiki` skill when prior work can help answer questions like:
+当已有工作可以帮助回答以下问题时，使用 `KernelWiki` 技能：
 
-- Has SGLang, vLLM, FlashInfer, PyTorch, CUTLASS, Triton, or TensorRT-LLM
-  already solved a similar kernel problem?
-- Is there a known Blackwell/Hopper technique for this memory layout, dtype,
-  tensor-core path, scheduling issue, or tail-effect symptom?
-- Is the current design missing an obvious upstream trick?
+- SGLang、vLLM、FlashInfer、PyTorch、CUTLASS、Triton 或 TensorRT-LLM 是否已经解决了类似的内核问题？
+- 对于此内存布局、dtype、tensor-core 路径、调度问题或尾效应症状，是否有已知的 Blackwell/Hopper 技术？
+- 当前设计是否缺少明显的上游技巧？
 
-Run commands from `{{KERNELWIKI_ROOT}}`:
+从 `{{KERNELWIKI_ROOT}}` 运行命令：
 
 ```bash
 cd {{KERNELWIKI_ROOT}}
@@ -215,59 +169,42 @@ python3 scripts/grep_wiki.py "tcgen05|tmem" --only prs
 python3 scripts/get_page.py kernel-flash-attention-sm100-mla-topk --follow-sources
 ```
 
-Use the results as evidence, not as a rulebook. If a source directly shapes
-implementation code, trace it back to a PR page, artifact, official doc, or
-upstream source path.
+将结果作为证据使用，而非作为规则手册。如果某个来源直接影响实现代码，将其追溯到 PR 页面、制品、官方文档或上游源路径。
 
-## Using ncu-report-skill
+## 使用 ncu-report-skill
 
-Use `ncu-report-skill` when profile evidence would change the next decision.
-Good triggers include:
+当性能分析证据会改变下一个决策时，使用 `ncu-report-skill`。良好的触发条件包括：
 
-- The baseline is unclear and a representative profile would locate the hot
-  path or bottleneck.
-- A correct candidate regresses or plateaus.
-- A candidate is unexpectedly fast or slow.
-- The next edit depends on knowing whether the issue is memory, occupancy,
-  scheduling, tensor-core utilization, or tail effects.
-- A reviewer asks for profiler-backed evidence.
+- 基线不清晰，代表性性能分析可以定位热路径或瓶颈。
+- 正确的候选出现回归或平台期。
+- 候选出乎意料地快或慢。
+- 下一次编辑取决于了解问题是内存、占用率、调度、tensor-core 利用率还是尾效应。
+- 审查者要求提供性能分析支持的证据。
 
-The NCU report should be small and actionable: keep the report path, key
-metrics, diagnosis, and one concrete next edit in `profile-artifacts/` or the
-attempt ledger. Do not block progress on profiling when compile/test/benchmark
-evidence is already enough for the current step.
+NCU 报告应简小且可操作：将报告路径、关键指标、诊断和一个具体的下一步编辑保存在 `profile-artifacts/` 或尝试账本中。当编译/测试/基准证据对当前步骤已经足够时，不要因性能分析而阻塞进度。
 
-## Progress Checks
+## 进度检查
 
-- If an attempt hangs or times out, reduce to the smallest executable shape or
-  tile under a hard timeout before target-size benchmarking.
-- If repeated rounds hit the same blocker, narrow the next round to a smaller
-  falsifiable milestone or reset the design.
-- If a correct candidate is far below target, use either prior art, profiling,
-  or a simpler baseline comparison to decide whether the lineage is worth
-  continuing.
+- 如果尝试挂起或超时，在目标大小基准测试之前，在硬超时下缩减到最小可执行 shape 或 tile。
+- 如果重复轮次遇到相同阻碍，将下一轮缩小到更小的可证伪里程碑或重置设计。
+- 如果正确的候选远低于目标，使用先验知识、性能分析或更简单的基线比较来决定谱系是否值得继续。
 
-## RLCR Startup
+## RLCR 启动
 
-After writing and committing the workspace scaffold, start the loop from inside
-the chosen workspace root:
+编写并提交工作区脚手架后，从选定的工作区根目录内启动循环：
 
 ```bash
 "{{HUMANIZE_RUNTIME_ROOT}}/scripts/setup-rlcr-loop.sh" .humanize/kernel-agent/refined-plan.md --yolo --strict-success
 ```
 
-If setup exits non-zero, report the error instead of bypassing the gate. The
-loop uses Humanize's configured review model and strict-success mode by default,
-so max-iteration and stagnation checks trigger recovery prompts rather than
-ending the run before the acceptance target is met. The caller may still pass
-explicit overrides such as `--max` or a model flag.
+如果设置以非零退出，报告错误而不是绕过门控。循环默认使用 Humanize 配置的审查模型和严格成功模式，因此最大迭代和停滞检查会触发恢复提示，而不是在达到验收目标之前结束运行。调用者仍可传递显式覆盖如 `--max` 或模型标志。
 
-After setup succeeds:
+设置成功后：
 
-1. Read `.humanize/rlcr/<timestamp>/round-0-prompt.md`.
-2. Execute the current round.
-3. Commit changes.
-4. Write the required round summary.
-5. Stop normally so the Humanize Stop hook can review.
+1. 读取 `.humanize/rlcr/<timestamp>/round-0-prompt.md`。
+2. 执行当前轮次。
+3. 提交更改。
+4. 编写所需的轮次摘要。
+5. 正常停止以便 Humanize Stop 钩子可以审查。
 
-If the hook blocks exit, follow the generated next-round prompt.
+如果钩子阻止退出，遵循生成的下一轮提示。

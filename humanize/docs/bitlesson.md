@@ -1,41 +1,41 @@
-# Bitter Lesson Workflow
+# Bitter Lesson 工作流
 
-BitLesson is the repository's Bitter Lesson-style knowledge capture system for RLCR rounds.
+BitLesson 是仓库中用于 RLCR 轮次的 Bitter Lesson 风格知识捕获系统。
 
-## Configuration
+## 配置
 
-The selector reads `bitlesson_model` from the merged config hierarchy:
+选择器从合并后的配置层级中读取 `bitlesson_model`：
 
 1. `config/default_config.json`
 2. `~/.config/humanize/config.json`
 3. `.humanize/config.json`
-4. CLI flags where applicable
+4. 适用时的 CLI 标志
 
-Provider routing is automatic:
+提供者路由是自动的：
 
-- `gpt-*`, `o[N]-*` (e.g. `o1-*`, `o3-*`, `o4-*`) route to Codex
-- `claude-*`, `haiku`, `sonnet`, `opus` route to Claude
+- `gpt-*`、`o[N]-*`（例如 `o1-*`、`o3-*`、`o4-*`）路由到 Codex
+- `claude-*`、`haiku`、`sonnet`、`opus` 路由到 Claude
 
-If the configured provider binary is missing, the selector falls back to the default Codex model so the loop can still proceed.
+如果配置的提供者二进制文件缺失，选择器会回退到默认的 Codex 模型，以使循环仍能继续进行。
 
-On Codex-only installs, Humanize writes `provider_mode: "codex-only"` into the user config.
-When that mode is present, the selector forces BitLesson selection onto the Codex/OpenAI path
-before provider resolution, even if an older default such as `haiku` would otherwise route to Claude.
+在仅安装 Codex 的环境中，Humanize 会在用户配置中写入 `provider_mode: "codex-only"`。
+当该模式存在时，选择器会在提供者解析之前强制将 BitLesson 选择指向 Codex/OpenAI 路径，
+即使旧的默认值（如 `haiku`）原本会路由到 Claude。
 
-## Workflow
+## 工作流
 
-Each project keeps its BitLesson knowledge base at `.humanize/bitlesson.md`.
+每个项目将其 BitLesson 知识库保存在 `.humanize/bitlesson.md`。
 
-When `start-rlcr-loop` begins:
+当 `start-rlcr-loop` 开始时：
 
-1. The file is initialized from `templates/bitlesson.md` if it does not already exist
-2. Each task or sub-task runs through `scripts/bitlesson-select.sh`
-3. The selected lesson IDs are applied during implementation, or `NONE` is recorded when nothing matches
-4. The stop gate validates a required `## BitLesson Delta` section in every round summary
+1. 如果文件尚不存在，则从 `templates/bitlesson.md` 初始化
+2. 每个任务或子任务通过 `scripts/bitlesson-select.sh` 运行
+3. 选定的 lesson ID 在实现过程中被应用，如果没有匹配项则记录 `NONE`
+4. 停止门控会在每轮摘要中验证必需的 `## BitLesson Delta` 部分
 
-## Summary Contract
+## 摘要契约
 
-Required summary shape:
+必需的摘要格式：
 
 ```markdown
 ## BitLesson Delta
@@ -44,8 +44,8 @@ Required summary shape:
 - Notes: <what changed and why>
 ```
 
-Validation rules are strict:
+验证规则是严格的：
 
-- `Action: none` must use `Lesson ID(s): NONE` or leave the field empty
-- `Action: add` and `Action: update` must reference concrete `BL-YYYYMMDD-short-name` IDs that exist in `.humanize/bitlesson.md`
-- `--require-bitlesson-entry-for-none` can be used to block empty knowledge bases from repeatedly reporting `none`
+- `Action: none` 必须使用 `Lesson ID(s): NONE` 或将该字段留空
+- `Action: add` 和 `Action: update` 必须引用 `.humanize/bitlesson.md` 中存在的具体 `BL-YYYYMMDD-short-name` ID
+- `--require-bitlesson-entry-for-none` 可用于阻止空知识库反复报告 `none`

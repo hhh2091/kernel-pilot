@@ -1,19 +1,19 @@
-# Tracked Humanize State Blocked
+# 已跟踪的 Humanize 状态被阻止
 
-Detected tracked or staged files under `.humanize/`.
+检测到 `.humanize/` 下有已跟踪或已暂存的文件。
 
-These files are local Humanize loop state and must remain outside version control.
+这些文件是本地 Humanize 循环状态，必须保留在版本控制之外。
 
-## Required Fix
+## 必需的修复
 
-1. Remove Humanize state from the index:
+1. 从索引中移除 Humanize 状态：
 
        git rm --cached -r .humanize
 
-2. Keep only real project files staged.
-3. Retry the stop action after the local state is no longer tracked.
+2. 仅保留实际的项目文件在暂存区。
+3. 在本地状态不再被跟踪后重试停止操作。
 
-## Important
+## 重要提示
 
-- Do NOT use `git add -f` on Humanize state files.
-- Do NOT commit RLCR trackers, round summaries, contracts, or cancel/finalize markers.
+- 不要在 Humanize 状态文件上使用 `git add -f`。
+- 不要提交 RLCR 跟踪器、轮次摘要、合同或取消/完成标记。

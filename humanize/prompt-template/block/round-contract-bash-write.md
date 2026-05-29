@@ -1,7 +1,7 @@
-# Round Contract Bash Write Blocked
+# 轮次合同 Bash 写入被阻止
 
-Do not use Bash commands to modify round contract files.
+不要使用 Bash 命令修改轮次合同文件。
 
-Use the `Write` or `Edit` tool instead:
+请改用 `Write` 或 `Edit` 工具：
 
 `{{CORRECT_PATH}}`

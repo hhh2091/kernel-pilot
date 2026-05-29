@@ -1,17 +1,17 @@
-# Code Review - Round {{CURRENT_ROUND}}
+# 代码审查 - 第 {{CURRENT_ROUND}} 轮
 
-## Original Implementation Plan
+## 原始实施计划
 
-**IMPORTANT**: The original plan that Claude is implementing is located at:
+**重要**：Claude 正在实施的原始计划位于：
 @{{PLAN_FILE}}
 
-You MUST read this plan file first to understand the full scope of work before conducting your review.
-This plan contains the complete requirements and implementation details that Claude should be following.
+你必须在进行审查之前先阅读此计划文件，以了解工作的完整范围。
+此计划包含 Claude 应遵循的完整需求和实施细节。
 
-Based on the original plan and @{{PROMPT_FILE}}, Claude claims to have completed the work. Please conduct a thorough critical review to verify this.
+根据原始计划和 @{{PROMPT_FILE}}，Claude 声称已完成工作。请进行彻底的批判性审查以验证这一点。
 
 ---
-Below is Claude's summary of the work completed:
+以下是 Claude 完成工作的摘要：
 <!-- CLAUDE's WORK SUMMARY START -->
 {{SUMMARY_CONTENT}}
 <!-- CLAUDE's WORK SUMMARY  END  -->
@@ -19,58 +19,58 @@ Below is Claude's summary of the work completed:
 
 {{COMMIT_HISTORY_SECTION}}
 
-## Part 1: Implementation Review
+## 第1部分：实施审查
 
-- Your task is to conduct a deep critical review, focusing on finding implementation issues and identifying gaps between "plan-design" and actual implementation.
-- Relevant top-level guidance documents, phased implementation plans, and other important documentation and implementation references are located under @{{DOCS_PATH}}.
-- If Claude planned to defer any tasks to future phases in its summary, DO NOT follow its lead. Instead, you should force Claude to complete ALL tasks as planned.
-  - Such deferred tasks are considered incomplete work and should be flagged in your review comments, requiring Claude to address them.
-  - If Claude planned to defer any tasks, please explore the codebase in-depth and draft a detailed implementation plan. This plan should be included in your review comments for Claude to follow.
-  - Your review should be meticulous and skeptical. Look for any discrepancies, missing features, incomplete implementations.
-- If Claude does not plan to defer any tasks, but honestly admits that some tasks are still pending (not yet completed), you should also include those pending tasks in your review.
-  - Your review should elaborate on those unfinished tasks, explore the codebase, and draft an implementation plan.
-  - A good engineering implementation plan should be **singular, directive, and definitive**, rather than discussing multiple possible implementation options.
-  - The implementation plan should be **unambiguous**, internally consistent, and coherent from beginning to end, so that **Claude can execute the work accurately and without error**.
+- 你的任务是进行深入的批判性审查，重点关注发现实施问题并识别"计划设计"与实际实施之间的差距。
+- 相关的顶层指导文档、分阶段实施计划以及其他重要文档和实施参考位于 @{{DOCS_PATH}} 下。
+- 如果 Claude 在摘要中计划将任何任务延期到未来阶段，请勿跟随其做法。相反，你应该强制 Claude 按计划完成所有任务。
+  - 此类延期任务被视为未完成工作，应在你的审查评论中标记，要求 Claude 处理。
+  - 如果 Claude 计划延期任何任务，请深入探索代码库并起草详细的实施计划。该计划应包含在你的审查评论中供 Claude 执行。
+  - 你的审查应细致且具有批判性。寻找任何差异、缺失功能或不完整的实施。
+- 如果 Claude 不打算延期任何任务，但诚实地承认某些任务仍在进行中（尚未完成），你也应将这些待处理任务纳入审查。
+  - 你的审查应详细说明那些未完成的任务，探索代码库，并起草实施计划。
+  - 一个好的工程实施计划应该是**单一的、指导性的和明确的**，而不是讨论多种可能的实施选项。
+  - 实施计划应该是**无歧义的**，内部一致且从头到尾连贯，以便 **Claude 能够准确无误地执行工作**。
 
-## Part 2: Goal Alignment Check (MANDATORY)
+## 第2部分：目标对齐检查（强制）
 
-Read @{{GOAL_TRACKER_FILE}} and verify:
+阅读 @{{GOAL_TRACKER_FILE}} 并验证：
 
-1. **Acceptance Criteria Progress**: For each AC, is progress being made? Are any ACs being ignored?
-2. **Forgotten Items**: Are there tasks from the original plan that are not tracked in Active/Completed/Deferred?
-3. **Deferred Items**: Are deferrals justified? Do they block any ACs?
-4. **Plan Evolution**: If Claude modified the plan, is the justification valid?
+1. **验收标准进展**：每个验收标准是否有进展？是否有验收标准被忽略？
+2. **遗漏项**：是否有原始计划中的任务未在进行中/已完成/已延期中被跟踪？
+3. **延期项**：延期是否有正当理由？是否阻塞了任何验收标准？
+4. **计划演进**：如果 Claude 修改了计划，理由是否有效？
 
-Include a brief Goal Alignment Summary in your review:
+在审查中包含简要的目标对齐摘要：
 ```
 ACs: X/Y addressed | Forgotten items: N | Unjustified deferrals: N
 ```
 
-## Part 3: Required Finding Classification
+## 第3部分：必需的发现分类
 
-You MUST classify your findings into these lanes:
-- **Mainline Gaps**: plan-derived work or AC progress that is missing, incomplete, or regressing
-- **Blocking Side Issues**: bugs or implementation issues that block the current mainline objective from succeeding safely
-- **Queued Side Issues**: valid non-blocking follow-up issues that should be documented but must NOT take over the next round
+你必须将你的发现分类到以下通道中：
+- **主线差距**：计划派生的工作或验收标准进展缺失、不完整或退化
+- **阻塞性侧边问题**：阻塞当前主线目标安全成功的缺陷或实施问题
+- **排队中的侧边问题**：有效的非阻塞后续问题，应被记录但不得占据下一轮
 
-Also include a one-line verdict:
+同时包含一行结论：
 ```
 Mainline Progress Verdict: ADVANCED / STALLED / REGRESSED
 ```
 
-This verdict line is mandatory. If you omit it, the Humanize stop hook will block the round and require the review to be rerun.
+此结论行是强制性的。如果你遗漏了它，Humanize 停止钩子将阻止该轮次并要求重新运行审查。
 
-If Claude mostly worked on queued side issues and failed to advance the mainline, say so explicitly.
+如果 Claude 主要处理排队中的侧边问题而未能推进主线，请明确指出。
 
-## Part 4: {{GOAL_TRACKER_UPDATE_SECTION}}
+## 第4部分：{{GOAL_TRACKER_UPDATE_SECTION}}
 
-## Part 5: Output Requirements
+## 第5部分：输出要求
 
-- In short, your review comments can include: problems/findings/blockers; claims that don't match reality; implementation plans for deferred work (to be implemented now); implementation plans for unfinished work; goal alignment issues.
-- Your output should be structured so Claude can tell which items are mainline gaps, blocking side issues, and queued side issues.
-- If after your investigation the actual situation does not match what Claude claims to have completed, or there is pending work to be done, output your review comments to @{{REVIEW_RESULT_FILE}}.
-- **CRITICAL**: Only output "COMPLETE" as the last line if ALL tasks from the original plan are FULLY completed with no deferrals
-  - DEFERRED items are considered INCOMPLETE - do NOT output COMPLETE if any task is deferred
-  - UNFINISHED items are considered INCOMPLETE - do NOT output COMPLETE if any task is pending
-  - The ONLY condition for COMPLETE is: all original plan tasks are done, all ACs are met, no deferrals or pending work allowed
-- The word COMPLETE on the last line will stop Claude.
+- 简而言之，你的审查评论可以包括：问题/发现/阻塞项；与现实不符的声明；延期工作的实施计划（现在就要实施）；未完成工作的实施计划；目标对齐问题。
+- 你的输出应结构化，以便 Claude 能够区分哪些项目是主线差距、阻塞性侧边问题和排队中的侧边问题。
+- 如果经过调查，实际情况与 Claude 声称完成的不符，或者有待完成的工作，请将你的审查评论输出到 @{{REVIEW_RESULT_FILE}}。
+- **关键要求**：只有当原始计划中的所有任务都完全完成且没有延期时，才在最后一行输出 "COMPLETE"
+  - 延期项被视为未完成 - 如果有任何任务被延期，请勿输出 COMPLETE
+  - 未完成项被视为未完成 - 如果有任何任务待处理，请勿输出 COMPLETE
+  - COMPLETE 的唯一条件是：原始计划的所有任务都已完成，所有验收标准都已满足，不允许延期或待处理工作
+- 最后一行的 COMPLETE 一词将停止 Claude。

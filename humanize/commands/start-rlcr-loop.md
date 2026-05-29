@@ -1,5 +1,5 @@
 ---
-description: "Start iterative loop with Codex review"
+description: "启动带 Codex 审查的迭代循环"
 argument-hint: "[path/to/plan.md | --plan-file path/to/plan.md] [--max N] [--codex-model MODEL:EFFORT] [--codex-timeout SECONDS] [--track-plan-file] [--push-every-round] [--base-branch BRANCH] [--full-review-round N] [--skip-impl] [--claude-answer-codex] [--agent-teams] [--yolo] [--skip-quiz] [--privacy] [--no-privacy] [--strict-success]"
 allowed-tools:
   - "Bash(${CLAUDE_PLUGIN_ROOT}/scripts/setup-rlcr-loop.sh:*)"
@@ -8,211 +8,209 @@ allowed-tools:
   - "AskUserQuestion"
 ---
 
-# Start RLCR Loop
+# 启动 RLCR 循环
 
-## Plan Compliance Pre-Check
+## 计划合规性预检查
 
-Before running the setup script, validate the plan file for compliance. This is a fool-proofing mechanism that catches obviously wrong plan files early.
+在运行设置脚本之前，验证计划文件的合规性。这是一种防错机制，用于尽早捕获明显错误的计划文件。
 
-**Skip this entire pre-check if** any of these conditions are true:
-- `$ARGUMENTS` contains `--skip-impl` (no plan file to validate)
-- `$ARGUMENTS` contains `-h` or `--help` (just showing help)
+**跳过整个预检查的条件**（满足任一即可）：
+- `$ARGUMENTS` 包含 `--skip-impl`（没有计划文件需要验证）
+- `$ARGUMENTS` 包含 `-h` 或 `--help`（仅显示帮助）
 
-### Extract the plan file path from arguments
+### 从参数中提取计划文件路径
 
-Parse `$ARGUMENTS` to find the plan file path:
-- If `--plan-file <path>` is present, use `<path>`
-- Otherwise, use the first positional argument (the first argument that does not start with `--` and is not a value following a known flag like `--max`, `--codex-model`, `--codex-timeout`, `--base-branch`, `--full-review-round`, `--plan-file`)
-- If no plan file path can be determined, skip the pre-check and let the setup script handle the error
+解析 `$ARGUMENTS` 以查找计划文件路径：
+- 如果存在 `--plan-file <path>`，使用 `<path>`
+- 否则，使用第一个位置参数（第一个不以 `--` 开头且不是已知标志值的参数，如 `--max`、`--codex-model`、`--codex-timeout`、`--base-branch`、`--full-review-round`、`--plan-file`）
+- 如果无法确定计划文件路径，跳过预检查，让设置脚本处理错误
 
-### Basic path safety gate
+### 基本路径安全检查
 
-Only proceed with the pre-check if the extracted path meets ALL of these conditions:
-- Is a relative path (does not start with forward slash)
-- Does not contain parent directory traversal (double dot path components)
-- Contains only safe path characters: letters, digits, hyphen, underscore, dot, and forward slash
+仅在提取的路径满足以下所有条件时继续预检查：
+- 是相对路径（不以正斜杠开头）
+- 不包含父目录遍历（双点路径组件）
+- 仅包含安全路径字符：字母、数字、连字符、下划线、点和正斜杠
 
-If any condition fails, skip the pre-check and let the setup script handle path validation.
+如果任何条件失败，跳过预检查，让设置脚本处理路径验证。
 
-### Read and validate plan content
+### 读取并验证计划内容
 
-1. Use the Read tool to read the plan file. If the file does not exist or cannot be read, skip the pre-check and let the setup script handle the error.
+1. 使用 Read 工具读取计划文件。如果文件不存在或无法读取，跳过预检查，让设置脚本处理错误。
 
-2. Use the Task tool to invoke the `humanize:plan-compliance-checker` agent (sonnet model):
+2. 使用 Task 工具调用 `humanize:plan-compliance-checker` agent（sonnet 模型）：
    ```
-   Task tool parameters:
+   Task 工具参数：
    - model: "sonnet"
-   - prompt: Include the plan file content and ask the agent to:
-     1. Explore the repository structure (README, CLAUDE.md, main files)
-     2. Check if the plan content relates to this repository
-     3. Check if the plan contains branch-switching instructions
-     4. Return exactly one of: `PASS: <summary>`, `FAIL_RELEVANCE: <reason>`, or `FAIL_BRANCH_SWITCH: <details>`
+   - prompt: 包含计划文件内容并要求 agent：
+     1. 探索仓库结构（README、CLAUDE.md、主要文件）
+     2. 检查计划内容是否与此仓库相关
+     3. 检查计划是否包含分支切换指令
+     4. 精确返回以下之一：`PASS: <summary>`、`FAIL_RELEVANCE: <reason>` 或 `FAIL_BRANCH_SWITCH: <details>`
    ```
 
-3. **Parse the result** (fail-closed):
-   - If output contains `PASS`: continue to setup script below
-   - If output contains `FAIL_RELEVANCE`: report "Plan compliance check failed: the plan does not appear to be related to this repository." Show the reason. **Stop the command.**
-   - If output contains `FAIL_BRANCH_SWITCH`: report "Plan compliance check failed: the plan contains branch-switching instructions, which are incompatible with RLCR. The RLCR loop requires the working branch to remain constant across all rounds." Show the details. **Stop the command.**
-   - If output contains none of the above (malformed): report "Plan compliance check produced unexpected output. Cannot proceed." **Stop the command.**
+3. **解析结果**（失败即关闭）：
+   - 如果输出包含 `PASS`：继续到下面的设置脚本
+   - 如果输出包含 `FAIL_RELEVANCE`：报告"计划合规性检查失败：该计划似乎与此仓库无关。"显示原因。**停止命令。**
+   - 如果输出包含 `FAIL_BRANCH_SWITCH`：报告"计划合规性检查失败：该计划包含分支切换指令，与 RLCR 不兼容。RLCR 循环要求工作分支在所有轮次中保持不变。"显示详情。**停止命令。**
+   - 如果输出不包含以上任何内容（格式错误）：报告"计划合规性检查产生了意外输出，无法继续。"**停止命令。**
 
 ---
 
-## Plan Understanding Quiz
+## 计划理解测验
 
-Before running the setup script, verify the user genuinely understands what the plan will do. This is an advisory check -- it never blocks the loop, but catches "wishful thinking" users who blindly accepted a generated plan without reading it.
+在运行设置脚本之前，验证用户是否真正理解计划将做什么。这是一个建议性检查——它永远不会阻塞循环，但会捕获那些盲目接受生成计划而没有阅读的"一厢情愿"用户。
 
-**Skip this entire quiz if** any of these conditions are true:
-- `$ARGUMENTS` contains `--skip-impl` (no plan to quiz about)
-- `$ARGUMENTS` contains `--yolo` (user explicitly opted out of all pre-flight checks)
-- `$ARGUMENTS` contains `--skip-quiz` (user explicitly opted out of the quiz)
-- `$ARGUMENTS` contains `-h` or `--help` (just showing help)
-- No plan content is available (the compliance pre-check was skipped because no plan file path could be determined)
+**跳过整个测验的条件**（满足任一即可）：
+- `$ARGUMENTS` 包含 `--skip-impl`（没有计划可以测验）
+- `$ARGUMENTS` 包含 `--yolo`（用户明确选择退出所有预检查）
+- `$ARGUMENTS` 包含 `--skip-quiz`（用户明确选择退出测验）
+- `$ARGUMENTS` 包含 `-h` 或 `--help`（仅显示帮助）
+- 没有可用的计划内容（由于无法确定计划文件路径而跳过了合规性预检查）
 
-### Run the quiz agent
+### 运行测验 agent
 
-1. Reuse the plan content that was already read during the compliance pre-check above (do not re-read the file).
+1. 复用上面合规性预检查中已经读取的计划内容（不要重新读取文件）。
 
-2. Use the Task tool to invoke the `humanize:plan-understanding-quiz` agent (opus model):
+2. 使用 Task 工具调用 `humanize:plan-understanding-quiz` agent（opus 模型）：
    ```
-   Task tool parameters:
+   Task 工具参数：
    - model: "opus"
-   - prompt: Include the plan file content and ask the agent to:
-     1. Explore the repository structure for context
-     2. Analyze the plan's technical implementation details
-     3. Generate 2 multiple-choice questions (4 options each) and a plan summary
-     4. Return in the structured format: QUESTION_1, OPTION_1A-D, ANSWER_1, QUESTION_2, OPTION_2A-D, ANSWER_2, PLAN_SUMMARY
+   - prompt: 包含计划文件内容并要求 agent：
+     1. 探索仓库结构以获取上下文
+     2. 分析计划的技术实现细节
+     3. 生成 2 个选择题（各 4 个选项）和一个计划摘要
+     4. 返回结构化格式：QUESTION_1、OPTION_1A-D、ANSWER_1、QUESTION_2、OPTION_2A-D、ANSWER_2、PLAN_SUMMARY
    ```
 
-3. **Parse the result**: Extract all 13 fields from the agent output (QUESTION_1, OPTION_1A through OPTION_1D, ANSWER_1, QUESTION_2, OPTION_2A through OPTION_2D, ANSWER_2, PLAN_SUMMARY). If the output is malformed (any field missing or ANSWER not A/B/C/D), warn: "Plan understanding quiz unavailable, continuing without it." and proceed to the Setup section below.
+3. **解析结果**：从 agent 输出中提取所有 13 个字段（QUESTION_1、OPTION_1A 到 OPTION_1D、ANSWER_1、QUESTION_2、OPTION_2A 到 OPTION_2D、ANSWER_2、PLAN_SUMMARY）。如果输出格式错误（任何字段缺失或 ANSWER 不是 A/B/C/D），警告："计划理解测验不可用，跳过继续。"并继续到下面的设置部分。
 
-### Ask questions and evaluate
+### 提问并评估
 
-4. Use AskUserQuestion to present QUESTION_1 as a multiple-choice question with the 4 options (OPTION_1A through OPTION_1D). Compare the user's choice against ANSWER_1:
-   - If the user selected the correct answer, mark QUESTION_1 as **PASS**
-   - Otherwise, mark as **WRONG**
+4. 使用 AskUserQuestion 将 QUESTION_1 作为选择题呈现，包含 4 个选项（OPTION_1A 到 OPTION_1D）。将用户的选择与 ANSWER_1 比较：
+   - 如果用户选择了正确答案，标记 QUESTION_1 为 **PASS**
+   - 否则，标记为 **WRONG**
 
-5. Use AskUserQuestion to present QUESTION_2 as a multiple-choice question with the 4 options (OPTION_2A through OPTION_2D). Compare the user's choice against ANSWER_2 using the same criteria.
+5. 使用 AskUserQuestion 将 QUESTION_2 作为选择题呈现，包含 4 个选项（OPTION_2A 到 OPTION_2D）。使用相同标准将用户的选择与 ANSWER_2 比较。
 
-### Decide whether to proceed
+### 决定是否继续
 
-6. **If both questions PASS**: Briefly acknowledge ("Your understanding of the plan looks solid. Proceeding with setup.") and continue to the Setup section below.
+6. **如果两个问题都 PASS**：简要确认（"你对计划的理解看起来很扎实。继续设置。"）并继续到下面的设置部分。
 
-7. **If one or both questions are WRONG**: Show the PLAN_SUMMARY to the user to help them understand what the plan does and the correct answers to the questions they missed. Then use AskUserQuestion with the question: "Would you like to proceed with the RLCR loop anyway, or stop and review the plan more carefully first?" with these choices:
-   - "Proceed with RLCR loop"
-   - "Stop and review the plan first"
+7. **如果一个或两个问题 WRONG**：向用户显示 PLAN_SUMMARY 以帮助他们理解计划的作用以及他们答错的问题的正确答案。然后使用 AskUserQuestion 提问："你想继续 RLCR 循环，还是先停下来更仔细地审查计划？"选项如下：
+   - "继续 RLCR 循环"
+   - "先停下来审查计划"
 
-   - If the user chooses **"Proceed with RLCR loop"**: Continue to the Setup section below.
-   - If the user chooses **"Stop and review the plan first"**: Report "Stopping. Please review the plan file and re-run start-rlcr-loop when ready." and **stop the command**.
+   - 如果用户选择 **"继续 RLCR 循环"**：继续到下面的设置部分。
+   - 如果用户选择 **"先停下来审查计划"**：报告"已停止。请审查计划文件并在准备好时重新运行 start-rlcr-loop。"**停止命令。**
 
 ---
 
-## Setup
+## 设置
 
-If the pre-check passed (or was skipped), and the quiz passed (or was skipped or user chose to proceed), execute the setup script to initialize the loop:
+如果预检查通过（或被跳过），且测验通过（或被跳过或用户选择继续），执行设置脚本以初始化循环：
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/setup-rlcr-loop.sh" $ARGUMENTS
 ```
 
-This command starts an iterative development loop where:
+此命令启动一个迭代开发循环，其中：
 
-1. You execute the implementation plan with task-tag routing
-   - `coding` tasks: Claude executes directly
-   - `analyze` tasks: execute via `/humanize:ask-codex`
-2. Write a summary of your work to the specified summary file
-3. When you try to exit, Codex reviews your summary
-4. If Codex finds issues, you receive feedback and continue
-5. If Codex outputs "COMPLETE", the loop enters **Review Phase**
-6. In Review Phase, `codex review --base <branch>` performs code review
-7. If code review finds issues (`[P0-9]` markers), you fix them and continue
-8. When no issues are found, the loop ends with a Finalize Phase
+1. 你使用任务标签路由执行实施计划
+   - `coding` 任务：Claude 直接执行
+   - `analyze` 任务：通过 `/humanize:ask-codex` 执行
+2. 将你的工作总结写入指定的摘要文件
+3. 当你尝试退出时，Codex 审查你的摘要
+4. 如果 Codex 发现问题，你会收到反馈并继续
+5. 如果 Codex 输出 "COMPLETE"，循环进入**审查阶段**
+6. 在审查阶段，`codex review --base <branch>` 执行代码审查
+7. 如果代码审查发现问题（`[P0-9]` 标记），你修复它们并继续
+8. 当没有发现问题时，循环以 Finalize 阶段结束
 
-## What Is a Round
+## 什么是轮次
 
-**One round = the agent believes the entire plan is finished.** A round boundary is when the agent writes a summary and attempts to exit, triggering Codex review. This is the fundamental semantic:
+**一轮 = agent 认为整个计划已完成。** 轮次边界是 agent 写入摘要并尝试退出，触发 Codex 审查的时刻。这是基本语义：
 
-- A round is NOT one task, one milestone, one stage, or one layer of the plan.
-- If the plan has multiple stages or milestones, they are all completed within a single round before writing the round summary.
-- Intermediate progress checks (e.g., verifying a stage before starting the next) should use manual `ask-codex` calls, not round boundaries.
-- Only write `round-N-summary.md` and attempt to exit when you believe ALL tasks in the plan are done.
+- 一轮不是一个任务、一个里程碑、一个阶段或计划的一层。
+- 如果计划有多个阶段或里程碑，它们都在写入轮次摘要之前在单轮内完成。
+- 中间进度检查（例如，在开始下一阶段之前验证当前阶段）应使用手动 `ask-codex` 调用，而不是轮次边界。
+- 仅当你认为计划中的所有任务都已完成时，才写入 `round-N-summary.md` 并尝试退出。
 
-## Goal Tracker System
+## Goal Tracker 系统
 
-This loop uses a **Goal Tracker** to prevent goal drift across iterations:
+此循环使用 **Goal Tracker** 来防止迭代间的目标漂移：
 
-### Structure
-- **IMMUTABLE SECTION**: Ultimate Goal and Acceptance Criteria (set in Round 0, never changed)
-- **MUTABLE SECTION**: Active Tasks, Completed Items, Deferred Items, Plan Evolution Log
+### 结构
+- **不可变部分**：终极目标和验收标准（在第 0 轮设置，永不更改）
+- **可变部分**：活跃任务、已完成项目、已推迟项目、计划演进日志
 
-### Key Features
-1. **Acceptance Criteria**: Each task maps to a specific AC - nothing can be "forgotten"
-2. **Task Tag Routing**: Every task should carry `coding` or `analyze` tag from plan generation
-   - `coding -> Claude`, `analyze -> Codex`
-3. **Plan Evolution Log**: If you discover the plan needs changes, document the change with justification
-4. **Explicit Deferrals**: Deferred tasks require strong justification and impact analysis
-5. **Full Alignment Checks**: At configurable intervals (default every 5 rounds: rounds 4, 9, 14, etc.), Codex conducts a comprehensive goal alignment audit. Use `--full-review-round N` to customize (min: 2)
+### 关键特性
+1. **验收标准**：每个任务映射到特定的 AC——不会有任何东西被"遗忘"
+2. **任务标签路由**：每个任务应携带来自计划生成的 `coding` 或 `analyze` 标签
+   - `coding -> Claude`，`analyze -> Codex`
+3. **计划演进日志**：如果你发现计划需要更改，记录更改及理由
+4. **显式推迟**：推迟的任务需要充分的理由和影响分析
+5. **全面对齐检查**：在可配置的间隔（默认每 5 轮：第 4、9、14 轮等），Codex 进行全面的目标对齐审计。使用 `--full-review-round N` 自定义（最小值：2）
 
-### How to Use
-1. **Round 0**: Initialize the Goal Tracker with Ultimate Goal and Acceptance Criteria
-2. **Each Round**: Update task status, log plan changes, note discovered issues
-3. **Before Exit**: Ensure goal-tracker.md reflects current state accurately
+### 使用方法
+1. **第 0 轮**：使用终极目标和验收标准初始化 Goal Tracker
+2. **每轮**：更新任务状态、记录计划更改、记录发现的问题
+3. **退出前**：确保 goal-tracker.md 准确反映当前状态
 
-## Important Rules
+## 重要规则
 
-1. **Write summaries**: Always write your work summary to the specified file before exiting
-2. **Maintain Goal Tracker**: Keep goal-tracker.md up-to-date with your progress
-3. **Be thorough**: Include details about what was implemented, files changed, and tests added
-4. **No cheating**: Do not try to exit the loop by editing state files or running cancel commands
-5. **Trust the process**: Codex's feedback helps improve the implementation
+1. **写摘要**：退出前始终将你的工作总结写入指定文件
+2. **维护 Goal Tracker**：保持 goal-tracker.md 与你的进度同步更新
+3. **彻底**：包含关于实现了什么、更改了哪些文件、添加了哪些测试的详细信息
+4. **不要作弊**：不要尝试通过编辑状态文件或运行取消命令来退出循环
+5. **信任过程**：Codex 的反馈有助于改进实现
 
-## BitLesson Workflow (Project Level)
+## BitLesson 工作流（项目级别）
 
-Each project must maintain its own `.humanize/bitlesson.md` file.
-If missing, `start-rlcr-loop` initializes it automatically with a strict template.
+每个项目必须维护自己的 `.humanize/bitlesson.md` 文件。
+如果缺失，`start-rlcr-loop` 会自动使用严格模板初始化它。
 
-Per round requirements:
-1. Read `.humanize/bitlesson.md` before execution
-2. Run `bitlesson-selector` for each task/sub-task
-3. Apply selected lesson IDs (or `NONE`) during implementation
-4. Include `## BitLesson Delta` in the round summary with `Action: none|add|update`
+每轮要求：
+1. 执行前读取 `.humanize/bitlesson.md`
+2. 为每个任务/子任务运行 `bitlesson-selector`
+3. 在实现过程中应用选定的课程 ID（或 `NONE`）
+4. 在轮次摘要中包含 `## BitLesson Delta`，带 `Action: none|add|update`
 
-If a problem is solved only after multiple rounds, add or update a precise lesson entry in `.humanize/bitlesson.md` (specific problem + specific solution).
-By default, empty `.humanize/bitlesson.md` does not block `Action: none`; use `--require-bitlesson-entry-for-none` to enforce strict blocking.
+如果问题在多轮后才解决，在 `.humanize/bitlesson.md` 中添加或更新精确的课程条目（具体问题 + 具体解决方案）。
+默认情况下，空的 `.humanize/bitlesson.md` 不会阻塞 `Action: none`；使用 `--require-bitlesson-entry-for-none` 强制严格阻塞。
 
-## Stopping the Loop
+## 停止循环
 
-- Reach the maximum iteration count, unless `--strict-success` is enabled
-- Codex confirms completion with "COMPLETE", followed by successful code review (no `[P0-9]` issues)
-- User runs `/humanize:cancel-rlcr-loop`
+- 达到最大迭代次数，除非启用了 `--strict-success`
+- Codex 确认完成（"COMPLETE"），随后成功的代码审查（没有 `[P0-9]` 问题）
+- 用户运行 `/humanize:cancel-rlcr-loop`
 
-With `--strict-success`, max-iteration and stagnation STOP checks become
-recovery prompts instead of terminal exits. Use this when an optimization loop
-must continue until the measured acceptance target is actually met.
+启用 `--strict-success` 时，最大迭代和停滞 STOP 检查会变为恢复提示而非终止退出。当优化循环必须持续到实际达到可接受目标时使用此选项。
 
-## Two-Phase System
+## 两阶段系统
 
-The RLCR loop has two phases within the active loop:
+RLCR 循环在活跃循环内有两个阶段：
 
-1. **Implementation Phase**: Work by task tags (`coding -> Claude`, `analyze -> /humanize:ask-codex`), then Codex reviews your summary
-2. **Review Phase**: After COMPLETE, `codex review` checks code quality with `[P0-9]` severity markers
+1. **实现阶段**：按任务标签工作（`coding -> Claude`，`analyze -> /humanize:ask-codex`），然后 Codex 审查你的摘要
+2. **审查阶段**：在 COMPLETE 之后，`codex review` 使用 `[P0-9]` 严重性标记检查代码质量
 
-The `--base-branch` option specifies the base branch for code review comparison. If not provided, it auto-detects from: remote default > local main > local master.
+`--base-branch` 选项指定代码审查比较的基础分支。如果未提供，它会自动检测：远程默认 > 本地 main > 本地 master。
 
-## Skip Implementation Mode
+## 跳过实现模式
 
-Use `--skip-impl` to skip the implementation phase and go directly to code review:
+使用 `--skip-impl` 跳过实现阶段，直接进入代码审查：
 
 ```bash
 /humanize:start-rlcr-loop --skip-impl
 ```
 
-In this mode:
-- Plan file is optional (not required)
-- No goal tracker initialization needed
-- Immediately starts code review when you try to exit
-- Useful for reviewing existing changes without an implementation plan
+在此模式下：
+- 计划文件是可选的（不需要）
+- 不需要初始化 goal tracker
+- 当你尝试退出时立即开始代码审查
+- 适用于在没有实施计划的情况下审查现有更改
 
-This is helpful when you want to:
-- Review code changes made outside of an RLCR loop
-- Get code quality feedback on existing work
-- Skip the implementation tracking overhead for simple tasks
+当你想要：
+- 审查在 RLCR 循环之外进行的代码更改
+- 获取现有工作的代码质量反馈
+- 为简单任务跳过实现跟踪开销时，这很有帮助

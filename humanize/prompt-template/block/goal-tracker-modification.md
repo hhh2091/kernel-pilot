@@ -1,14 +1,14 @@
-# Goal Tracker Update Blocked (Round {{CURRENT_ROUND}})
+# 目标跟踪器更新被阻止（第 {{CURRENT_ROUND}} 轮）
 
-After Round 0, you may update only the **MUTABLE SECTION** of the active goal tracker.
+在第 0 轮之后，您只能更新活动目标跟踪器的**可变部分**。
 
-Use Write or Edit on:
+使用 Write 或 Edit 修改：
 `{{CORRECT_PATH}}`
 
-## Rules
+## 规则
 
-- Keep the **IMMUTABLE SECTION** unchanged
-- Do not modify `goal-tracker.md` via Bash
-- Do not write to an old loop session's tracker
+- 保持**不可变部分**不变
+- 不要通过 Bash 修改 `goal-tracker.md`
+- 不要写入旧循环会话的跟踪器
 
-If you need Codex to correct tracker drift that you could not safely resolve yourself, include an optional `Goal Tracker Update Request` in your summary.
+如果您需要 Codex 纠正您无法安全解决的跟踪器偏移，请在摘要中包含可选的 `Goal Tracker Update Request`。

@@ -1,18 +1,18 @@
-# Codex Review Failed
+# Codex 审查失败
 
-The Codex review process failed to produce output.
+Codex 审查过程未能产生输出。
 
-**Exit Code**: {{CODEX_EXIT_CODE}}
-**Review Result File**: {{REVIEW_RESULT_FILE}} (not created)
+**退出代码**：{{CODEX_EXIT_CODE}}
+**审查结果文件**：{{REVIEW_RESULT_FILE}}（未创建）
 
-**Debug Files**:
-- Command: {{CODEX_CMD_FILE}}
-- Stdout: {{CODEX_STDOUT_FILE}}
-- Stderr: {{CODEX_STDERR_FILE}}
+**调试文件**：
+- 命令：{{CODEX_CMD_FILE}}
+- 标准输出：{{CODEX_STDOUT_FILE}}
+- 标准错误：{{CODEX_STDERR_FILE}}
 
-**Stderr (last 50 lines)**:
+**标准错误（最后 50 行）**：
 ```
 {{STDERR_CONTENT}}
 ```
 
-Please check the debug files for more details. The system will attempt another review when you exit.
+请检查调试文件以获取更多详细信息。系统将在您退出时尝试再次审查。

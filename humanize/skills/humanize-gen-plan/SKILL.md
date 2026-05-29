@@ -1,16 +1,16 @@
 ---
 name: humanize-gen-plan
-description: Generate a structured implementation plan from a draft document. Validates input, checks relevance, analyzes for issues, and generates a complete plan.md with acceptance criteria.
+description: 从草稿文档生成结构化的实施计划。验证输入、检查相关性、分析问题，并生成包含验收标准的完整 plan.md。
 type: flow
 user-invocable: false
 disable-model-invocation: true
 ---
 
-# Humanize Generate Plan
+# Humanize 生成计划
 
-Transforms a rough draft document into a well-structured implementation plan with clear goals, acceptance criteria (AC-X format), path boundaries, and feasibility suggestions.
+将粗略的草稿文档转换为结构良好的实施计划，包含清晰的目标、验收标准（AC-X 格式）、路径边界和可行性建议。
 
-The installer hydrates this skill with an absolute runtime root path:
+安装程序会使用绝对运行时根路径注入此技能：
 
 ```bash
 {{HUMANIZE_RUNTIME_ROOT}}
@@ -18,43 +18,43 @@ The installer hydrates this skill with an absolute runtime root path:
 
 ```mermaid
 flowchart TD
-    BEGIN([BEGIN]) --> VALIDATE[Validate input/output paths<br/>Run: {{HUMANIZE_RUNTIME_ROOT}}/scripts/validate-gen-plan-io.sh --input &lt;draft&gt; --output &lt;plan&gt;]
-    VALIDATE --> CHECK{Validation passed?}
-    CHECK -->|No| REPORT_ERROR[Report validation error<br/>Stop]
-    REPORT_ERROR --> END_FAIL([END])
-    CHECK -->|Yes| READ_DRAFT[Read input draft file]
-    READ_DRAFT --> CHECK_RELEVANCE{Is draft relevant to<br/>this repository?}
-    CHECK_RELEVANCE -->|No| REPORT_IRRELEVANT[Report: Draft not related to repo<br/>Stop]
+    BEGIN([开始]) --> VALIDATE[验证输入/输出路径<br/>运行: {{HUMANIZE_RUNTIME_ROOT}}/scripts/validate-gen-plan-io.sh --input &lt;draft&gt; --output &lt;plan&gt;]
+    VALIDATE --> CHECK{验证通过？}
+    CHECK -->|否| REPORT_ERROR[报告验证错误<br/>停止]
+    REPORT_ERROR --> END_FAIL([结束])
+    CHECK -->|是| READ_DRAFT[读取输入草稿文件]
+    READ_DRAFT --> CHECK_RELEVANCE{草稿是否与<br/>此仓库相关？}
+    CHECK_RELEVANCE -->|否| REPORT_IRRELEVANT[报告：草稿与仓库无关<br/>停止]
     REPORT_IRRELEVANT --> END_FAIL
-    CHECK_RELEVANCE -->|Yes| ANALYZE[Analyze draft for:<br/>- Clarity<br/>- Consistency<br/>- Completeness<br/>- Functionality]
-    ANALYZE --> HAS_ISSUES{Issues found?}
-    HAS_ISSUES -->|Yes| RESOLVE[Engage user to resolve issues<br/>via AskUserQuestion]
+    CHECK_RELEVANCE -->|是| ANALYZE[分析草稿：<br/>- 清晰性<br/>- 一致性<br/>- 完整性<br/>- 功能性]
+    ANALYZE --> HAS_ISSUES{发现问题？}
+    HAS_ISSUES -->|是| RESOLVE[与用户沟通解决问题<br/>通过 AskUserQuestion]
     RESOLVE --> ANALYZE
-    HAS_ISSUES -->|No| CHECK_METRICS{Has quantitative<br/>metrics?}
-    CHECK_METRICS -->|Yes| CONFIRM_METRICS[Confirm metrics with user:<br/>Hard requirement or trend?]
+    HAS_ISSUES -->|否| CHECK_METRICS{是否有量化<br/>指标？}
+    CHECK_METRICS -->|是| CONFIRM_METRICS[与用户确认指标：<br/>硬性要求还是趋势？]
     CONFIRM_METRICS --> GEN_PLAN
-    CHECK_METRICS -->|No| GEN_PLAN[Generate structured plan:<br/>- Goal Description<br/>- Acceptance Criteria with TDD tests<br/>- Path Boundaries<br/>- Feasibility Hints<br/>- Dependencies & Milestones]
-    GEN_PLAN --> WRITE[Write plan to output file<br/>using Edit tool to preserve draft]
-    WRITE --> REVIEW[Review complete plan<br/>Check for inconsistencies]
-    REVIEW --> INCONSISTENT{Inconsistencies?}
-    INCONSISTENT -->|Yes| FIX[Fix inconsistencies]
+    CHECK_METRICS -->|否| GEN_PLAN[生成结构化计划：<br/>- 目标描述<br/>- 包含 TDD 测试的验收标准<br/>- 路径边界<br/>- 可行性提示<br/>- 依赖与里程碑]
+    GEN_PLAN --> WRITE[将计划写入输出文件<br/>使用 Edit 工具保留草稿]
+    WRITE --> REVIEW[审查完整计划<br/>检查不一致之处]
+    REVIEW --> INCONSISTENT{存在不一致？}
+    INCONSISTENT -->|是| FIX[修复不一致]
     FIX --> REVIEW
-    INCONSISTENT -->|No| CHECK_LANG{Multiple languages?}
-    CHECK_LANG -->|Yes| UNIFY[Ask user to unify language]
+    INCONSISTENT -->|否| CHECK_LANG{多种语言？}
+    CHECK_LANG -->|是| UNIFY[要求用户统一语言]
     UNIFY --> REPORT_SUCCESS
-    CHECK_LANG -->|No| REPORT_SUCCESS[Report success:<br/>- Plan path<br/>- AC count<br/>- Language unified?]
-    REPORT_SUCCESS --> END_SUCCESS([END])
+    CHECK_LANG -->|否| REPORT_SUCCESS[报告成功：<br/>- 计划路径<br/>- AC 数量<br/>- 语言已统一？]
+    REPORT_SUCCESS --> END_SUCCESS([结束])
 ```
 
-## Input Requirements
+## 输入要求
 
-**Required Arguments:**
-- `--input <path/to/draft.md>` - The draft document
-- `--output <path/to/plan.md>` - Where to write the plan
+**必需参数：**
+- `--input <path/to/draft.md>` - 草稿文档
+- `--output <path/to/plan.md>` - 计划写入位置
 
-## Plan Structure Output
+## 计划结构输出
 
-The generated plan includes:
+生成的计划包含：
 
 ```markdown
 # Plan Title
@@ -93,31 +93,31 @@ Minimum viable implementation
 - Code should NOT contain plan terminology
 ```
 
-## Validation Exit Codes
+## 验证退出代码
 
-| Exit Code | Meaning |
+| 退出代码 | 含义 |
 |-----------|---------|
-| 0 | Success - continue |
-| 1 | Input file not found |
-| 2 | Input file is empty |
-| 3 | Output directory does not exist |
-| 4 | Output file already exists |
-| 5 | No write permission |
-| 6 | Invalid arguments |
-| 7 | Plan template file not found |
+| 0 | 成功 - 继续 |
+| 1 | 输入文件未找到 |
+| 2 | 输入文件为空 |
+| 3 | 输出目录不存在 |
+| 4 | 输出文件已存在 |
+| 5 | 无写入权限 |
+| 6 | 参数无效 |
+| 7 | 计划模板文件未找到 |
 
-## Usage
+## 使用方法
 
 ```bash
-# Start the flow
+# 启动流程
 /flow:humanize-gen-plan
 
-# The flow will ask for:
-# - Input draft file path
-# - Output plan file path
+# 流程将询问：
+# - 输入草稿文件路径
+# - 输出计划文件路径
 ```
 
-Or with the skill only (no auto-execution):
+或仅使用技能（不自动执行）：
 
 ```bash
 /skill:humanize-gen-plan

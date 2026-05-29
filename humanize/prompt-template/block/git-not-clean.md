@@ -1,18 +1,18 @@
-# Git Not Clean
+# Git 未清理
 
-You are trying to stop, but you have **{{GIT_ISSUES}}**.
+您正在尝试停止，但您有 **{{GIT_ISSUES}}**。
 {{SPECIAL_NOTES}}
-**Required Actions**:
-0. If the `code-simplifier` plugin is installed, use it to review and simplify your code before committing. Invoke via: `/code-simplifier`, `@agent-code-simplifier`, or `@code-simplifier:code-simplifier (agent)`
-1. Review untracked files - add build artifacts to `.gitignore`
-2. Stage only real changes with specific paths: `git add <files>`
-3. Commit with a descriptive message following project conventions
+**必需的操作**：
+0. 如果已安装 `code-simplifier` 插件，请在提交前使用它来审查和简化您的代码。通过以下方式调用：`/code-simplifier`、`@agent-code-simplifier` 或 `@code-simplifier:code-simplifier (agent)`
+1. 检查未跟踪的文件 - 将构建产物添加到 `.gitignore`
+2. 仅暂存实际更改，使用具体路径：`git add <files>`
+3. 使用符合项目规范的描述性消息提交
 
-**Important Rules**:
-- Do NOT use `git add -A`, `git add --all`, or `git add .` during an active RLCR loop
-- Never stage `.humanize/` or legacy `.humanize-*` loop artifacts
-- Commit message must follow project conventions
-- AI tools (Claude, Codex, etc.) must NOT have authorship in commits
-- Do NOT include `Co-Authored-By: Claude` or similar AI attribution
+**重要规则**：
+- 在活动的 RLCR 循环期间，不要使用 `git add -A`、`git add --all` 或 `git add .`
+- 永远不要暂存 `.humanize/` 或旧版 `.humanize-*` 循环产物
+- 提交消息必须符合项目规范
+- AI 工具（Claude、Codex 等）不得在提交中署名
+- 不要包含 `Co-Authored-By: Claude` 或类似的 AI 署名
 
-After committing all changes, you may attempt to exit again.
+提交所有更改后，您可以再次尝试退出。

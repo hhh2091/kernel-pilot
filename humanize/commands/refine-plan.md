@@ -1,5 +1,5 @@
 ---
-description: "Refine an annotated implementation plan and generate a QA ledger"
+description: "优化带注释的实施计划并生成 QA 台账"
 argument-hint: "--input <path/to/annotated-plan.md> [--output <path/to/refined-plan.md>] [--qa-dir <path/to/qa-dir>] [--alt-language <language-or-code>] [--discussion|--direct]"
 allowed-tools:
   - "Bash(${CLAUDE_PLUGIN_ROOT}/scripts/validate-refine-plan-io.sh:*)"
@@ -12,118 +12,118 @@ allowed-tools:
 hide-from-slash-command-tool: "true"
 ---
 
-# Refine Annotated Plan
+# 优化带注释的计划
 
-Read and execute below with ultrathink.
+请仔细阅读并执行以下内容。
 
-## Hard Constraint: Planning-Only Refinement
+## 硬性约束：仅限计划优化
 
-This command MUST ONLY refine plan artifacts. It MUST NOT implement repository code, modify source files unrelated to the plan outputs, start RLCR automatically, or create a new plan schema.
+本命令只能优化计划产物。不得实施仓库代码、修改与计划输出无关的源文件、自动启动 RLCR 或创建新的计划模式。
 
-Permitted writes are limited to:
-- The refined plan output file (`--output`, or `--input` in in-place mode)
-- The QA document under `--qa-dir`
-- Optional translated language variants for the refined plan and QA document
+允许的写入仅限于：
+- 优化后的计划输出文件（`--output`，或就地模式下的 `--input`）
+- `--qa-dir` 下的 QA 文档
+- 优化计划和 QA 文档的可选翻译语言变体
 
-The refined plan MUST reuse the existing `gen-plan` schema. Do not invent new top-level sections. Keep required sections intact, preserve optional sections when present, and preserve any `--- Original Design Draft Start ---` appendix or other non-comment content unless a comment explicitly requires a plan-level change there.
+优化后的计划必须复用现有的 `gen-plan` 模式。不要发明新的顶级部分。保持必需部分完整，保留存在的可选部分，并保留任何 `--- Original Design Draft Start ---` 附录或其他非注释内容，除非注释明确要求在此处进行计划级更改。
 
-## Workflow Overview
+## 工作流程概览
 
-> **Sequential Execution Constraint**: Execute the phases strictly in order. Do NOT parallelize work across phases. Finish each phase before moving to the next one.
+> **顺序执行约束**：严格按顺序执行阶段。不得跨阶段并行化工作。在进入下一个之前完成每个阶段。
 
-1. **Execution Mode Setup**: Parse CLI arguments and derive output paths
-2. **Load Project Config**: Resolve `alternative_plan_language` and mode defaults using `config-loader.sh` semantics
-3. **IO Validation**: Run `validate-refine-plan-io.sh`
-4. **Comment Extraction**: Scan the annotated plan and extract valid comment blocks (`CMT:`/`ENDCMT`, `<cmt>`/`</cmt>`, `<comment>`/`</comment>`)
-5. **Comment Classification**: Classify each extracted comment for downstream handling
-6. **Comment Processing**: Answer questions, apply requested plan edits, and perform targeted research
-7. **Plan Refinement**: Produce the comment-free refined plan while preserving the `gen-plan` structure
-8. **QA Generation**: Populate the QA template with the comment ledger and outcomes
-9. **Atomic Write**: Commit the refined plan, QA document, and optional variants as one transaction
+1. **执行模式设置**：解析 CLI 参数并派生输出路径
+2. **加载项目配置**：使用 `config-loader.sh` 语义解析 `alternative_plan_language` 和模式默认值
+3. **IO 验证**：运行 `validate-refine-plan-io.sh`
+4. **注释提取**：扫描带注释的计划并提取有效注释块（`CMT:`/`ENDCMT`、`<cmt>`/`</cmt>`、`<comment>`/`</comment>`）
+5. **注释分类**：对每个提取的注释进行分类以供下游处理
+6. **注释处理**：回答问题、应用请求的计划编辑并执行定向研究
+7. **计划优化**：生成无注释的优化计划，同时保留 `gen-plan` 结构
+8. **QA 生成**：用注释台账和结果填充 QA 模板
+9. **原子写入**：将优化计划、QA 文档和可选变体作为一个事务提交
 
 ---
 
-## Phase 0: Execution Mode Setup
+## 阶段 0：执行模式设置
 
-Parse `$ARGUMENTS` and set the following variables:
+解析 `$ARGUMENTS` 并设置以下变量：
 
-- `INPUT_FILE` from `--input` (required)
-- `OUTPUT_FILE` from `--output`
-- `QA_DIR` from `--qa-dir`
-- `CLI_ALT_LANGUAGE_RAW` from `--alt-language`
-- `REFINE_PLAN_MODE_DISCUSSION=true` if `--discussion` is present
-- `REFINE_PLAN_MODE_DIRECT=true` if `--direct` is present
+- 从 `--input` 获取 `INPUT_FILE`（必填）
+- 从 `--output` 获取 `OUTPUT_FILE`
+- 从 `--qa-dir` 获取 `QA_DIR`
+- 从 `--alt-language` 获取 `CLI_ALT_LANGUAGE_RAW`
+- 如果存在 `--discussion`，则 `REFINE_PLAN_MODE_DISCUSSION=true`
+- 如果存在 `--direct`，则 `REFINE_PLAN_MODE_DIRECT=true`
 
-Argument rules:
+参数规则：
 
-1. `--input <path>` is required.
-2. `--output <path>` is optional. If omitted, set `OUTPUT_FILE=INPUT_FILE` for in-place mode.
-3. `--qa-dir <path>` is optional. If omitted, set `QA_DIR=.humanize/plan_qa`.
-4. `--alt-language <language-or-code>` is optional. If present without a value, report `Invalid arguments: --alt-language requires a value` and stop.
-5. `--discussion` and `--direct` are mutually exclusive. If both are present, report `Cannot use --discussion and --direct together` and stop.
+1. `--input <path>` 是必需的。
+2. `--output <path>` 是可选的。如果省略，设置 `OUTPUT_FILE=INPUT_FILE` 以就地模式。
+3. `--qa-dir <path>` 是可选的。如果省略，设置 `QA_DIR=.humanize/plan_qa`。
+4. `--alt-language <language-or-code>` 是可选的。如果存在但没有值，报告 `Invalid arguments: --alt-language requires a value` 并停止。
+5. `--discussion` 和 `--direct` 互斥。如果同时存在，报告 `Cannot use --discussion and --direct together` 并停止。
 
-Derived paths:
+派生路径：
 
-1. Compute `IN_PLACE_MODE=true` when `OUTPUT_FILE` equals `INPUT_FILE`; otherwise `false`.
-2. Compute `QA_FILE` from the input basename, not the output basename:
-   - `plan.md` becomes `<QA_DIR>/plan-qa.md`
-   - `docs/my-plan.md` becomes `<QA_DIR>/my-plan-qa.md`
-   - `plan` becomes `<QA_DIR>/plan-qa.md`
-3. Keep `--alt-language` out of the validator invocation because `validate-refine-plan-io.sh` does not accept it. Pass only:
+1. 当 `OUTPUT_FILE` 等于 `INPUT_FILE` 时计算 `IN_PLACE_MODE=true`；否则 `false`。
+2. 从输入基本名称（而非输出基本名称）计算 `QA_FILE`：
+   - `plan.md` 变为 `<QA_DIR>/plan-qa.md`
+   - `docs/my-plan.md` 变为 `<QA_DIR>/my-plan-qa.md`
+   - `plan` 变为 `<QA_DIR>/plan-qa.md`
+3. 将 `--alt-language` 排除在验证器调用之外，因为 `validate-refine-plan-io.sh` 不接受它。仅传递：
    - `--input`
-   - `--output` when provided
-   - `--qa-dir` when provided
-   - `--discussion` or `--direct` when provided
+   - 提供时的 `--output`
+   - 提供时的 `--qa-dir`
+   - 提供时的 `--discussion` 或 `--direct`
 
-Scope rules for v1:
+v1 的范围规则：
 
-- Do not introduce `--language` or `--qa-output`
-- Do not add new config keys
-- Do not auto-start RLCR after refinement
+- 不引入 `--language` 或 `--qa-output`
+- 不添加新的配置键
+- 优化后不自动启动 RLCR
 
 ---
 
-## Phase 0.5: Load Project Config
+## 阶段 0.5：加载项目配置
 
-Resolve configuration by following the same precedence and merge semantics defined in `${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-loader.sh`. Reuse that behavior; do not invent a separate refine-plan config model.
+遵循 `${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-loader.sh` 中定义的相同优先级和合并语义解析配置。复用该行为；不要发明单独的 refine-plan 配置模型。
 
-### Config Merge Semantics
+### 配置合并语义
 
-Use the same layer order as `load_merged_config`:
+使用与 `load_merged_config` 相同的层顺序：
 
-1. Required default config: `${CLAUDE_PLUGIN_ROOT}/config/default_config.json`
-2. Optional user config: `${XDG_CONFIG_HOME:-$HOME/.config}/humanize/config.json`
-3. Optional project config: `${HUMANIZE_CONFIG:-$PROJECT_ROOT/.humanize/config.json}`
+1. 必需默认配置：`${CLAUDE_PLUGIN_ROOT}/config/default_config.json`
+2. 可选用户配置：`${XDG_CONFIG_HOME:-$HOME/.config}/humanize/config.json`
+3. 可选项目配置：`${HUMANIZE_CONFIG:-$PROJECT_ROOT/.humanize/config.json}`
 
-Later layers override earlier layers. Malformed optional JSON objects are treated as warnings and ignored. A malformed required default config is a fatal configuration error.
+后续层覆盖前面的层。格式错误的可选 JSON 对象视为警告并被忽略。格式错误的必需默认配置是致命配置错误。
 
-### Values to Extract
+### 需要提取的值
 
-Read the merged config and resolve:
+读取合并配置并解析：
 
-- `CONFIG_ALT_LANGUAGE_RAW` from `alternative_plan_language`
-- `CONFIG_GEN_PLAN_MODE_RAW` from `gen_plan_mode`
+- 从 `alternative_plan_language` 获取 `CONFIG_ALT_LANGUAGE_RAW`
+- 从 `gen_plan_mode` 获取 `CONFIG_GEN_PLAN_MODE_RAW`
 
-### Mode Resolution
+### 模式解析
 
-Resolve `REFINE_PLAN_MODE` with this priority:
+使用以下优先级解析 `REFINE_PLAN_MODE`：
 
 1. CLI `--discussion` => `discussion`
 2. CLI `--direct` => `direct`
-3. Valid config value `gen_plan_mode` (`discussion` or `direct`, case-insensitive)
-4. Default => `discussion`
+3. 有效的配置值 `gen_plan_mode`（`discussion` 或 `direct`，不区分大小写）
+4. 默认 => `discussion`
 
-If `gen_plan_mode` is present but invalid, log a warning and fall back to the next rule.
+如果 `gen_plan_mode` 存在但无效，记录警告并回退到下一条规则。
 
-### Alternative Language Resolution
+### 替代语言解析
 
-Resolve the variant language with this priority:
+使用以下优先级解析变体语言：
 
 1. CLI `--alt-language`
-2. Config `alternative_plan_language`
-3. No variant
+2. 配置 `alternative_plan_language`
+3. 无变体
 
-Normalize the value case-insensitively using this mapping table:
+使用此映射表不区分大小写地规范化值：
 
 | Language   | Code | Suffix |
 |------------|------|--------|
@@ -137,74 +137,74 @@ Normalize the value case-insensitively using this mapping table:
 | Russian    | ru   | `_ru`  |
 | Arabic     | ar   | `_ar`  |
 
-Normalization rules:
+规范化规则：
 
-1. Trim leading and trailing whitespace before matching.
-2. Accept either the full language name or the ISO code from the table.
-3. Treat `English` / `en` as a no-op: no translated variant is generated.
-4. If the CLI value is unsupported, report `Unsupported --alt-language "<value>"` and stop.
-5. If the config value is unsupported, log a warning and disable variant generation.
+1. 匹配前修剪前导和尾随空格。
+2. 接受表中的完整语言名称或 ISO 代码。
+3. 将 `English` / `en` 视为无操作：不生成翻译变体。
+4. 如果 CLI 值不受支持，报告 `Unsupported --alt-language "<value>"` 并停止。
+5. 如果配置值不受支持，记录警告并禁用变体生成。
 
-Set:
+设置：
 
-- `ALT_PLAN_LANGUAGE` to the normalized language name or empty string
-- `ALT_PLAN_LANG_CODE` to the normalized code or empty string
+- `ALT_PLAN_LANGUAGE` 为规范化的语言名称或空字符串
+- `ALT_PLAN_LANG_CODE` 为规范化的代码或空字符串
 
-Do not depend on deprecated `chinese_plan`. `refine-plan` only uses `alternative_plan_language`.
+不要依赖已弃用的 `chinese_plan`。`refine-plan` 仅使用 `alternative_plan_language`。
 
 ---
 
-## Phase 1: IO Validation
+## 阶段 1：IO 验证
 
-Run the validator with the parsed arguments, excluding `--alt-language`:
+使用解析的参数（不包括 `--alt-language`）运行验证器：
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/validate-refine-plan-io.sh" <validated-arguments>
 ```
 
-Handle exit codes exactly:
+准确处理退出码：
 
-- Exit code 0: Continue to Phase 2
-- Exit code 1: Report `Input file not found` and stop
-- Exit code 2: Report `Input file is empty` and stop
-- Exit code 3: Report `Input file has no comment blocks` and stop
-- Exit code 4: Report `Input file is missing required gen-plan sections` and stop
-- Exit code 5: Report `Output directory does not exist or is not writable - please fix it` and stop
-- Exit code 6: Report `QA directory is not writable` and stop
-- Exit code 7: Report `Invalid arguments` and show the validator usage, then stop
+- 退出码 0：继续阶段 2
+- 退出码 1：报告 `Input file not found` 并停止
+- 退出码 2：报告 `Input file is empty` 并停止
+- 退出码 3：报告 `Input file has no comment blocks` 并停止
+- 退出码 4：报告 `Input file is missing required gen-plan sections` 并停止
+- 退出码 5：报告 `Output directory does not exist or is not writable - please fix it` 并停止
+- 退出码 6：报告 `QA directory is not writable` 并停止
+- 退出码 7：报告 `Invalid arguments` 并显示验证器用法，然后停止
 
-Validation notes:
+验证说明：
 
-1. `validate-refine-plan-io.sh` may create `QA_DIR` when it does not exist. Treat that as expected setup, not as a side effect to undo.
-2. After validation succeeds, read the input file and preserve its exact contents as `ORIGINAL_PLAN_TEXT`.
-3. Do not mutate the validated input yet. All writes happen in Phase 7 only.
+1. `validate-refine-plan-io.sh` 可能会在 `QA_DIR` 不存在时创建它。将其视为预期设置，而非需要撤消的副作用。
+2. 验证成功后，读取输入文件并将其确切内容保存为 `ORIGINAL_PLAN_TEXT`。
+3. 暂时不要修改已验证的输入。所有写入仅在阶段 7 进行。
 
 ---
 
-## Phase 2: Comment Extraction
+## 阶段 2：注释提取
 
-Extract comments using a **stateful scanner** equivalent to POSIX `awk` wrapped by `bash`, not a naive regular expression pass. The scanner behavior must match the Task 3 findings.
+使用等效于 POSIX `awk` 由 `bash` 包装的**有状态扫描器**提取注释，而非朴素的正则表达式扫描。扫描器行为必须与 Task 3 的发现匹配。
 
-### Scanner Requirements
+### 扫描器要求
 
-Track these states while scanning the validated input in document order:
+在按文档顺序扫描已验证输入时跟踪以下状态：
 
-- `IN_FENCE` with the active fence marker (` ``` ` or ` ~~~ `)
-- `IN_HTML_COMMENT` for `<!-- ... -->`
+- `IN_FENCE`，带有活动围栏标记（` ``` ` 或 ` ~~~ `）
+- `IN_HTML_COMMENT`，用于 `<!-- ... -->`
 - `IN_CMT_BLOCK`
 - `NEAREST_HEADING`
 
-Extraction rules:
+提取规则：
 
-1. Support three comment formats:
-   - Classic: `CMT:` as start marker and `ENDCMT` as end marker
-   - Short tag: `<cmt>` as start marker and `</cmt>` as end marker
-   - Long tag: `<comment>` as start marker and `</comment>` as end marker
-2. Support both inline and multi-line blocks for all formats:
-   - Inline: `Text before CMT: comment text ENDCMT text after`
-   - Inline: `Text before <cmt>comment text</cmt> text after`
-   - Inline: `Text before <comment>comment text</comment> text after`
-   - Multi-line:
+1. 支持三种注释格式：
+   - 经典：`CMT:` 作为开始标记，`ENDCMT` 作为结束标记
+   - 短标签：`<cmt>` 作为开始标记，`</cmt>` 作为结束标记
+   - 长标签：`<comment>` 作为开始标记，`</comment>` 作为结束标记
+2. 所有格式支持内联和多行块：
+   - 内联：`Text before CMT: comment text ENDCMT text after`
+   - 内联：`Text before <cmt>comment text</cmt> text after`
+   - 内联：`Text before <comment>comment text</comment> text after`
+   - 多行：
      ```markdown
      CMT:
      comment text
@@ -220,128 +220,128 @@ Extraction rules:
      comment text
      </comment>
      ```
-3. Ignore comment markers inside fenced code blocks.
-4. Ignore comment markers inside HTML comments.
-5. Update `NEAREST_HEADING` whenever a Markdown heading is encountered outside fenced code and HTML comments.
-6. Preserve surrounding non-comment text when removing inline comment blocks from the working plan text.
-7. Assign raw comment IDs in document order as `CMT-1`, `CMT-2`, ... only for non-empty blocks.
-8. If a block is empty after trimming whitespace, remove it from the working plan text but do not create a ledger item and do not consume an ID.
+3. 忽略围栏代码块内的注释标记。
+4. 忽略 HTML 注释内的注释标记。
+5. 在围栏代码和 HTML 注释之外遇到 Markdown 标题时更新 `NEAREST_HEADING`。
+6. 从工作计划文本中移除内联注释块时保留周围的非注释文本。
+7. 按文档顺序为非空块分配原始注释 ID，格式为 `CMT-1`、`CMT-2`、...
+8. 如果块在修剪空白后为空，从工作计划文本中移除它但不创建台账项也不消耗 ID。
 
-### Extracted Metadata
+### 提取的元数据
 
-For each non-empty comment block, capture:
+对于每个非空注释块，捕获：
 
-- `id` (`CMT-N`)
-- `original_text` exactly as written between the comment markers
-- `normalized_text` with surrounding whitespace trimmed
-- `start_line`, `start_column`
-- `end_line`, `end_column`
-- `nearest_heading` or `Preamble` when no heading exists yet
-- `location_label` for QA output
-- `form` = `inline` or `multiline`
-- `context_excerpt` from the nearest non-comment source text
+- `id`（`CMT-N`）
+- `original_text`，注释标记之间的确切书写内容
+- `normalized_text`，修剪周围空白
+- `start_line`、`start_column`
+- `end_line`、`end_column`
+- `nearest_heading` 或尚无标题时的 `Preamble`
+- QA 输出的 `location_label`
+- `form` = `inline` 或 `multiline`
+- 最近非注释源文本的 `context_excerpt`
 
-### Parse Errors
+### 解析错误
 
-These are fatal extraction errors:
+这些是致命提取错误：
 
-1. Nested comment start marker while already inside a comment block
-2. Comment end marker encountered while not inside a comment block or wrong end marker for the format
-3. End of file reached while still inside a comment block
+1. 已在注释块内时遇到嵌套注释开始标记
+2. 未在注释块内时遇到注释结束标记，或格式的结束标记不匹配
+3. 仍在注释块内时到达文件末尾
 
-Every fatal parse error MUST report:
+每个致命解析错误必须报告：
 
-- The error kind
-- The exact line and column
-- The nearest heading
-- A short context excerpt
+- 错误类型
+- 确切的行和列
+- 最近的标题
+- 简短的上下文摘录
 
-Examples of acceptable messages:
+可接受消息的示例：
 
 - `Comment parse error: nested comment block at line 48, column 3 near "## Acceptance Criteria" (context: "<cmt>split AC-2...")`
 - `Comment parse error: stray comment end marker at line 109, column 1 near "## Task Breakdown" (context: "</comment>")`
 - `Comment parse error: missing end marker for block opened at line 72, column 5 near "## Dependencies and Sequence"`
 
-### Outputs from Phase 2
+### 阶段 2 的输出
 
-Produce:
+生成：
 
-- `EXTRACTED_COMMENTS`: ordered list of comment records
-- `PLAN_WITH_COMMENTS_REMOVED`: the original plan text with every valid comment block removed and surrounding inline text preserved
+- `EXTRACTED_COMMENTS`：注释记录的有序列表
+- `PLAN_WITH_COMMENTS_REMOVED`：移除每个有效注释块并保留周围内联文本的原始计划文本
 
-If `EXTRACTED_COMMENTS` is empty after removing no-op blocks, report `No non-empty CMT blocks remain after parsing` and stop.
+如果 `EXTRACTED_COMMENTS` 在移除无操作块后为空，报告 `No non-empty CMT blocks remain after parsing` 并停止。
 
 ---
 
-## Phase 3: Comment Classification
+## 阶段 3：注释分类
 
-Classify every extracted comment for downstream handling.
+对每个提取的注释进行分类以供下游处理。
 
-### Primary Classification Set
+### 主要分类集
 
-Each raw comment block must receive exactly one primary classification:
+每个原始注释块必须恰好获得一个主要分类：
 
 - `question`
 - `change_request`
 - `research_request`
 
-### Heuristic Rules
+### 启发式规则
 
-Use these heuristics first:
+首先使用这些启发式：
 
-- `question`: asks why, how, what, explain, clarify, or says the plan is unclear
-- `change_request`: asks to add, remove, delete, rewrite, restore, rename, split, merge, or otherwise modify the plan
-- `research_request`: asks to investigate the repository, compare existing patterns, confirm current behavior, or gather evidence before deciding
+- `question`：询问为什么、如何、什么、解释、澄清，或说计划不清楚
+- `change_request`：要求添加、移除、删除、重写、恢复、重命名、拆分、合并或以其他方式修改计划
+- `research_request`：要求调查仓库、比较现有模式、确认当前行为，或在决定前收集证据
 
-When more than one intent appears in the same raw block:
+当同一原始块中出现多个意图时：
 
-1. Keep the raw ledger ID unchanged (`CMT-N`)
-2. Create deterministic processing sub-items in textual order: `CMT-N.1`, `CMT-N.2`, ...
-3. Assign each sub-item one of the three classifications above
-4. Assign the raw block a dominant classification for the QA ledger using this precedence:
+1. 保持原始台账 ID 不变（`CMT-N`）
+2. 按文本顺序创建确定性处理子项：`CMT-N.1`、`CMT-N.2`、...
+3. 为每个子项分配上述三种分类之一
+4. 使用以下优先级为原始块分配 QA 台账的主导分类：
    - `research_request`
    - `change_request`
    - `question`
 
-### Ambiguity Handling
+### 歧义处理
 
-If classification is still ambiguous after applying the heuristics:
+如果应用启发式后分类仍有歧义：
 
-- In `discussion` mode: use `AskUserQuestion` to confirm the classification before continuing
-- In `direct` mode: choose the most action-driving interpretation and record the assumption in the QA document
+- 在 `discussion` 模式下：使用 `AskUserQuestion` 在继续之前确认分类
+- 在 `direct` 模式下：选择最能驱动行动的解释并在 QA 文档中记录假设
 
-Examples:
+示例：
 
 - `Why do we need two config layers here?` => `question`
 - `Delete task5 and fold its work into task4.` => `change_request`
-- `Investigate how config loading works in this repo before deciding whether AC-3 should change.` => `research_request`, or split into research plus follow-up change sub-items if the block clearly contains both intents
+- `Investigate how config loading works in this repo before deciding whether AC-3 should change.` => `research_request`，或如果块明显包含两种意图，则拆分为研究加后续更改子项
 
-### Classification Record
+### 分类记录
 
-For each raw comment block and any sub-items, record:
+对于每个原始注释块和任何子项，记录：
 
 - `id`
-- `parent_id` when applicable
+- 适用时的 `parent_id`
 - `classification`
 - `classification_rationale`
-- `needs_user_confirmation` (`true` or `false`)
-- `resolved_via_discussion` (`true` or `false`)
+- `needs_user_confirmation`（`true` 或 `false`）
+- `resolved_via_discussion`（`true` 或 `false`）
 
 ---
 
-## Phase 4: Comment Processing
+## 阶段 4：注释处理
 
-Process comments in document order. When a raw block has sub-items, process the sub-items in order before moving to the next raw block.
+按文档顺序处理注释。当原始块有子项时，在移动到下一个原始块之前按顺序处理子项。
 
 ### `question`
 
-Default behavior:
+默认行为：
 
-1. Answer the question in the QA document.
-2. Apply only minimal clarifying plan edits when the current plan text is genuinely ambiguous or misleading.
-3. Do not use a question as an excuse to expand scope, add implementation detail, or rewrite unrelated sections.
+1. 在 QA 文档中回答问题。
+2. 仅在当前计划文本确实含糊或误导时应用最小的澄清性计划编辑。
+3. 不要以问题为借口扩展范围、添加实施细节或重写不相关的部分。
 
-Preferred destinations for light clarification:
+轻度澄清的首选目标：
 
 - `## Goal Description`
 - `## Feasibility Hints and Suggestions`
@@ -350,55 +350,55 @@ Preferred destinations for light clarification:
 
 ### `change_request`
 
-Default behavior:
+默认行为：
 
-1. Apply the requested plan edits directly to the refined plan draft.
-2. Keep the `gen-plan` structure intact.
-3. Propagate changes across all affected sections so the plan stays internally consistent.
+1. 将请求的计划编辑直接应用到优化计划草稿。
+2. 保持 `gen-plan` 结构完整。
+3. 在所有受影响的部分传播更改，使计划保持内部一致。
 
-Consistency obligations:
+一致性义务：
 
-- Acceptance criteria still match referenced tasks
-- Task Breakdown still points to existing ACs
-- Task dependencies still reference existing task IDs or `-`
-- Milestones and sequencing remain aligned with the changed scope
-- `Claude-Codex Deliberation` and `Pending User Decisions` reflect the new state
-- Task routing tags remain exactly `coding` or `analyze`
+- 验收标准仍匹配引用的任务
+- Task Breakdown 仍指向现有的 AC
+- 任务依赖仍引用现有的任务 ID 或 `-`
+- 里程碑和排序仍与更改后的范围对齐
+- `Claude-Codex Deliberation` 和 `Pending User Decisions` 反映新状态
+- 任务路由标签仍为 `coding` 或 `analyze`
 
 ### `research_request`
 
-Default behavior:
+默认行为：
 
-1. Perform targeted repository research using only `Read`, `Glob`, and `Grep`.
-2. Keep the research tightly scoped to the comment. Do not drift into implementation work.
-3. Summarize the files and patterns examined in the QA document.
-4. Integrate the conclusion into the refined plan if the evidence supports a clear plan update.
-5. If the research narrows the issue but still requires a human choice, add or update a `DEC-N` item in `## Pending User Decisions` and record the same decision in the QA document.
+1. 仅使用 `Read`、`Glob` 和 `Grep` 执行定向仓库研究。
+2. 将研究严格限定在注释范围内。不要偏向实施工作。
+3. 在 QA 文档中总结检查的文件和模式。
+4. 如果证据支持明确的计划更新，将结论整合到优化计划中。
+5. 如果研究缩小了问题但仍需要人工选择，在 `## Pending User Decisions` 中添加或更新 `DEC-N` 项，并在 QA 文档中记录相同的决策。
 
-### Resolution Rules
+### 解决规则
 
-1. Every raw `CMT-N` must end with one disposition:
+1. 每个原始 `CMT-N` 必须以一种处置结束：
    - `answered`
    - `applied`
    - `researched`
    - `deferred`
    - `resolved`
-2. Preserve the original comment text in the QA document exactly as captured in Phase 2.
-3. If a comment cannot be fully resolved without user input:
-   - In `discussion` mode, ask only the minimum necessary question
-   - In `direct` mode, make the smallest safe assumption, mark it explicitly in QA, and add a pending decision when the assumption materially affects the plan
-4. If unresolved user decisions remain after processing, the plan convergence status must be `partially_converged`
-5. If all comments are fully resolved and no pending decisions remain, preserve or set convergence status to `converged`
+2. 在 QA 文档中保留阶段 2 中捕获的原始注释文本。
+3. 如果注释无法在没有用户输入的情况下完全解决：
+   - 在 `discussion` 模式下，仅询问最少必要的问题
+   - 在 `direct` 模式下，做出最小的安全假设，在 QA 中明确标记，并在假设实质性影响计划时添加待处理决策
+4. 如果处理后仍有未解决的用户决策，计划收敛状态必须为 `partially_converged`
+5. 如果所有注释都已完全解决且没有待处理决策，保留或设置收敛状态为 `converged`
 
 ---
 
-## Phase 5: Generate Refined Plan
+## 阶段 5：生成优化计划
 
-Starting from `PLAN_WITH_COMMENTS_REMOVED`, apply the accepted refinements from Phase 4 and produce `REFINED_PLAN_TEXT`.
+从 `PLAN_WITH_COMMENTS_REMOVED` 开始，应用阶段 4 中接受的优化并生成 `REFINED_PLAN_TEXT`。
 
-### Structural Preservation Rules
+### 结构保留规则
 
-The refined plan MUST retain these required sections:
+优化计划必须保留这些必需部分：
 
 - `## Goal Description`
 - `## Acceptance Criteria`
@@ -410,57 +410,57 @@ The refined plan MUST retain these required sections:
 - `## Pending User Decisions`
 - `## Implementation Notes`
 
-Optional sections that MUST be preserved when present in the input:
+存在于输入中时必须保留的可选部分：
 
 - `## Codex Team Workflow`
 - `## Convergence Log`
-- `--- Original Design Draft Start ---` appendix and its matching end marker
+- `--- Original Design Draft Start ---` 附录及其匹配的结束标记
 
-### Refinement Rules
+### 优化规则
 
-1. Remove every resolved comment marker and all enclosed comment text from the refined plan.
-2. Do not add any new top-level schema section.
-3. Preserve `AC-X` / `AC-X.Y` formatting.
-4. Preserve task IDs unless a comment explicitly requests a structural change.
-5. If task IDs or AC IDs change, update all references consistently across the plan.
-6. Keep task routing tags restricted to `coding` or `analyze`.
-7. Keep the refined plan in the same main language as the input plan. Only normalize mixed-language content when the input is ambiguous and discussion-mode user input explicitly requests normalization.
+1. 从优化计划中移除每个已解决的注释标记和所有包含的注释文本。
+2. 不添加任何新的顶级模式部分。
+3. 保留 `AC-X` / `AC-X.Y` 格式。
+4. 除非注释明确请求结构更改，否则保留任务 ID。
+5. 如果任务 ID 或 AC ID 更改，在整个计划中一致地更新所有引用。
+6. 保持任务路由标签限制为 `coding` 或 `analyze`。
+7. 保持优化计划与输入计划相同的主语言。仅在输入含糊且 discussion 模式用户输入明确请求规范化时规范化混合语言内容。
 
-### Main Language Detection
+### 主语言检测
 
-Determine the primary language of the input plan after comment removal.
+在注释移除后确定输入计划的主语言。
 
-Rules:
+规则：
 
-1. Use the dominant language of headings and prose as the default main language.
-2. If the plan is clearly mixed-language and the dominant language is ambiguous:
-   - In `discussion` mode, ask the user whether to keep the current mix or normalize to the dominant language
-   - In `direct` mode, keep the dominant language inferred from headings and body text; if still tied, default to English
-3. The QA document MUST use the same main language as the refined plan.
-4. If `ALT_PLAN_LANGUAGE` resolves to the same language as the main language, skip variant generation.
+1. 使用标题和正文的主导语言作为默认主语言。
+2. 如果计划明显是混合语言且主导语言含糊：
+   - 在 `discussion` 模式下，询问用户是保持当前混合还是规范化为主导语言
+   - 在 `direct` 模式下，保持从标题和正文推断的主导语言；如果仍有平局，默认为英语
+3. QA 文档必须使用与优化计划相同的主语言。
+4. 如果 `ALT_PLAN_LANGUAGE` 解析为与主语言相同的语言，跳过变体生成。
 
-### Required Validation Before Phase 6
+### 阶段 6 之前的必需验证
 
-Before generating the QA document, verify:
+在生成 QA 文档之前，验证：
 
-1. All required sections are still present
-2. No comment markers remain
-3. Every referenced `AC-*` exists
-4. Every task dependency references an existing task ID or `-`
-5. Every task row has exactly one valid routing tag: `coding` or `analyze`
-6. `## Pending User Decisions` and `### Convergence Status` agree with the actual unresolved state
+1. 所有必需部分仍然存在
+2. 没有注释标记残留
+3. 每个引用的 `AC-*` 都存在
+4. 每个任务依赖引用现有的任务 ID 或 `-`
+5. 每个任务行恰好有一个有效的路由标签：`coding` 或 `analyze`
+6. `## Pending User Decisions` 和 `### Convergence Status` 与实际未解决状态一致
 
-If a validation issue can be fixed by reconciling the plan, fix it before continuing. If it cannot be fixed without inventing requirements, stop and report the blocking inconsistency.
+如果验证问题可以通过调和计划来修复，在继续之前修复它。如果无法在不发明需求的情况下修复，停止并报告阻塞的不一致性。
 
 ---
 
-## Phase 6: Generate QA Document
+## 阶段 6：生成 QA 文档
 
-Read `${CLAUDE_PLUGIN_ROOT}/prompt-template/plan/refine-plan-qa-template.md` and populate it completely. The QA document is not optional.
+读取 `${CLAUDE_PLUGIN_ROOT}/prompt-template/plan/refine-plan-qa-template.md` 并完全填充它。QA 文档不是可选的。
 
-### QA Content Requirements
+### QA 内容要求
 
-Populate all template sections:
+填充所有模板部分：
 
 1. `## Summary`
 2. `## Comment Ledger`
@@ -470,138 +470,138 @@ Populate all template sections:
 6. `## Remaining Decisions`
 7. `## Refinement Metadata`
 
-### Ledger Rules
+### 台账规则
 
-The `Comment Ledger` MUST contain exactly one row per raw `CMT-N` extracted in Phase 2, in document order.
+`Comment Ledger` 必须按文档顺序为阶段 2 中提取的每个原始 `CMT-N` 包含恰好一行。
 
-Each row must include:
+每行必须包含：
 
 - `CMT-ID`
-- Dominant classification
-- Location
-- Original text excerpt
-- Final disposition
+- 主导分类
+- 位置
+- 原始文本摘录
+- 最终处置
 
-If a raw block was split into processing sub-items, keep one ledger row for the raw ID and describe the sub-item handling in the detailed sections.
+如果原始块被拆分为处理子项，为原始 ID 保留一行台账，并在详细部分中描述子项处理。
 
-### Section-Specific Rules
+### 部分特定规则
 
-- `Answers`: include all `question` items and any clarifying edits made to the plan
-- `Research Findings`: include all `research_request` items, the files or patterns examined, and the impact on the plan
-- `Plan Changes Applied`: include all `change_request` items and cross-reference updates
-- `Remaining Decisions`: include every unresolved or assumption-heavy item that still needs user choice
+- `Answers`：包含所有 `question` 项和对计划所做的任何澄清编辑
+- `Research Findings`：包含所有 `research_request` 项、检查的文件或模式，以及对计划的影响
+- `Plan Changes Applied`：包含所有 `change_request` 项和交叉引用更新
+- `Remaining Decisions`：包含每个仍需要用户选择的未解决或假设较多的项目
 
-Language rules:
+语言规则：
 
-1. Write the main QA document in the same main language as `REFINED_PLAN_TEXT`
-2. Keep identifiers unchanged: `AC-*`, task IDs, file paths, API names, command flags, config keys
-3. Preserve the original comment text verbatim inside fenced code blocks
+1. 用与 `REFINED_PLAN_TEXT` 相同的主语言编写主 QA 文档
+2. 保持标识符不变：`AC-*`、任务 ID、文件路径、API 名称、命令标志、配置键
+3. 在围栏代码块内逐字保留原始注释文本
 
-Metadata rules:
+元数据规则：
 
-1. Record the resolved input path, output path, QA path, date, and counts by classification
-2. Record the final convergence status as `converged` or `partially_converged`
-3. Record the set of plan sections modified during refinement
+1. 记录解析的输入路径、输出路径、QA 路径、日期和按分类的计数
+2. 记录最终收敛状态为 `converged` 或 `partially_converged`
+3. 记录优化期间修改的计划部分集
 
 ---
 
-## Phase 7: Atomic Write Transaction
+## 阶段 7：原子写入事务
 
-Do not write any final output until all content is fully prepared.
+在所有内容完全准备好之前不要写入任何最终输出。
 
-### Files in Scope
+### 范围内的文件
 
-Always prepare:
+始终准备：
 
-- Main refined plan at `OUTPUT_FILE`
-- Main QA document at `QA_FILE`
+- `OUTPUT_FILE` 处的主优化计划
+- `QA_FILE` 处的主 QA 文档
 
-Conditionally prepare:
+条件性准备：
 
-- Plan variant at `OUTPUT_FILE` with `_<ALT_PLAN_LANG_CODE>` inserted before the extension
-- QA variant at `QA_FILE` with `_<ALT_PLAN_LANG_CODE>` inserted before the extension
+- `OUTPUT_FILE` 处的计划变体，在扩展名前插入 `_<ALT_PLAN_LANG_CODE>`
+- `QA_FILE` 处的 QA 变体，在扩展名前插入 `_<ALT_PLAN_LANG_CODE>`
 
-Filename construction rule for variants:
+变体的文件名构建规则：
 
-1. If the filename has an extension, insert `_<code>` before the last `.`
-2. If the filename has no extension, append `_<code>`
+1. 如果文件名有扩展名，在最后一个 `.` 之前插入 `_<code>`
+2. 如果文件名没有扩展名，追加 `_<code>`
 
-Examples:
+示例：
 
 - `plan.md` -> `plan_zh.md`
 - `feature-a-qa.md` -> `feature-a-qa_zh.md`
 - `output` -> `output_zh`
 
-### Variant Content Rules
+### 变体内容规则
 
-If `ALT_PLAN_LANGUAGE` is non-empty and different from the main language:
+如果 `ALT_PLAN_LANGUAGE` 非空且与主语言不同：
 
-1. Translate the main refined plan into `ALT_PLAN_LANGUAGE`
-2. Translate the main QA document into `ALT_PLAN_LANGUAGE`
-3. Keep identifiers unchanged
-4. For Chinese, default to Simplified Chinese
+1. 将主优化计划翻译为 `ALT_PLAN_LANGUAGE`
+2. 将主 QA 文档翻译为 `ALT_PLAN_LANGUAGE`
+3. 保持标识符不变
+4. 中文默认使用简体中文
 
-If `ALT_PLAN_LANGUAGE` is empty or equals the main language, do not create variant files.
+如果 `ALT_PLAN_LANGUAGE` 为空或等于主语言，不创建变体文件。
 
-### Transaction Rules
+### 事务规则
 
-1. Prepare all final content in memory first:
+1. 首先在内存中准备所有最终内容：
    - `REFINED_PLAN_TEXT`
    - `QA_TEXT`
-   - Optional `REFINED_PLAN_VARIANT_TEXT`
-   - Optional `QA_VARIANT_TEXT`
-2. Write each output to a temporary file in the same directory as its final destination.
-3. Use temp naming patterns equivalent to:
+   - 可选 `REFINED_PLAN_VARIANT_TEXT`
+   - 可选 `QA_VARIANT_TEXT`
+2. 将每个输出写入与其最终目标相同目录中的临时文件。
+3. 使用等效的临时命名模式：
    - `.refine-plan-XXXXXX`
    - `.refine-qa-XXXXXX`
    - `.refine-plan-variant-XXXXXX`
    - `.refine-qa-variant-XXXXXX`
-4. If any temp write or translation step fails:
-   - Delete all temp files
-   - Leave existing final outputs untouched
-   - Report the failure
-5. Only after every temp file is written successfully may you replace final outputs.
-6. Replace auxiliary outputs before replacing the main in-place plan file, so the primary plan is updated last.
-7. If finalization fails after any destination was replaced, restore from backups if the environment allows it; otherwise report the partial-finalization risk explicitly.
+4. 如果任何临时写入或翻译步骤失败：
+   - 删除所有临时文件
+   - 保持现有最终输出不变
+   - 报告失败
+5. 仅在每个临时文件成功写入后才能替换最终输出。
+6. 在替换主就地计划文件之前替换辅助输出，以便主计划最后更新。
+7. 如果在替换任何目标后最终化失败，如果环境允许则从备份恢复；否则明确报告部分最终化风险。
 
-Success condition:
+成功条件：
 
-- Main refined plan written successfully
-- Main QA document written successfully
-- Every requested variant written successfully
-- No stale temp files remain
+- 主优化计划写入成功
+- 主 QA 文档写入成功
+- 每个请求的变体写入成功
+- 没有残留的临时文件
 
-### Final Report
+### 最终报告
 
-Report:
+报告：
 
-- Path to the refined plan
-- Path to the QA document
-- Paths to any generated variants
-- Number of raw comments processed
-- Counts by classification
-- Whether pending decisions remain
-- Final convergence status
-- Whether refinement ran in `discussion` or `direct` mode
+- 优化计划的路径
+- QA 文档的路径
+- 任何生成的变体的路径
+- 处理的原始注释数量
+- 按分类的计数
+- 是否仍有待处理决策
+- 最终收敛状态
+- 优化是在 `discussion` 还是 `direct` 模式下运行
 
 ---
 
-## Error Handling
+## 错误处理
 
-If a blocking issue occurs:
+如果发生阻塞问题：
 
-- Report the exact phase where it failed
-- Include the concrete reason
-- Include any relevant line/column/context detail for parse errors
-- Do not leave partially refined plan artifacts behind
+- 报告失败的确切阶段
+- 包含具体原因
+- 包含解析错误的任何相关行/列/上下文细节
+- 不要留下部分优化的计划产物
 
-If a user decision is needed in `discussion` mode:
+如果在 `discussion` 模式下需要用户决策：
 
-- Ask only the narrowest question needed to proceed
-- Record the decision in the QA document and, when still unresolved, in `## Pending User Decisions`
+- 仅询问继续所需的最窄问题
+- 在 QA 文档中记录决策，当仍未解决时记录在 `## Pending User Decisions`
 
-If a decision is deferred in `direct` mode:
+如果在 `direct` 模式下决策被延迟：
 
-- Make the smallest safe assumption
-- Record the assumption explicitly in the QA document
-- Mark the plan as `partially_converged` when the deferred item materially affects implementation direction
+- 做出最小的安全假设
+- 在 QA 文档中明确记录假设
+- 当延迟项实质性影响实施方向时将计划标记为 `partially_converged`

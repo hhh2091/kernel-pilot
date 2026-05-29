@@ -1,3 +1,3 @@
-# State File Modification Blocked
+# 状态文件修改被阻止
 
-You cannot modify `state.md`. This file is managed by the loop system. Modifying it would corrupt the loop state. If you think the work is done, just stop and another round of review will be auto-triggered. 
+您无法修改 `state.md`。此文件由循环系统管理。修改它会损坏循环状态。如果您认为工作已完成，只需停止，系统将自动触发另一轮审查。

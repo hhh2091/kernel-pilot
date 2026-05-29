@@ -1,118 +1,118 @@
 ---
 name: humanize
-description: Iterative development with AI review. Provides RLCR (Ralph-Loop with Codex Review) for implementation planning and code review loops.
+description: 基于 AI 审查的迭代开发。提供 RLCR（Ralph-Loop with Codex Review）用于实施规划和代码审查循环。
 user-invocable: false
 disable-model-invocation: true
 ---
 
-# Humanize - Iterative Development with AI Review
+# Humanize - 基于 AI 审查的迭代开发
 
-Humanize creates a feedback loop where AI implements your plan while another AI independently reviews the work, ensuring quality through continuous refinement.
+Humanize 创建一个反馈循环，其中一个 AI 实施你的计划，另一个 AI 独立审查工作，通过持续精炼确保质量。
 
-## Runtime Root
+## 运行时根目录
 
-The installer hydrates this skill with an absolute runtime root path:
+安装程序会使用绝对运行时根路径注入此技能：
 
 ```bash
 {{HUMANIZE_RUNTIME_ROOT}}
 ```
 
-All command examples below use `{{HUMANIZE_RUNTIME_ROOT}}`.
+以下所有命令示例均使用 `{{HUMANIZE_RUNTIME_ROOT}}`。
 
-## Core Philosophy
+## 核心理念
 
-**Iteration over Perfection**: Instead of expecting perfect output in one shot, Humanize leverages an iterative feedback loop where:
-- AI implements your plan
-- Another AI independently reviews progress
-- Issues are caught and addressed early
-- Work continues until all acceptance criteria are met
+**迭代优于完美**：与其期望一次输出完美结果，Humanize 利用迭代反馈循环，其中：
+- AI 实施你的计划
+- 另一个 AI 独立审查进度
+- 问题被及早发现和解决
+- 工作持续进行直到所有验收标准满足
 
-## Available Workflows
+## 可用工作流
 
-### 1. RLCR Loop - Iterative Development with Review
+### 1. RLCR 循环 - 带审查的迭代开发
 
-The RLCR (Ralph-Loop with Codex Review) loop has two phases:
+RLCR（Ralph-Loop with Codex Review）循环有两个阶段：
 
-**Phase 1: Implementation**
-- AI works on the implementation plan
-- AI writes a summary of work completed
-- Codex reviews the summary for completeness and correctness
-- If issues found → feedback loop continues
-- If Codex outputs "COMPLETE" → enters Review Phase
+**阶段 1：实施**
+- AI 按照实施计划工作
+- AI 编写已完成工作的摘要
+- Codex 审查摘要的完整性和正确性
+- 如果发现问题 → 反馈循环继续
+- 如果 Codex 输出 "COMPLETE" → 进入审查阶段
 
-**Phase 2: Code Review**
-- `codex review --base <branch>` checks code quality
-- Issues marked with `[P0-9]` severity markers
-- If issues found → AI fixes them and continues
-- If no issues → loop completes with Finalize Phase
-- On Codex CLI `0.114.0+` with `codex_hooks` enabled, Humanize installs a native `Stop` hook so exit gating runs automatically
+**阶段 2：代码审查**
+- `codex review --base <branch>` 检查代码质量
+- 问题用 `[P0-9]` 严重性标记
+- 如果发现问题 → AI 修复并继续
+- 如果没有问题 → 循环以 Finalize 阶段完成
+- 在 Codex CLI `0.114.0+` 且启用 `codex_hooks` 时，Humanize 安装原生 `Stop` 钩子，退出门控自动运行
 
-### 2. Generate Plan - Structured Plan from Draft
+### 2. 生成计划 - 从草稿生成结构化计划
 
-Transforms a rough draft document into a structured implementation plan with:
-- Clear goal description
-- Acceptance criteria in AC-X format with TDD-style positive/negative tests
-- Path boundaries (upper/lower bounds, allowed choices)
-- Feasibility hints and conceptual approach
-- Dependencies and milestone sequencing
+将粗略草稿文档转换为结构化实施计划，包含：
+- 清晰的目标描述
+- AC-X 格式的验收标准，包含 TDD 风格的正向/负向测试
+- 路径边界（上界/下界、允许的选择）
+- 可行性提示和概念方法
+- 依赖和里程碑排序
 
-## Commands Reference
+## 命令参考
 
-### Start RLCR Loop
+### 启动 RLCR 循环
 
 ```bash
-# With a plan file
+# 使用计划文件
 "{{HUMANIZE_RUNTIME_ROOT}}/scripts/setup-rlcr-loop.sh" path/to/plan.md
 
-# Or without plan (review-only mode)
+# 或无计划（仅审查模式）
 "{{HUMANIZE_RUNTIME_ROOT}}/scripts/setup-rlcr-loop.sh" --skip-impl
 ```
 
-After each round, write the required summary and stop/exit normally. Humanize's native Codex `Stop` hook handles review gating automatically.
+每轮之后，编写所需摘要并正常停止/退出。Humanize 的原生 Codex `Stop` 钩子自动处理审查门控。
 
-**Common Options:**
-- `--max N` - Maximum iterations before auto-stop (default: 84)
-- `--codex-model MODEL:EFFORT` - Codex model and reasoning effort for `codex exec` (default: gpt-5.5:high)
-- Review phase `codex review` uses `gpt-5.5:high`
-- `--codex-timeout SECONDS` - Timeout for each Codex review (default: 5400)
-- `--base-branch BRANCH` - Base branch for code review (auto-detects if not specified)
-- `--full-review-round N` - Interval for full alignment checks (default: 5)
-- `--skip-impl` - Skip implementation phase, go directly to code review
-- `--track-plan-file` - Enforce plan-file immutability when tracked in git
-- `--push-every-round` - Require git push after each round
-- `--claude-answer-codex` - Let Claude answer Codex Open Questions directly (default is AskUserQuestion)
-- `--agent-teams` - Enable Agent Teams mode
-- `--yolo` - Skip Plan Understanding Quiz and enable --claude-answer-codex
-- `--skip-quiz` - Skip the Plan Understanding Quiz only
-- `--privacy` - No-op; methodology analysis is disabled by default
-- `--no-privacy` - Enable methodology analysis at loop exit
-- `--strict-success` - Continue past max-iteration and stagnation STOP gates until the acceptance criteria are actually met
+**常用选项：**
+- `--max N` - 自动停止前的最大迭代次数（默认：84）
+- `--codex-model MODEL:EFFORT` - `codex exec` 的 Codex 模型和推理努力程度（默认：gpt-5.5:high）
+- 审查阶段 `codex review` 使用 `gpt-5.5:high`
+- `--codex-timeout SECONDS` - 每次 Codex 审查的超时（默认：5400）
+- `--base-branch BRANCH` - 代码审查的基准分支（未指定时自动检测）
+- `--full-review-round N` - 全对齐检查间隔（默认：5）
+- `--skip-impl` - 跳过实施阶段，直接进入代码审查
+- `--track-plan-file` - 在 git 中跟踪时强制计划文件不可变
+- `--push-every-round` - 每轮要求 git push
+- `--claude-answer-codex` - 让 Claude 直接回答 Codex 开放问题（默认为 AskUserQuestion）
+- `--agent-teams` - 启用代理团队模式
+- `--yolo` - 跳过计划理解测验并启用 --claude-answer-codex
+- `--skip-quiz` - 仅跳过计划理解测验
+- `--privacy` - 无操作；方法论分析默认禁用
+- `--no-privacy` - 在循环退出时启用方法论分析
+- `--strict-success` - 继续通过最大迭代和停滞 STOP 门控直到验收标准实际满足
 
-### Cancel RLCR Loop
+### 取消 RLCR 循环
 
 ```bash
 "{{HUMANIZE_RUNTIME_ROOT}}/scripts/cancel-rlcr-loop.sh"
-# or force cancel during finalize phase
+# 或在 finalize 阶段强制取消
 "{{HUMANIZE_RUNTIME_ROOT}}/scripts/cancel-rlcr-loop.sh" --force
 ```
 
-### Generate Plan from Draft
+### 从草稿生成计划
 
 ```bash
 "{{HUMANIZE_RUNTIME_ROOT}}/scripts/validate-gen-plan-io.sh" --input path/to/draft.md --output path/to/plan.md
 ```
 
-Then follow the workflow in this skill to generate the structured plan content.
+然后按照此技能中的工作流生成结构化计划内容。
 
-### Ask Codex (One-shot Consultation)
+### 咨询 Codex（一次性咨询）
 
 ```bash
 "{{HUMANIZE_RUNTIME_ROOT}}/scripts/ask-codex.sh" [--codex-model MODEL:EFFORT] [--codex-timeout SECONDS] "your question"
 ```
 
-## Plan File Structure
+## 计划文件结构
 
-A good plan file should include:
+良好的计划文件应包含：
 
 ```markdown
 # Plan Title
@@ -151,41 +151,41 @@ Minimum viable implementation
 - Code should NOT contain plan terminology like "AC-", "Milestone", "Step"
 ```
 
-## Goal Tracker System
+## 目标追踪系统
 
-The RLCR loop uses a Goal Tracker to prevent goal drift:
+RLCR 循环使用目标追踪器防止目标漂移：
 
-- **IMMUTABLE SECTION**: Ultimate Goal and Acceptance Criteria (set in Round 0, never changed)
-- **MUTABLE SECTION**: Active Tasks, Completed Items, Deferred Items, Plan Evolution Log
+- **不可变节**：最终目标和验收标准（在第 0 轮设定，永不更改）
+- **可变节**：活跃任务、已完成项目、延迟项目、计划演进日志
 
-### Key Principles
+### 关键原则
 
-1. **Acceptance Criteria**: Each task maps to a specific AC
-2. **Plan Evolution Log**: Document any plan changes with justification
-3. **Explicit Deferrals**: Deferred tasks require strong justification
-4. **Full Alignment Checks**: Every N rounds (default: 5), comprehensive goal alignment audit
+1. **验收标准**：每个任务映射到特定 AC
+2. **计划演进日志**：记录任何计划变更及其理由
+3. **显式延迟**：延迟的任务需要充分理由
+4. **全对齐检查**：每 N 轮（默认：5），全面的目标对齐审计
 
-## Important Rules
+## 重要规则
 
-1. **Write summaries**: Always write work summary to the specified file before exiting
-2. **Maintain Goal Tracker**: Keep goal-tracker.md up-to-date with progress
-3. **Be thorough**: Include details about implementation, files changed, tests added
-4. **No cheating**: Don't try to exit by editing state files or running cancel commands
-5. **Use the native Stop hook on Codex**: After writing the required summary, stop/exit normally so Codex runs the Humanize Stop hook
-6. **Trust the process**: External review helps improve implementation quality
+1. **编写摘要**：退出前始终将工作摘要写入指定文件
+2. **维护目标追踪器**：保持 goal-tracker.md 与进度同步更新
+3. **详尽**：包含实施细节、更改的文件、添加的测试
+4. **不要作弊**：不要试图通过编辑状态文件或运行取消命令来退出
+5. **使用 Codex 上的原生 Stop 钩子**：编写所需摘要后，正常停止/退出以便 Codex 运行 Humanize Stop 钩子
+6. **信任流程**：外部审查有助于提高实施质量
 
-## Prerequisites
+## 前置条件
 
-- `codex` - OpenAI Codex CLI (for review)
+- `codex` - OpenAI Codex CLI（用于审查）
 
 
-## Directory Structure
+## 目录结构
 
-Humanize stores all data in `.humanize/`:
+Humanize 将所有数据存储在 `.humanize/` 中：
 
 ```
 .humanize/
-├── rlcr/           # RLCR loop data
+├── rlcr/           # RLCR 循环数据
 │   └── <timestamp>/
 │       ├── state.md
 │       ├── goal-tracker.md
@@ -197,35 +197,35 @@ Humanize stores all data in `.humanize/`:
 │       ├── methodology-analysis-report.md
 │       ├── methodology-analysis-done.md
 │       └── complete-state.md
-└── skill/          # One-shot skill results
+└── skill/          # 一次性技能结果
     └── <timestamp>/
         ├── input.md
         ├── output.md
         └── metadata.md
 ```
 
-## Monitoring
+## 监控
 
-Use the monitor script to track loop progress:
+使用监控脚本跟踪循环进度：
 
 ```bash
 source "{{HUMANIZE_RUNTIME_ROOT}}/scripts/humanize.sh"
-humanize monitor rlcr   # Monitor RLCR loop
+humanize monitor rlcr   # 监控 RLCR 循环
 ```
 
-## Exit Codes
+## 退出代码
 
 ### ask-codex.sh
-- `0` - Success
-- `1` - Validation error
-- `124` - Timeout
+- `0` - 成功
+- `1` - 验证错误
+- `124` - 超时
 
 ### validate-gen-plan-io.sh
-- `0` - Success
-- `1` - Input file not found
-- `2` - Input file is empty
-- `3` - Output directory does not exist
-- `4` - Output file already exists
-- `5` - No write permission
-- `6` - Invalid arguments
-- `7` - Plan template file not found
+- `0` - 成功
+- `1` - 输入文件未找到
+- `2` - 输入文件为空
+- `3` - 输出目录不存在
+- `4` - 输出文件已存在
+- `5` - 无写入权限
+- `6` - 参数无效
+- `7` - 计划模板文件未找到

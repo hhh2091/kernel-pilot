@@ -1,18 +1,18 @@
-# Goal Tracker Not Initialized
+# 目标跟踪器未初始化
 
-You are in **Round 0** and the Goal Tracker has not been properly initialized.
+您处于**第 0 轮**，目标跟踪器尚未正确初始化。
 
-**Missing items in `{{GOAL_TRACKER_FILE}}`**:
+**`{{GOAL_TRACKER_FILE}}` 中缺少的项目**：
 {{MISSING_ITEMS}}
 
-**Required Actions**:
-1. Read `{{GOAL_TRACKER_FILE}}`
-2. Replace placeholder text with actual content:
-   - Extract or define the **Ultimate Goal** from your understanding of the plan
-   - Define 3-7 specific, testable **Acceptance Criteria**
-   - Populate **Active Tasks** with tasks from the plan, mapping each to an AC
-3. Write the updated goal-tracker.md
+**必需的操作**：
+1. 读取 `{{GOAL_TRACKER_FILE}}`
+2. 将占位符文本替换为实际内容：
+   - 根据您对计划的理解提取或定义**最终目标**
+   - 定义 3-7 个具体的、可测试的**验收标准**
+   - 用计划中的任务填充**活动任务**，并将每个任务映射到一个验收标准
+3. 写入更新后的 goal-tracker.md
 
-**IMPORTANT**: The IMMUTABLE SECTION can only be set in Round 0. After this round, it becomes read-only.
+**重要提示**：不可变部分只能在第 0 轮设置。在此轮之后，它将变为只读。
 
-After updating the Goal Tracker, you may attempt to exit again.
+更新目标跟踪器后，您可以再次尝试退出。

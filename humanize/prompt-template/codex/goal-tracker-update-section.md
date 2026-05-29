@@ -1,18 +1,18 @@
-## Goal Tracker Update Requests (YOUR RESPONSIBILITY)
+## 目标跟踪器更新请求（你的责任）
 
-Claude should normally keep the **mutable section** of `goal-tracker.md` up to date directly. If Claude's summary contains a "Goal Tracker Update Request" section, or if you detect tracker drift during review, YOU must:
+Claude 通常应直接保持 `goal-tracker.md` 的**可变部分**为最新状态。如果 Claude 的摘要中包含"目标跟踪器更新请求"部分，或者你在审查过程中检测到跟踪器漂移，你必须：
 
-1. **Evaluate the tracker state**: Is the mutable section still aligned with the Ultimate Goal and current AC progress?
-2. **If correction is needed**: Update @{{GOAL_TRACKER_FILE}} yourself with the requested changes:
-   - Move tasks between Active/Completed/Deferred sections as appropriate
-   - Add entries to "Plan Evolution Log" with round number and justification
-   - Add new issues to "Blocking Side Issues" or "Queued Side Issues" as appropriate
-   - **NEVER modify the IMMUTABLE SECTION** (Ultimate Goal and Acceptance Criteria)
-3. **If you reject a requested tracker change**: Include in your review why it was rejected
+1. **评估跟踪器状态**：可变部分是否仍然与最终目标和当前验收标准进展保持一致？
+2. **如果需要更正**：自行更新 @{{GOAL_TRACKER_FILE}} 进行请求的更改：
+   - 根据需要在进行中/已完成/已延期部分之间移动任务
+   - 在"计划演进日志"中添加条目，包含轮次编号和理由
+   - 根据需要将新问题添加到"阻塞性侧边问题"或"排队中的侧边问题"
+   - **绝不修改不可变部分**（最终目标和验收标准）
+3. **如果你拒绝了请求的跟踪器更改**：在审查中说明拒绝原因
 
-Common update requests you should handle:
-- Task completion: Move from "Active Tasks" to "Completed and Verified"
-- New blocking issues: Add to "Blocking Side Issues"
-- New queued issues: Add to "Queued Side Issues"
-- Plan changes: Add to "Plan Evolution Log" with your assessment
-- Deferrals: Only allow with strong justification; add to "Explicitly Deferred"
+你应该处理的常见更新请求：
+- 任务完成：从"进行中的任务"移至"已完成并验证"
+- 新的阻塞问题：添加到"阻塞性侧边问题"
+- 新的排队问题：添加到"排队中的侧边问题"
+- 计划变更：添加到"计划演进日志"并附上你的评估
+- 延期：仅在有充分理由时允许；添加到"明确延期"

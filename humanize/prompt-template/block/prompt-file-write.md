@@ -1,12 +1,12 @@
-# Prompt File Write Blocked
+# 提示文件写入被阻止
 
-You cannot write to `round-*-prompt.md` files.
+您无法写入 `round-*-prompt.md` 文件。
 
-**Prompt files contain instructions FROM Codex TO you (Claude).**
+**提示文件包含 Codex 给您（Claude）的指令。**
 
-You cannot modify your own instructions. Your job is to:
-1. Read the current round's prompt file for instructions
-2. Execute the tasks described in the prompt
-3. Write your results to the summary file
+您无法修改自己的指令。您的工作是：
+1. 读取当前轮次的提示文件以获取指令
+2. 执行提示中描述的任务
+3. 将结果写入摘要文件
 
-If the prompt contains errors, document this in your summary file.
+如果提示包含错误，请在摘要文件中记录。

@@ -1,68 +1,68 @@
-Your work is not finished. Read and execute the below with ultrathink.
+你的工作尚未完成。请仔细阅读并执行以下内容。
 
-## Drift Recovery Mode
+## 漂移恢复模式
 
-Codex judged the recent implementation rounds as failing to advance the mainline.
+Codex 判定最近的实现轮次未能推进主线。
 
-- Consecutive stalled/regressed rounds: {{STALL_COUNT}}
-- Last mainline verdict: {{LAST_MAINLINE_VERDICT}}
+- 连续停滞/回退轮次：{{STALL_COUNT}}
+- 最近主线判定：{{LAST_MAINLINE_VERDICT}}
 
-This round is a **drift recovery round**. Do not continue with normal issue-clearing behavior.
+本轮是**漂移恢复轮次**。不要继续正常的清除问题行为。
 
-## Original Implementation Plan
+## 原始实现计划
 
-**IMPORTANT**: Re-anchor on the original plan first:
+**重要**：首先重新锚定到原始计划：
 @{{PLAN_FILE}}
 
-## Required Recovery Re-anchor
+## 必需的恢复重锚定
 
-Before changing code:
-- Re-read @{{PLAN_FILE}}
-- Re-read @{{GOAL_TRACKER_FILE}}
-- Re-read the recent round summaries and review results that led here
-- Rewrite the round contract at @{{ROUND_CONTRACT_FILE}}
+在更改代码之前：
+- 重新阅读 @{{PLAN_FILE}}
+- 重新阅读 @{{GOAL_TRACKER_FILE}}
+- 重新阅读导致此结果的最近轮次摘要和审查结果
+- 在 @{{ROUND_CONTRACT_FILE}} 重写轮次契约
 
-Your recovery contract must contain:
-- Exactly one recovered **mainline objective**
-- The 1-2 target ACs that prove mainline progress this round
-- The root cause of recent drift or stagnation
-- Which issues are truly **blocking** the recovered mainline objective
-- Which issues remain **queued** and explicitly out of scope
-- Concrete success criteria that would change the verdict back to `ADVANCED`
+你的恢复契约必须包含：
+- 恰好一个恢复的**主线目标**
+- 1-2 个证明本轮主线进展的目标验收标准
+- 最近漂移或停滞的根本原因
+- 哪些问题真正**阻塞**了恢复的主线目标
+- 哪些问题仍然**排队**且明确超出范围
+- 将判定改回 `ADVANCED` 的具体成功标准
 
-Do not start implementation until the recovery contract exists.
+在恢复契约存在之前不要开始实现。
 
-## Task Lane Rules
+## 任务通道规则
 
-Use the Task system (TaskCreate, TaskUpdate, TaskList) with one required tag per task:
-- `[mainline]` for plan-derived work that directly advances the recovered objective
-- `[blocking]` for issues that prevent the recovered mainline objective from succeeding safely
-- `[queued]` for non-blocking bugs, cleanup, or follow-up work
+使用 Task 系统（TaskCreate、TaskUpdate、TaskList），每个任务需要一个标签：
+- `[mainline]` 用于直接推进恢复目标的计划衍生工作
+- `[blocking]` 用于阻止恢复的主线目标安全成功的问题
+- `[queued]` 用于非阻塞的错误、清理或后续工作
 
-Rules:
-- This round must prove mainline movement, not just reduce noise
-- `[blocking]` work is allowed only when it directly unblocks the recovered mainline objective
-- `[queued]` work must stay documented but must NOT replace the recovered objective
-- If a new issue does not block the recovered objective, tag it `[queued]` and keep moving on mainline work
+规则：
+- 本轮必须证明主线推进，而不仅仅是减少噪音
+- `[blocking]` 工作仅在直接解除恢复的主线目标阻塞时才允许
+- `[queued]` 工作必须保持记录，但不得替代恢复的目标
+- 如果新问题不阻塞恢复的目标，将其标记为 `[queued]` 并继续主线工作
 
 ---
-Below is Codex's review result:
+以下是 Codex 的审查结果：
 <!-- CODEX's REVIEW RESULT START -->
 {{REVIEW_CONTENT}}
 <!-- CODEX's REVIEW RESULT  END  -->
 ---
 
-## Goal Tracker Reference
+## 目标跟踪器参考
 
-Before starting work, **read and update** @{{GOAL_TRACKER_FILE}} as needed:
-- Keep the immutable section unchanged
-- Record the drift/stagnation cause in the mutable section if it changed planning
-- Keep blocking vs queued issue classification accurate
-- Ensure the tracker and contract now describe the same recovered mainline objective
+在开始工作之前，根据需要**阅读并更新** @{{GOAL_TRACKER_FILE}}：
+- 保持不可变部分不变
+- 如果漂移/停滞原因改变了规划，在可变部分中记录
+- 保持阻塞与排队问题分类的准确性
+- 确保跟踪器和契约现在描述相同的恢复主线目标
 
-## Recovery Guardrails
+## 恢复护栏
 
-- Do not spend this round mostly on queued cleanup
-- Do not broaden scope to compensate for previous stalls
-- If the original approach was flawed, log the plan evolution explicitly instead of silently changing direction
-- If you cannot produce a credible recovered mainline objective, say so in the summary with concrete blockers
+- 不要将本轮主要花在排队的清理工作上
+- 不要扩大范围以弥补之前的停滞
+- 如果原始方法有缺陷，请明确记录计划演进，而不是静默改变方向
+- 如果无法产生可信的恢复主线目标，请在摘要中说明具体的阻塞因素

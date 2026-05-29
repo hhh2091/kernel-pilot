@@ -1,2 +1,2 @@
 
-Note: Since `--push-every-round` is enabled, you must push your commits to remote after each round.
+注意：由于启用了 `--push-every-round`，你必须在每轮之后将提交推送到远程。

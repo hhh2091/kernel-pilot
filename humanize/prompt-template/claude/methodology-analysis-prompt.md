@@ -1,73 +1,73 @@
-# Methodology Analysis Phase
+# 方法论分析阶段
 
-The RLCR loop has reached its exit point.
+RLCR 循环已达到退出点。
 
-**Exit reason**: {{EXIT_REASON}} - {{EXIT_REASON_DESCRIPTION}}
-**Rounds completed**: {{CURRENT_ROUND}} of {{MAX_ITERATIONS}}
+**退出原因**：{{EXIT_REASON}} - {{EXIT_REASON_DESCRIPTION}}
+**已完成轮次**：{{CURRENT_ROUND}} / {{MAX_ITERATIONS}}
 
-Before the loop fully exits, please perform a methodology improvement analysis. This analysis helps improve the Humanize development methodology itself -- it is NOT about the project you just worked on.
+在循环完全退出之前，请执行方法论改进分析。此分析旨在改进 Humanize 开发方法论本身——它与你刚刚工作的项目无关。
 
-## Instructions
+## 指令
 
-### 1. Spawn an Opus Agent for Sanitized Analysis
+### 1. 创建一个 Opus Agent 进行净化分析
 
-Use the Agent tool with `model: "opus"` to spawn an analysis agent. Give it this task:
+使用 Agent 工具以 `model: "opus"` 创建一个分析 agent。给它以下任务：
 
-**Agent prompt**: Read the development records in `{{LOOP_DIR}}`:
-- All files matching `round-*-summary.md`
-- All files matching `round-*-review-result.md`
+**Agent 提示**：阅读 `{{LOOP_DIR}}` 中的开发记录：
+- 所有匹配 `round-*-summary.md` 的文件
+- 所有匹配 `round-*-review-result.md` 的文件
 
-Analyze these records from a **pure methodology perspective** and write your findings to `{{LOOP_DIR}}/methodology-analysis-report.md`.
+从**纯方法论角度**分析这些记录，并将你的发现写入 `{{LOOP_DIR}}/methodology-analysis-report.md`。
 
-**CRITICAL SANITIZATION RULES** - The report MUST NOT contain:
-- File paths, directory paths, or module paths
-- Function names, variable names, class names, or method names
-- Branch names, commit hashes, or git identifiers
-- Business domain terms, product names, or feature names
-- Code snippets or code fragments of any kind
-- Raw error messages or stack traces
-- Project-specific URLs or endpoints
-- Any information that could identify the specific project
+**关键净化规则** - 报告不得包含：
+- 文件路径、目录路径或模块路径
+- 函数名、变量名、类名或方法名
+- 分支名称、提交哈希或 git 标识符
+- 业务领域术语、产品名称或功能名称
+- 任何类型的代码片段或代码片段
+- 原始错误消息或堆栈跟踪
+- 项目特定的 URL 或端点
+- 任何可以识别特定项目的信息
 
-**Focus areas for analysis**:
-- Iteration efficiency: Were rounds productive or did they repeat similar work?
-- Feedback loop quality: Did reviewer feedback lead to meaningful improvements?
-- Stagnation patterns: Were there signs of going in circles?
-- Review effectiveness: Did reviews catch real issues or create false positives?
-- Plan-to-execution alignment: Did execution follow the plan or drift?
-- Round count vs. progress ratio: Was the number of rounds proportional to progress?
-- Communication clarity: Were summaries and reviews clear and actionable?
+**分析重点领域**：
+- 迭代效率：轮次是否高效，还是重复了类似的工作？
+- 反馈循环质量：审查者的反馈是否带来了有意义的改进？
+- 停滞模式：是否有原地打转的迹象？
+- 审查有效性：审查是否发现了真正的问题还是产生了误报？
+- 计划与执行的对齐：执行是否遵循了计划还是偏离了？
+- 轮次计数与进展比率：轮次数量是否与进展成比例？
+- 沟通清晰度：摘要和审查是否清晰且可操作？
 
-**Output format**: Write a structured report with methodology improvement suggestions. Each suggestion should describe a general pattern observed and a concrete improvement to the RLCR methodology. If no improvements are found, write a brief note saying the methodology worked well for this session.
+**输出格式**：编写一份包含方法论改进建议的结构化报告。每条建议应描述观察到的通用模式和对 RLCR 方法论的具体改进。如果未找到改进，请写一条简短说明，表明方法论在本次会话中运行良好。
 
-### 2. Read the Analysis Report
+### 2. 阅读分析报告
 
-After the agent completes, read `{{LOOP_DIR}}/methodology-analysis-report.md`. ALL subsequent user-facing content MUST be derived solely from this report -- do NOT reference raw development records directly.
+Agent 完成后，阅读 `{{LOOP_DIR}}/methodology-analysis-report.md`。所有后续面向用户的内容必须仅从此报告派生——不要直接引用原始开发记录。
 
-### 3. Handle Results
+### 3. 处理结果
 
-**If no improvements found**: Briefly inform the user that the methodology analysis found no significant improvement suggestions. Then write a completion note to `{{LOOP_DIR}}/methodology-analysis-done.md` and exit.
+**如果未找到改进**：简要告知用户方法论分析未发现重大改进建议。然后将完成说明写入 `{{LOOP_DIR}}/methodology-analysis-done.md` 并退出。
 
-**If improvements found**:
+**如果找到改进**：
 
-a) Report to the user:
-   - Brief summary of the exit reason ({{EXIT_REASON}}: {{EXIT_REASON_DESCRIPTION}})
-   - Methodology improvement suggestions from the report
+a) 向用户报告：
+   - 退出原因的简要摘要（{{EXIT_REASON}}：{{EXIT_REASON_DESCRIPTION}}）
+   - 报告中的方法论改进建议
 
-b) Use `AskUserQuestion` to ask if the user would like to help improve Humanize by opening a GitHub issue with these suggestions. Emphasize:
-   - This is completely voluntary
-   - The content is fully sanitized (no project-specific information)
-   - It helps improve the methodology for everyone
+b) 使用 `AskUserQuestion` 询问用户是否愿意通过打开 GitHub issue 来帮助改进 Humanize。强调：
+   - 这完全是自愿的
+   - 内容已完全净化（无项目特定信息）
+   - 它有助于为每个人改进方法论
 
-c) **If user declines**: Thank them, write completion marker to `{{LOOP_DIR}}/methodology-analysis-done.md`, and exit.
+c) **如果用户拒绝**：感谢他们，将完成标记写入 `{{LOOP_DIR}}/methodology-analysis-done.md`，然后退出。
 
-d) **If user agrees**:
-   - Draft a GitHub issue title and body from the analysis report
-   - Show the draft via a second `AskUserQuestion` for the user to review and confirm
-   - If confirmed: run `gh issue create --repo PolyArch/humanize --title "..." --body "..."`
-   - If `gh` is not available, provide the title and body so the user can create the issue manually
-   - Write completion marker to `{{LOOP_DIR}}/methodology-analysis-done.md` and exit
+d) **如果用户同意**：
+   - 从分析报告中起草 GitHub issue 标题和正文
+   - 通过第二次 `AskUserQuestion` 展示草稿供用户审查和确认
+   - 如果确认：运行 `gh issue create --repo PolyArch/humanize --title "..." --body "..."`
+   - 如果 `gh` 不可用，请提供标题和正文，以便用户手动创建 issue
+   - 将完成标记写入 `{{LOOP_DIR}}/methodology-analysis-done.md` 并退出
 
-### 4. Completion Marker
+### 4. 完成标记
 
-You MUST write meaningful content to `{{LOOP_DIR}}/methodology-analysis-done.md` before exiting. This file signals that the analysis phase is complete. A brief summary of what was done (e.g., "Analysis complete, no suggestions" or "Analysis complete, issue filed") is sufficient.
+你必须在退出之前将有意义的内容写入 `{{LOOP_DIR}}/methodology-analysis-done.md`。此文件表示分析阶段已完成。简要总结所做的事情（例如，"分析完成，无建议"或"分析完成，已提交 issue"）即可。

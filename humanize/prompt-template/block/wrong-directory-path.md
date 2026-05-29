@@ -1,6 +1,6 @@
-# Wrong Directory Path
+# 错误的目录路径
 
-You are trying to {{ACTION}}: `{{FILE_PATH}}`
-Correct path: `{{CORRECT_PATH}}`
+您正在尝试 {{ACTION}}：`{{FILE_PATH}}`
+正确路径：`{{CORRECT_PATH}}`
 
-If you need this file, use: `cat {{FILE_PATH}}`
+如果需要此文件，请使用：`cat {{FILE_PATH}}`

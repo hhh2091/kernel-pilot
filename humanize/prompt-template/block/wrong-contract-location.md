@@ -1,5 +1,5 @@
-# Wrong Round Contract Location
+# 错误的轮次合同位置
 
-Round contract files MUST be in the active loop directory.
+轮次合同文件必须在活动循环目录中。
 
-**Correct path**: `{{CORRECT_PATH}}`
+**正确路径**：`{{CORRECT_PATH}}`

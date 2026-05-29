@@ -1,31 +1,31 @@
 # <TITLE>
 
-## Original Idea
+## 原始创意
 
 <ORIGINAL_IDEA>
 
-## Primary Direction: <PRIMARY_NAME>
+## 主要方向：<PRIMARY_NAME>
 
-### Rationale
+### 理由
 
 <PRIMARY_RATIONALE>
 
-### Approach Summary
+### 方法摘要
 
 <PRIMARY_APPROACH_SUMMARY>
 
-### Objective Evidence
+### 客观证据
 
 <PRIMARY_OBJECTIVE_EVIDENCE>
 
-### Known Risks
+### 已知风险
 
 <PRIMARY_KNOWN_RISKS>
 
-## Alternative Directions Considered
+## 考虑过的替代方向
 
 <ALTERNATIVES>
 
-## Synthesis Notes
+## 综合说明
 
 <SYNTHESIS_NOTES>

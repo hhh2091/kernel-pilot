@@ -1,8 +1,8 @@
-# BitLesson Delta Missing
+# 缺少 BitLesson Delta
 
-Your summary is missing the required `## BitLesson Delta` section.
+您的摘要中缺少必需的 `## BitLesson Delta` 部分。
 
-Required minimal format:
+所需的最小格式：
 
 ```markdown
 ## BitLesson Delta

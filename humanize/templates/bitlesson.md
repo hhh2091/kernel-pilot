@@ -1,10 +1,10 @@
-# BitLesson Knowledge Base
+# BitLesson 知识库
 
-This file is project-specific. Keep entries precise and reusable for future rounds.
+此文件为项目专用。请保持条目精确且可在后续轮次中复用。
 
-## Entry Template (Strict)
+## 条目模板（严格格式）
 
-Use this exact field order for every entry:
+请为每个条目使用以下严格的字段顺序：
 
 ```markdown
 ## Lesson: <unique-id>
@@ -18,6 +18,6 @@ Validation Evidence: <tests/commands/logs/PR evidence>
 Source Rounds: <round numbers where problem appeared and was solved>
 ```
 
-## Entries
+## 条目
 
-<!-- Add lessons below using the strict template. -->
+<!-- 请使用严格模板在下方添加经验教训。 -->

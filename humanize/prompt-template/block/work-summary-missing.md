@@ -1,16 +1,16 @@
-# Work Summary Missing
+# 缺少工作摘要
 
-You attempted to exit without writing your work summary.
+您尝试在未编写工作摘要的情况下退出。
 
-**Required Action**: Write your work summary to:
+**必需的操作**：将工作摘要写入：
 ```
 {{SUMMARY_FILE}}
 ```
 
-The summary should include:
-- What was implemented
-- Files created/modified
-- Tests added/passed
-- Any remaining items
+摘要应包括：
+- 实现了什么
+- 创建/修改的文件
+- 添加/通过的测试
+- 任何剩余项目
 
-After writing the summary, you may attempt to exit again.
+编写摘要后，您可以再次尝试退出。
