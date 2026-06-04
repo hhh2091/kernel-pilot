@@ -15,6 +15,7 @@ HUMANIZE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 KERNELPILOT_ROOT="$(cd "$HUMANIZE_ROOT/.." && pwd)"
 KERNELWIKI_ROOT="${KERNELWIKI_ROOT:-}"
 NCU_REPORT_SKILL_ROOT="${NCU_REPORT_SKILL_ROOT:-}"
+SDAA_KERNELWIKI_ROOT="${SDAA_KERNELWIKI_ROOT:-}"
 CLAUDE_BIN="${CLAUDE_BIN:-}"
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-${HOME}/.claude}"
 INSTALL_PIP="true"
@@ -33,6 +34,8 @@ Options:
   --kernelwiki-root PATH      KernelWiki checkout root (default: external/KernelWiki)
   --ncu-report-skill-root PATH
                               ncu-report-skill checkout root (default: external/ncu-report-skill)
+  --sdaa-kernelwiki-root PATH
+                              SDAAKernelWiki checkout root (default: external/SDAAKernelWiki if present)
   --claude-bin PATH           Claude Code binary (default: claude or ~/.local/bin/claude)
   --claude-config-dir PATH    Claude config dir (default: ~/.claude)
   --skip-pip                  Do not run pip install for KernelWiki requirements
@@ -88,7 +91,7 @@ hydrate_plugin_cache() {
         return
     fi
 
-    python3 - "$plugin_root" "$KERNELPILOT_ROOT" "$KERNELWIKI_ROOT" "$NCU_REPORT_SKILL_ROOT" <<'PY'
+    python3 - "$plugin_root" "$KERNELPILOT_ROOT" "$KERNELWIKI_ROOT" "$NCU_REPORT_SKILL_ROOT" "$SDAA_KERNELWIKI_ROOT" <<'PY'
 import pathlib
 import sys
 
@@ -96,12 +99,14 @@ plugin_root = pathlib.Path(sys.argv[1])
 kernelpilot_root = pathlib.Path(sys.argv[2])
 kernelwiki_root = pathlib.Path(sys.argv[3])
 ncu_report_skill_root = pathlib.Path(sys.argv[4])
+sdaa_kernelwiki_root = pathlib.Path(sys.argv[5]) if sys.argv[5] else pathlib.Path("")
 
 replacements = {
     "{{HUMANIZE_RUNTIME_ROOT}}": str(plugin_root),
     "{{KERNELPILOT_ROOT}}": str(kernelpilot_root),
     "{{KERNELWIKI_ROOT}}": str(kernelwiki_root),
     "{{NCU_REPORT_SKILL_ROOT}}": str(ncu_report_skill_root),
+    "{{SDAA_KERNELWIKI_ROOT}}": str(sdaa_kernelwiki_root),
 }
 
 for path in sorted((plugin_root / "skills").glob("*/SKILL*.md")):
@@ -117,8 +122,8 @@ PY
 verify_no_placeholders() {
     local plugin_root="$1"
 
-    if grep -R '{{HUMANIZE_RUNTIME_ROOT}}\|{{KERNELPILOT_ROOT}}\|{{KERNELWIKI_ROOT}}\|{{NCU_REPORT_SKILL_ROOT}}' "$plugin_root/skills" >/dev/null 2>&1; then
-        grep -R -n '{{HUMANIZE_RUNTIME_ROOT}}\|{{KERNELPILOT_ROOT}}\|{{KERNELWIKI_ROOT}}\|{{NCU_REPORT_SKILL_ROOT}}' "$plugin_root/skills" >&2 || true
+    if grep -R '{{HUMANIZE_RUNTIME_ROOT}}\|{{KERNELPILOT_ROOT}}\|{{KERNELWIKI_ROOT}}\|{{NCU_REPORT_SKILL_ROOT}}\|{{SDAA_KERNELWIKI_ROOT}}' "$plugin_root/skills" >/dev/null 2>&1; then
+        grep -R -n '{{HUMANIZE_RUNTIME_ROOT}}\|{{KERNELPILOT_ROOT}}\|{{KERNELWIKI_ROOT}}\|{{NCU_REPORT_SKILL_ROOT}}\|{{SDAA_KERNELWIKI_ROOT}}' "$plugin_root/skills" >&2 || true
         die "unhydrated placeholders remain in Claude plugin skills"
     fi
 }
@@ -177,9 +182,15 @@ resolve_external_skill_roots() {
     if [[ -z "$NCU_REPORT_SKILL_ROOT" ]]; then
         NCU_REPORT_SKILL_ROOT="$KERNELPILOT_ROOT/external/ncu-report-skill"
     fi
+    if [[ -z "$SDAA_KERNELWIKI_ROOT" && -f "$KERNELPILOT_ROOT/external/SDAAKernelWiki/SKILL.md" ]]; then
+        SDAA_KERNELWIKI_ROOT="$KERNELPILOT_ROOT/external/SDAAKernelWiki"
+    fi
 
     KERNELWIKI_ROOT="$(cd "$KERNELWIKI_ROOT" 2>/dev/null && pwd || true)"
     NCU_REPORT_SKILL_ROOT="$(cd "$NCU_REPORT_SKILL_ROOT" 2>/dev/null && pwd || true)"
+    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+        SDAA_KERNELWIKI_ROOT="$(cd "$SDAA_KERNELWIKI_ROOT" 2>/dev/null && pwd || true)"
+    fi
 
     [[ -n "$KERNELWIKI_ROOT" ]] || die "could not resolve KernelWiki root"
     [[ -f "$KERNELWIKI_ROOT/SKILL.md" ]] || die "KernelWiki skill not found: $KERNELWIKI_ROOT/SKILL.md"
@@ -188,6 +199,11 @@ resolve_external_skill_roots() {
     [[ -n "$NCU_REPORT_SKILL_ROOT" ]] || die "could not resolve ncu-report-skill root"
     [[ -f "$NCU_REPORT_SKILL_ROOT/SKILL.md" ]] || die "ncu-report-skill not found: $NCU_REPORT_SKILL_ROOT/SKILL.md"
     [[ -d "$NCU_REPORT_SKILL_ROOT/reference" ]] || die "ncu-report-skill reference docs not found: $NCU_REPORT_SKILL_ROOT/reference"
+    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+        [[ -f "$SDAA_KERNELWIKI_ROOT/SKILL.md" ]] || die "SDAAKernelWiki skill not found: $SDAA_KERNELWIKI_ROOT/SKILL.md"
+        [[ -f "$SDAA_KERNELWIKI_ROOT/scripts/query.py" ]] || die "SDAAKernelWiki query script not found: $SDAA_KERNELWIKI_ROOT/scripts/query.py"
+        [[ -d "$SDAA_KERNELWIKI_ROOT/wiki" ]] || die "SDAAKernelWiki pages not found: $SDAA_KERNELWIKI_ROOT/wiki"
+    fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -205,6 +221,11 @@ while [[ $# -gt 0 ]]; do
         --ncu-report-skill-root)
             [[ -n "${2:-}" ]] || die "--ncu-report-skill-root requires a value"
             NCU_REPORT_SKILL_ROOT="$2"
+            shift 2
+            ;;
+        --sdaa-kernelwiki-root)
+            [[ -n "${2:-}" ]] || die "--sdaa-kernelwiki-root requires a value"
+            SDAA_KERNELWIKI_ROOT="$2"
             shift 2
             ;;
         --claude-bin)
@@ -251,6 +272,9 @@ PLUGIN_ROOT="$CLAUDE_CONFIG_DIR/plugins/cache/KernelPilot/humanize/$VERSION"
 log "kernelpilot root: $KERNELPILOT_ROOT"
 log "kernelwiki root: $KERNELWIKI_ROOT"
 log "ncu-report-skill root: $NCU_REPORT_SKILL_ROOT"
+if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+    log "sdaa-kernelwiki root: $SDAA_KERNELWIKI_ROOT"
+fi
 log "claude binary: $CLAUDE_BIN"
 log "claude config dir: $CLAUDE_CONFIG_DIR"
 log "plugin cache root: $PLUGIN_ROOT"
@@ -273,6 +297,9 @@ fi
 sync_plugin_cache_from_source "$PLUGIN_ROOT"
 link_skill "KernelWiki" "$KERNELWIKI_ROOT"
 link_skill "ncu-report-skill" "$NCU_REPORT_SKILL_ROOT"
+if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+    link_skill "SDAAKernelWiki" "$SDAA_KERNELWIKI_ROOT"
+fi
 
 if [[ "$INSTALL_PIP" == "true" ]]; then
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -303,3 +330,9 @@ External skills:
   $CLAUDE_CONFIG_DIR/skills/KernelWiki -> $KERNELWIKI_ROOT
   $CLAUDE_CONFIG_DIR/skills/ncu-report-skill -> $NCU_REPORT_SKILL_ROOT
 EOF
+
+if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+    cat <<EOF
+  $CLAUDE_CONFIG_DIR/skills/SDAAKernelWiki -> $SDAA_KERNELWIKI_ROOT
+EOF
+fi

@@ -11,6 +11,7 @@ type: flow
 风格刻意保持轻量：
 
 - 当上游 PR、wiki 笔记、文档或已有内核有助于当前设计选择时，使用 `KernelWiki`。
+- 当目标是 SDAA / 太初 / TECO T1 时，优先使用 `SDAAKernelWiki`，不要直接套用 NVIDIA 的 SM/warp/shared-memory 术语。
 - 当需要性能分析证据来解释基线、回归、平台期、意外提升或下一次优化编辑时，使用 `ncu-report-skill`。
 - 不要仅为满足流程仪式而运行知识或性能分析步骤。当工具实质性地改变了下一步时，记录原因。
 
@@ -36,10 +37,12 @@ W: workload distribution or focused benchmark case
 Humanize runtime: {{HUMANIZE_RUNTIME_ROOT}}
 KernelPilot root: {{KERNELPILOT_ROOT}}
 KernelWiki root: {{KERNELWIKI_ROOT}}
+SDAAKernelWiki root: {{SDAA_KERNELWIKI_ROOT}}
 ncu-report-skill root: {{NCU_REPORT_SKILL_ROOT}}
 ```
 
 如果 `{{KERNELWIKI_ROOT}}` 或 `{{NCU_REPORT_SKILL_ROOT}}` 未被注入，查找名为 `KernelWiki` 和 `ncu-report-skill` 的同级技能，或使用 KernelPilot 检出默认值 `external/KernelWiki` 和 `external/ncu-report-skill`。
+如果 `{{SDAA_KERNELWIKI_ROOT}}` 未被注入，查找名为 `SDAAKernelWiki` 的同级技能，或使用 KernelPilot 检出默认值 `external/SDAAKernelWiki`。
 
 ## 循环应执行的操作
 
@@ -53,6 +56,8 @@ ncu-report-skill root: {{NCU_REPORT_SKILL_ROOT}}
 6. 读取 `.humanize/rlcr/<timestamp>/round-0-prompt.md`。
 7. 然后才在 Humanize 审查下基于正确性和基准证据迭代候选内核。
 8. 当先验知识可以指导设计时，使用 KernelWiki 或实时上游源。
+   - NVIDIA Blackwell/Hopper 任务使用 `KernelWiki`。
+   - SDAA / 太初 / TECO T1 任务使用 `SDAAKernelWiki`。
 9. 当性能分析证据可以回答当前问题时，使用 ncu-report-skill。
 10. 仅在 `W` 确实需要时才按 shape 进行自动调优或调度。
 
@@ -170,6 +175,27 @@ python3 scripts/get_page.py kernel-flash-attention-sm100-mla-topk --follow-sourc
 ```
 
 将结果作为证据使用，而非作为规则手册。如果某个来源直接影响实现代码，将其追溯到 PR 页面、制品、官方文档或上游源路径。
+
+## 使用 SDAAKernelWiki
+
+当目标硬件或任务描述包含 SDAA、太初、TECO T1、SPA、SPE、LDM、DMA/RMA、ACE、pipe0/pipe1 或 optest PMU 字段时，使用 `SDAAKernelWiki` 技能。它提供 SDAA 本硬件口径：
+
+- `SPA/SPE` 代替 NVIDIA `SM/warp` 直觉。
+- `LDM/local memory` 代替未翻译的 shared memory 术语。
+- `pipe0/pipe1 launch/cannot-launch/zero-launch` 代替 scheduler/eligible-warps 直觉。
+- `DMA/RMA/ACE/HBM channel-bank-row` 作为算子生成的主要资源模型。
+
+从 `{{SDAA_KERNELWIKI_ROOT}}` 运行命令：
+
+```bash
+cd {{SDAA_KERNELWIKI_ROOT}}
+python3 scripts/query.py "RMSNorm zero launch LDM pressure" --compact
+python3 scripts/query.py --tag dma --type technique --compact
+python3 scripts/get_page.py technique-dma-periodic-partitioning --follow-sources
+python3 scripts/get_page.py docs-gap-analysis
+```
+
+SDAA 任务的尝试账本应记录使用过的 SDAAKernelWiki page id，并说明该页面如何改变候选实现、测量项或下一步编辑。
 
 ## 使用 ncu-report-skill
 

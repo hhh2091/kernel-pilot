@@ -1,0 +1,62 @@
+architectures:
+  - teco-t1
+  - sdaa
+  - spa
+hardware_features:
+  - spa
+  - spe
+  - ldm
+  - dma
+  - rma
+  - ace
+  - hbm
+  - mesh
+  - pipe0
+  - pipe1
+  - ppu
+  - icache
+  - simd
+techniques:
+  - periodic-partitioning
+  - block-partitioning
+  - dma-alignment
+  - dma-odd-even-interleave
+  - dma-queue-budgeting
+  - rma-put-preference
+  - rma-broadcast-selection
+  - double-diagonal-broadcast
+  - strided-column-broadcast
+  - ace-double-buffering
+  - p0-p1-overlap
+  - ldm-locality
+  - load-balance
+  - static-cycle-estimation
+  - profiler-cross-check
+kernel_types:
+  - rmsnorm
+  - layernorm
+  - reduction
+  - elementwise
+  - gemm
+  - matmul
+  - broadcast
+  - memory-copy
+languages:
+  - sdaa-cpp
+  - tecocc
+  - python
+source_category:
+  - local-note
+  - local-analysis
+  - empirical-table
+  - profiler-report
+  - official-doc
+symptoms:
+  - scheduling-bubbles
+  - ldm-pressure
+  - dma-hbm-underutilization
+  - rma-contention
+  - ace-feeding-stall
+  - icache-miss
+  - runtime-launch-overhead
+

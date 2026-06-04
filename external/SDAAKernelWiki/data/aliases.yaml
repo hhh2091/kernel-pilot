@@ -1,0 +1,51 @@
+teco-t1:
+  - T1
+  - 太初
+  - TECO T1
+sdaa:
+  - SDAA
+  - domestic gpu
+  - 国产显卡
+spa:
+  - core group
+  - 核组
+spe:
+  - core
+  - slave core
+  - 从核
+ldm:
+  - local memory
+  - SPM
+  - 本地存储
+dma:
+  - DMA engine
+  - dma_get
+  - dma_put
+rma:
+  - RMA put
+  - RMA get
+  - remote LDM
+ace:
+  - matrix unit
+  - 异步加速
+  - 矩阵单元
+pipe0:
+  - P0
+  - compute pipe
+pipe1:
+  - P1
+  - memory control pipe
+periodic-partitioning:
+  - cyclic partitioning
+  - 周期划分
+block-partitioning:
+  - 块划分
+double-diagonal-broadcast:
+  - 双对角线行广播
+scheduling-bubbles:
+  - zero launch
+  - cannot launch
+ldm-pressure:
+  - local-memory pressure
+  - local memory unarb
+

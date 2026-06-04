@@ -20,6 +20,7 @@ KernelPilot 适用于严肃的 CUDA 内核调优场景，在这些场景中关�
 | --- | --- | --- |
 | [`humanize-kernel-agent-loop`](humanize/skills/humanize-kernel-agent-loop/) | KernelPilot | 围绕 `K`、`R`、`W` 创建干净的内核优化循环：独立工作区、正确性/基准证据、轻量级账本、可选的性能分析、可选的先验知识查找，以及 Humanize 审查。 |
 | [`KernelWiki`](external/KernelWiki/) | [`BBuf/KernelWiki`](https://github.com/BBuf/KernelWiki/tree/kernelpilot-knowledge-expansion) | 当先前的 PR、wiki 综合页面、文档、博客或上游内核示例可以为当前设计提供参考时使用。 |
+| [`SDAAKernelWiki`](external/SDAAKernelWiki/) | KernelPilot local knowledge | 当目标硬件是 SDAA / 太初 / TECO T1 时使用，提供 SPA/SPE、LDM、DMA/RMA、ACE、pipe0/pipe1、HBM 访问和 optest PMU 的本硬件口径。 |
 | [`ncu-report-skill`](external/ncu-report-skill/) | [`DongyunZou/ncu-report-skill`](https://github.com/DongyunZou/ncu-report-skill) | 当需要 Nsight Compute 证据来分析内核性能、诊断瓶颈、解释回退或选择下一次优化编辑时使用。 |
 
 它们共同构成了一个可以从简单请求开始工作的优化循环：
@@ -80,6 +81,23 @@ less reference/08-b200-metric-names.md
 ```
 
 该 skill 强调每次分析使用独立运行目录、尽可能使用独立测试工具、`ncu --set full` 加源码级收集、通过 `ncu_report` API 进行 Python 解析，以及最终生成按证据支持排序的下一次编辑建议报告。
+
+## SDAAKernelWiki
+
+`SDAAKernelWiki` 位于 [`external/SDAAKernelWiki`](external/SDAAKernelWiki/)。它是 KernelWiki 结构在 SDAA / 太初 T1 上的本地迁移版本，当前基于 [`external/knowledge`](external/knowledge/) 中的硬件模型、T1 架构笔记、指令拍数表、RMS 性能分析样例和 ACE 表格整理。
+
+查询示例：
+
+```bash
+cd external/SDAAKernelWiki
+python3 scripts/query.py "RMSNorm zero launch LDM pressure" --compact
+python3 scripts/query.py --tag dma --type technique --compact
+python3 scripts/get_page.py technique-dma-periodic-partitioning --follow-sources
+python3 scripts/get_page.py docs-gap-analysis
+python3 scripts/validate.py
+```
+
+当优化目标是 SDAA / 太初 / TECO T1 时，`humanize-kernel-agent-loop` 会优先按 SDAAKernelWiki 的硬件本语分析，避免直接套用 NVIDIA 的 `SM/warp/shared memory/occupancy` 口径。
 
 ## 安装
 

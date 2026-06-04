@@ -22,6 +22,8 @@
 #   --kernelwiki-root PATH  kernel-agent 技能使用的 KernelWiki 检出（默认: external/KernelWiki）
 #   --ncu-report-skill-root PATH
 #                            kernel-agent 技能使用的 ncu-report-skill 检出（默认: external/ncu-report-skill）
+#   --sdaa-kernelwiki-root PATH
+#                            kernel-agent 技能使用的 SDAAKernelWiki 检出（默认: external/SDAAKernelWiki，若存在）
 #   --dry-run               打印操作但不写入
 #   -h, --help              显示帮助
 #
@@ -43,6 +45,7 @@ DRY_RUN="false"
 KERNELPILOT_ROOT="${KERNELPILOT_ROOT:-}"
 KERNELWIKI_ROOT="${KERNELWIKI_ROOT:-}"
 NCU_REPORT_SKILL_ROOT="${NCU_REPORT_SKILL_ROOT:-}"
+SDAA_KERNELWIKI_ROOT="${SDAA_KERNELWIKI_ROOT:-}"
 
 SKILL_NAMES=(
     "humanize"
@@ -53,6 +56,7 @@ SKILL_NAMES=(
 )
 KERNELWIKI_SKILL_NAME="KernelWiki"
 NCU_REPORT_SKILL_NAME="ncu-report-skill"
+SDAA_KERNELWIKI_SKILL_NAME="SDAAKernelWiki"
 
 usage() {
     cat <<'EOF'
@@ -73,6 +77,8 @@ Options:
   --kernelwiki-root PATH  KernelWiki checkout used by kernel-agent skill (default: external/KernelWiki)
   --ncu-report-skill-root PATH
                            ncu-report-skill checkout used by kernel-agent skill (default: external/ncu-report-skill)
+  --sdaa-kernelwiki-root PATH
+                           SDAAKernelWiki checkout used by kernel-agent skill (default: external/SDAAKernelWiki if present)
   --dry-run               Print actions without writing
   -h, --help              Show help
 EOF
@@ -181,6 +187,23 @@ resolve_ncu_report_skill_root() {
     done
 }
 
+resolve_sdaa_kernelwiki_root() {
+    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+        SDAA_KERNELWIKI_ROOT="$(cd "$SDAA_KERNELWIKI_ROOT" 2>/dev/null && pwd || true)"
+        return 0
+    fi
+
+    local candidate
+    for candidate in \
+        "$KERNELPILOT_ROOT/external/SDAAKernelWiki" \
+        "$REPO_ROOT/../external/SDAAKernelWiki"; do
+        if [[ -n "$candidate" && -f "$candidate/SKILL.md" && -f "$candidate/scripts/query.py" ]]; then
+            SDAA_KERNELWIKI_ROOT="$(cd "$candidate" && pwd)"
+            return 0
+        fi
+    done
+}
+
 validate_external_skill_roots() {
     [[ -n "$KERNELPILOT_ROOT" ]] || die "KernelPilot root not found; run from the kernel-pilot/humanize checkout or pass --kernelpilot-root PATH"
     [[ -d "$KERNELPILOT_ROOT" ]] || die "KernelPilot root is not a directory: $KERNELPILOT_ROOT"
@@ -194,6 +217,13 @@ validate_external_skill_roots() {
     [[ -f "$NCU_REPORT_SKILL_ROOT/SKILL.md" ]] || die "ncu-report-skill not found: $NCU_REPORT_SKILL_ROOT/SKILL.md"
     [[ -d "$NCU_REPORT_SKILL_ROOT/reference" ]] || die "ncu-report-skill reference docs not found: $NCU_REPORT_SKILL_ROOT/reference"
     [[ -d "$NCU_REPORT_SKILL_ROOT/helpers" ]] || die "ncu-report-skill helpers not found: $NCU_REPORT_SKILL_ROOT/helpers"
+    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+        [[ -d "$SDAA_KERNELWIKI_ROOT" ]] || die "SDAAKernelWiki root is not a directory: $SDAA_KERNELWIKI_ROOT"
+        [[ -f "$SDAA_KERNELWIKI_ROOT/SKILL.md" ]] || die "SDAAKernelWiki skill not found: $SDAA_KERNELWIKI_ROOT/SKILL.md"
+        [[ -f "$SDAA_KERNELWIKI_ROOT/scripts/query.py" ]] || die "SDAAKernelWiki query script not found: $SDAA_KERNELWIKI_ROOT/scripts/query.py"
+        [[ -f "$SDAA_KERNELWIKI_ROOT/data/tags.yaml" ]] || die "SDAAKernelWiki tags not found: $SDAA_KERNELWIKI_ROOT/data/tags.yaml"
+        [[ -d "$SDAA_KERNELWIKI_ROOT/wiki" ]] || die "SDAAKernelWiki wiki pages not found: $SDAA_KERNELWIKI_ROOT/wiki"
+    fi
 }
 
 sync_dir() {
@@ -272,6 +302,12 @@ sync_ncu_report_skill() {
     sync_dir "$NCU_REPORT_SKILL_ROOT" "$dst"
 }
 
+sync_sdaa_kernelwiki_skill() {
+    local target_dir="$1"
+    local dst="$target_dir/$SDAA_KERNELWIKI_SKILL_NAME"
+    sync_dir "$SDAA_KERNELWIKI_ROOT" "$dst"
+}
+
 install_runtime_bundle() {
     local target_dir="$1"
     local runtime_root="$target_dir/humanize"
@@ -308,11 +344,13 @@ hydrate_skill_runtime_root() {
             _HYDRATE_KERNELPILOT_ROOT="$KERNELPILOT_ROOT" \
             _HYDRATE_KERNELWIKI_ROOT="$KERNELWIKI_ROOT" \
             _HYDRATE_NCU_REPORT_SKILL_ROOT="$NCU_REPORT_SKILL_ROOT" \
+            _HYDRATE_SDAA_KERNELWIKI_ROOT="$SDAA_KERNELWIKI_ROOT" \
                 awk '{
                     gsub(/\{\{HUMANIZE_RUNTIME_ROOT\}\}/, ENVIRON["_HYDRATE_RUNTIME_ROOT"]);
                     gsub(/\{\{KERNELPILOT_ROOT\}\}/, ENVIRON["_HYDRATE_KERNELPILOT_ROOT"]);
                     gsub(/\{\{KERNELWIKI_ROOT\}\}/, ENVIRON["_HYDRATE_KERNELWIKI_ROOT"]);
                     gsub(/\{\{NCU_REPORT_SKILL_ROOT\}\}/, ENVIRON["_HYDRATE_NCU_REPORT_SKILL_ROOT"]);
+                    gsub(/\{\{SDAA_KERNELWIKI_ROOT\}\}/, ENVIRON["_HYDRATE_SDAA_KERNELWIKI_ROOT"]);
                     print
                 }' "$skill_file" > "$tmp" \
                 || { rm -f "$tmp"; die "failed to hydrate $skill_file"; }
@@ -379,6 +417,10 @@ sync_target() {
     sync_kernelwiki_skill "$target_dir"
     log "syncing [$label] skill: $NCU_REPORT_SKILL_NAME"
     sync_ncu_report_skill "$target_dir"
+    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+        log "syncing [$label] skill: $SDAA_KERNELWIKI_SKILL_NAME"
+        sync_sdaa_kernelwiki_skill "$target_dir"
+    fi
     install_runtime_bundle "$target_dir"
     hydrate_skill_runtime_root "$target_dir"
     strip_claude_specific_frontmatter "$target_dir"
@@ -598,6 +640,11 @@ while [[ $# -gt 0 ]]; do
             NCU_REPORT_SKILL_ROOT="$2"
             shift 2
             ;;
+        --sdaa-kernelwiki-root)
+            [[ -n "${2:-}" ]] || die "--sdaa-kernelwiki-root requires a value"
+            SDAA_KERNELWIKI_ROOT="$2"
+            shift 2
+            ;;
         --dry-run)
             DRY_RUN="true"
             shift
@@ -616,6 +663,7 @@ resolve_source_layout "$REPO_ROOT"
 resolve_kernelpilot_root
 resolve_kernelwiki_root
 resolve_ncu_report_skill_root
+resolve_sdaa_kernelwiki_root
 validate_external_skill_roots
 validate_repo
 
@@ -643,6 +691,9 @@ log "target: $TARGET"
 log "kernelpilot root: $KERNELPILOT_ROOT"
 log "kernelwiki root: $KERNELWIKI_ROOT"
 log "ncu-report-skill root: $NCU_REPORT_SKILL_ROOT"
+if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+    log "sdaa-kernelwiki root: $SDAA_KERNELWIKI_ROOT"
+fi
 if [[ "$TARGET" == "kimi" || "$TARGET" == "both" ]]; then
     log "kimi skills dir: $KIMI_SKILLS_DIR"
 fi

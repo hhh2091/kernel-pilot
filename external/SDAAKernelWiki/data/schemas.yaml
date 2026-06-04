@@ -1,0 +1,27 @@
+page_types:
+  source-local:
+    id_prefix: source-local-
+    required: [id, title, source_category, path, captured_at]
+  wiki-hardware:
+    id_prefix: hw-
+    required: [id, title, type, architectures, tags, confidence, sources]
+  wiki-technique:
+    id_prefix: technique-
+    required: [id, title, type, architectures, tags, confidence, reproducibility, sources]
+  wiki-pattern:
+    id_prefix: pattern-
+    required: [id, title, type, symptoms, candidate_techniques, sources]
+  wiki-kernel:
+    id_prefix: kernel-
+    required: [id, title, type, architectures, kernel_types, confidence, sources]
+confidence:
+  verified: "由官方文档和实现/profiler 证据共同支持。"
+  source-reported: "由本地笔记、表格或报告支持。"
+  inferred: "从多个本地来源综合推断。"
+  experimental: "需要复测或官方确认。"
+reproducibility:
+  concept: "仅文本概念。"
+  pseudocode: "算法草图。"
+  snippet: "代码片段或具体命令模式。"
+  runnable: "自包含可运行样例。"
+  benchmarked: "可运行且有 benchmark/profiler 证据。"
