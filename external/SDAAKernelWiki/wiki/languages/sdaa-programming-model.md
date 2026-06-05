@@ -8,7 +8,7 @@ confidence: source-reported
 reproducibility: concept
 languages: [sdaa-cpp, tecocc]
 related: [hw-spa-spe, hw-dma, hw-rma, hw-ace]
-sources: [source-local-teco-t1]
+sources: [source-local-teco-t1, doc-sdaa-c-programming-guide-v3-1-0]
 ---
 
 # SDAA 编程模型笔记
@@ -24,4 +24,4 @@ sources: [source-local-teco-t1]
 - `sync_threads()`：SPA 级同步，另有面向指定 SPE group 的变体。
 - 数据搬运包括 host/device copy、same-core movement、DMA、RMA，以及行/列/自定义 SPE group 广播。
 
-该页面目前还不足以支撑代码生成，因为精确头文件、函数签名、类型约束、编译器参数和示例仍缺失。见 `docs/gap-analysis.md`。
+官方 `SDAA C 编程指南 v3.1.0` 已补齐精确语言入口、runtime API、编译器、DMA/RMA/Broadcast、matmul、SIMD 和 perf sampling 的结构化页面。需要代码生成时优先读取 `lang-sdaa-c-programming-guide`，再按具体瓶颈读取技术页。

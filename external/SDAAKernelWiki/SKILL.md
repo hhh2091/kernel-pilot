@@ -15,8 +15,13 @@ allowed-tools: "Bash Read Grep Glob"
 
 ```bash
 python3 scripts/query.py "RMSNorm zero launch LDM pressure" --compact
+python3 scripts/query.py "SDAA C GEMM matmul broadcast double buffering" --compact
 python3 scripts/query.py --tag dma --type technique --compact
+python3 scripts/query.py --tag simd-vectorization --compact
+python3 scripts/query.py "atomic transpose math activation reduction" --compact
 python3 scripts/query.py --symptom scheduling-bubbles --compact
+python3 scripts/get_page.py kernel-sdaa-gemm --follow-sources
+python3 scripts/get_page.py example-sdaa-programming-guide-examples
 python3 scripts/get_page.py hw-ace --follow-sources
 python3 scripts/get_page.py docs-gap-analysis
 ```
@@ -27,9 +32,10 @@ python3 scripts/get_page.py docs-gap-analysis
 
 优先使用 SDAA 本硬件术语：
 
-- `SPA`、`SPE`、`LDM`、`DMA`、`RMA`、`ACE`、`pipe0`、`pipe1`
+- `SPA`、`SPE`、`SPM/LDM`、`Global memory`、`DMA`、`RMA`、`Broadcast`、`ACE`、`pipe0`、`pipe1`
 - `HBM channel / pseudo-channel / bank / row`
 - `launch / zero-launch / cannot-launch`、`local-memory unarb`、`DMA queue`
+- `tecocc`、`.scpp`、`threadIdx`、`threadDim`、`__global__`、`__local__`
 
 不要直接输出未经翻译的 NVIDIA 术语，例如 `SM`、`warp`、`shared memory bank conflict`、`occupancy`、`waves/SM`、`L1TEX`。如果要迁移 KernelWiki 中的模式，必须显式翻译到 SDAA 硬件口径。
 
@@ -37,7 +43,7 @@ python3 scripts/get_page.py docs-gap-analysis
 
 1. 回答时引用 page id 和路径。
 2. 沿 `sources:` 追溯到 `sources/local/` 下的本地原始资料页。
-3. 当前 T1 规则应视为 `source-reported` 或 `inferred`，除非页面明确说明有官方最终微架构依据。
+3. 来自 `SDAA C 编程指南 v3.1.0` 的语言/API 规则可按 `verified` 使用；T1 微架构和性能经验仍应视为 `source-reported` 或 `inferred`，除非页面明确说明有官方最终微架构依据。
 4. 静态指令拍数表只能支持 `possible` 级结论。只有结合 profiler、PMU、cycle log 或 benchmark 证据后，才能升级为 `likely` 或 `confirmed`。
 5. 用于算子生成时，输出必须是可验证的优化计划：K/R/W、候选映射、预期瓶颈、必要测量项和 fallback。
 

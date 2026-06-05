@@ -1,7 +1,7 @@
 ---
 id: docs-gap-analysis
 title: "SDAAKernelWiki 面向算子优化生成的缺口分析"
-sources: [source-local-hardware-model, source-local-teco-t1, source-local-instruction-latency-pipeline, source-local-rms-metrics-analysis, source-local-ace-cost-table]
+sources: [source-local-hardware-model, source-local-teco-t1, source-local-instruction-latency-pipeline, source-local-rms-metrics-analysis, source-local-ace-cost-table, doc-sdaa-c-programming-guide-v3-1-0]
 ---
 
 # SDAAKernelWiki 缺口分析
@@ -11,25 +11,28 @@ sources: [source-local-hardware-model, source-local-teco-t1, source-local-instru
 当前 wiki 已经能支撑第一阶段的 SDAA 算子优化推理：
 
 - 硬件词表：SPA、SPE、LDM、DMA、RMA、ACE、pipe0、pipe1、HBM、mesh。
+- 官方 SDAA C 入口：`.scpp`、`tecocc`、kernel launch、`threadIdx/threadDim`、Host Runtime、SPM allocation、DMA/RMA/Broadcast、matmul、SIMD、atomic、transpose、math/high-level API、perf sampling、环境变量和设备端调试。
 - 数据搬运规则：128B DMA 包、2KB 聚合 HBM channel 目标、全 SPA 视角的周期划分、DMA 队列深度、DMA 奇偶引擎顺序。
 - 通信规则：RMA 点对点 vs 广播、行/列广播、双对角线行广播、DMA/RMA 共享路径。
 - 计算规则：P0/P1 发射拆分、SIMD 寄存器宽度、长延迟 sqrt/div、ACE 累加器双缓冲和 cost table 查找。
 - PMU 分析词表：zero-launch、cannot-launch、local-memory unarb、DMA request density、icache miss、runtime/driver overhead。
+- 示例与算子开发路线：quickstart、向量运算、SPMD/SUMMA 矩阵乘、自定义 atomic、GEMM baseline、SIMD、matmul/ACE、Broadcast、double buffering。
 
 ## 距离可靠算子优化生成还缺什么
 
-1. **官方编程模型参考**
-   - 稳定的 `tecocc`、kernel launch 语法、`__global__`、`__device__`、`__local__`、sync API、DMA/RMA API、ACE API 和约束文档。
-   - `rt_ace_load_west`、`rt_ace_writeback`、DMA get/put、RMA get/put/broadcast、sync 变体的精确函数签名。
-
-2. **可运行算子样例**
-   - elementwise、reduction、RMSNorm/LayerNorm、memcpy、broadcast、GEMM/ACE matmul、RMA communication 的最小正确 kernel。
+1. **可运行算子样例**
+   - elementwise、reduction、RMSNorm/LayerNorm、memcpy、broadcast、GEMM/matmul、RMA communication 的最小正确 kernel。
    - 每个样例都应包含 K/R/W、构建命令、正确性 oracle 和 benchmark 命令。
+   - 官方指南示例已整理为 wiki 路线，但还需要落成 KernelPilot 可直接执行的 workspace seed。
 
-3. **Profiler schema 和指标定义**
+2. **Profiler schema 和指标定义**
    - PMU / SDPTI / optest metrics 的规范 JSON schema。
    - `zero_launch`、`cannot_launch`、local-memory unarb、DMA/RMA counter、ACE counter、cycle 归一化和 active-SPE 逻辑的定义。
    - 字段到 pattern 的映射，以及阈值和置信度规则。
+
+3. **T1 微架构与官方 API 的对齐**
+   - `sdaa_matmul.h` 官方接口已覆盖通用 matmul，但本地 `rt_ace_load_west`、`rt_ace_writeback` 等 ACE 底层符号仍需要从真实头文件或示例确认。
+   - 需要明确 ACE、DMA、RMA、Broadcast 在 T1 上的硬件 counter、队列深度和争用规则是否与本地笔记完全一致。
 
 4. **ACE cost model 验证**
    - 将 `ACE.xlsx` 转成机器可读的 CSV/JSON。
@@ -51,13 +54,15 @@ sources: [source-local-hardware-model, source-local-teco-t1, source-local-instru
 
 ## 推荐补充顺序
 
-1. 固化本 wiki 的 schema 和词表。
-2. 将 query / validate 纳入 CI 或本地测试。
-3. 将 ACE.xlsx 转成 JSON，并增加 `ace_cost.py` helper。
-4. 增加 3 个可运行 seed kernel：memcpy/DMA、RMSNorm、ACE matmul。
+1. 将 query / validate 纳入 CI 或本地测试。
+2. 基于 `kernel-sdaa-gemm` 增加可运行 GEMM seed workspace：baseline、SIMD、matmul、Broadcast、double buffering。
+3. 增加 3 个基础 seed kernel：memcpy/DMA、RMSNorm、RMA/Broadcast。
+4. 将 ACE.xlsx 转成 JSON，并增加 `ace_cost.py` helper。
 5. 增加 profiler parser 和当前 optest JSON 的阈值规则。
 6. 增加 KernelPilot SDAA 工作区脚手架和 ledger。
 7. 用真实优化尝试记录和性能声明扩展知识库。
+
+面向算子团队的具体资料索取清单见 `docs/operator-team-request-gap-analysis.md`。
 
 ## SDAA 算子优化生成的 Ready 标准
 

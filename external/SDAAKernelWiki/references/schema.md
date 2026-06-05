@@ -5,11 +5,16 @@
 | 类型 | ID 前缀 | 用途 |
 |---|---|---|
 | `source-local` | `source-local-*` | 本地原始笔记、分析报告、表格或 HTML 产物。 |
+| `source-doc` | `doc-*` | 官方或外部文档的结构化摘要来源页。 |
 | `wiki-hardware` | `hw-*` | SDAA 硬件特性页面。 |
 | `wiki-technique` | `technique-*` | 优化技术与代码生成启发式。 |
 | `wiki-pattern` | `pattern-*` | 症状 -> 诊断 -> 候选技术。 |
 | `wiki-kernel` | `kernel-*` | 带证据的算子案例研究。 |
-| `wiki-language` | `lang-*` | SDAA 编程模型、编译器或运行时指南。 |
+| `wiki-language` | `lang-*` | SDAA 编程模型与语言规则。 |
+| `wiki-runtime` | `runtime-*` | Host runtime、stream、内存管理和同步入口。 |
+| `wiki-compiler` | `compiler-*` | TecoCC、LTO、debug 和构建规则。 |
+| `wiki-migration` | `migration-*` | CUDA / NVIDIA 经验迁移到 SDAA 的翻译规则。 |
+| `wiki-example` | `example-*` | PDF 示例、quickstart 和可转成 KernelPilot seed 的样例路线。 |
 
 ## 置信度
 
@@ -22,9 +27,9 @@
 
 在 `tags`、`hardware_features` 或 `techniques` 中使用这些受控术语：
 
-- 硬件：`spa`、`spe`、`ldm`、`dma`、`rma`、`ace`、`hbm`、`mesh`、`pipe0`、`pipe1`、`ppu`、`icache`、`simd`。
-- 技术：`periodic-partitioning`、`dma-alignment`、`dma-odd-even-interleave`、`dma-queue-budgeting`、`rma-put-preference`、`double-diagonal-broadcast`、`strided-column-broadcast`、`ace-double-buffering`、`p0-p1-overlap`。
-- 症状：`scheduling-bubbles`、`ldm-pressure`、`dma-hbm-underutilization`、`rma-contention`、`ace-feeding-stall`、`icache-miss`、`runtime-launch-overhead`。
+- 硬件：`spa`、`spe`、`ldm`、`spm`、`global-memory`、`dma`、`rma`、`ace`、`hbm`、`mesh`、`pipe0`、`pipe1`、`ppu`、`icache`、`simd`。
+- 技术：`periodic-partitioning`、`dma-alignment`、`dma-odd-even-interleave`、`dma-queue-budgeting`、`async-dma`、`async-rma`、`broadcast`、`rma-put-preference`、`double-diagonal-broadcast`、`strided-column-broadcast`、`ace-double-buffering`、`p0-p1-overlap`、`simd-vectorization`、`perf-sampling`、`tecocc-lto`、`cuda-migration`、`math-functions`、`high-level-api`、`atomics`、`transpose`、`device-debug`、`quickstart`。
+- 症状：`scheduling-bubbles`、`ldm-pressure`、`dma-hbm-underutilization`、`rma-contention`、`ace-feeding-stall`、`icache-miss`、`runtime-launch-overhead`、`compile-error`、`porting-mismatch`。
 
 ## 算子生成契约
 

@@ -2,6 +2,9 @@ page_types:
   source-local:
     id_prefix: source-local-
     required: [id, title, source_category, path, captured_at]
+  source-doc:
+    id_prefix: doc-
+    required: [id, title, type, source_category, product_version, published_at, captured_at]
   wiki-hardware:
     id_prefix: hw-
     required: [id, title, type, architectures, tags, confidence, sources]
@@ -14,6 +17,21 @@ page_types:
   wiki-kernel:
     id_prefix: kernel-
     required: [id, title, type, architectures, kernel_types, confidence, sources]
+  wiki-language:
+    id_prefix: lang-
+    required: [id, title, type, architectures, tags, confidence, reproducibility, sources]
+  wiki-compiler:
+    id_prefix: compiler-
+    required: [id, title, type, architectures, tags, confidence, reproducibility, sources]
+  wiki-runtime:
+    id_prefix: runtime-
+    required: [id, title, type, architectures, tags, confidence, reproducibility, sources]
+  wiki-migration:
+    id_prefix: migration-
+    required: [id, title, type, architectures, tags, confidence, reproducibility, sources]
+  wiki-example:
+    id_prefix: example-
+    required: [id, title, type, architectures, tags, confidence, reproducibility, sources]
 confidence:
   verified: "由官方文档和实现/profiler 证据共同支持。"
   source-reported: "由本地笔记、表格或报告支持。"

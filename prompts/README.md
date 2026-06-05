@@ -8,6 +8,7 @@
 
 | 提示词 | 目标 |
 | --- | --- |
+| [SDAA TECO T1 GEMM](sdaa-teco-t1-gemm.md) | 在 TECO_AICARD_01 太初 SDAA 显卡上建立 GEMM 端到端优化生成任务，使用 SDAAKernelWiki 引导 ACE、DMA、HBM 和形状特化探索。 |
 | [B200 int8_scaled_mm](b200-int8-scaled-mm.md) | 在 B200 上针对一个聚焦形状优化 SGLang `int8_scaled_mm`，目标是相比 SGLang 基线至少实现 2.5 倍加速。 |
 | [B200 FA4 MHA](b200-fa4-mha.md) | 构建一个独立的 BF16 纯前向 MHA 内核，在配置的 B200 用例上以至少 5% 的几何平均 TFLOPS 击败官方 FlashAttention-4。 |
 

@@ -6,6 +6,11 @@ sdaa:
   - SDAA
   - domestic gpu
   - 国产显卡
+sdaa-c:
+  - SDAA C
+  - .scpp
+  - tecocc
+  - 太初 C
 spa:
   - core group
   - 核组
@@ -17,6 +22,13 @@ ldm:
   - local memory
   - SPM
   - 本地存储
+spm:
+  - SPM
+  - local storage
+  - local memory
+global-memory:
+  - Global
+  - device global memory
 dma:
   - DMA engine
   - dma_get
@@ -29,6 +41,39 @@ ace:
   - matrix unit
   - 异步加速
   - 矩阵单元
+matmul:
+  - GEMM
+  - matrix multiply
+  - 矩阵乘
+simd-vectorization:
+  - SIMD
+  - vectorization
+  - 向量化
+atomics:
+  - atomic
+  - 原子
+  - atomic add
+transpose:
+  - layout transform
+  - 矩阵转置
+math-functions:
+  - math
+  - activation
+  - reduction
+high-level-api:
+  - batch math
+  - 高层接口
+quickstart:
+  - hello ai card
+  - smoke test
+device-debug:
+  - printf
+  - assert
+  - TecoGDB
+cuda-migration:
+  - CUDA porting
+  - CUDA 迁移
+  - warp migration
 pipe0:
   - P0
   - compute pipe
@@ -48,4 +93,3 @@ scheduling-bubbles:
 ldm-pressure:
   - local-memory pressure
   - local memory unarb
-

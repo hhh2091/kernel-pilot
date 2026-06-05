@@ -6,9 +6,13 @@ hardware_features:
   - spa
   - spe
   - ldm
+  - spm
+  - global-memory
   - dma
   - rma
   - ace
+  - fu
+  - su
   - hbm
   - mesh
   - pipe0
@@ -32,6 +36,21 @@ techniques:
   - load-balance
   - static-cycle-estimation
   - profiler-cross-check
+  - thread-grouping
+  - spm-allocation
+  - async-dma
+  - async-rma
+  - broadcast
+  - simd-vectorization
+  - perf-sampling
+  - tecocc-lto
+  - cuda-migration
+  - math-functions
+  - high-level-api
+  - atomics
+  - transpose
+  - device-debug
+  - quickstart
 kernel_types:
   - rmsnorm
   - layernorm
@@ -41,8 +60,13 @@ kernel_types:
   - matmul
   - broadcast
   - memory-copy
+  - transpose
+  - atomic
+  - vector
+  - reduction
 languages:
   - sdaa-cpp
+  - sdaa-c
   - tecocc
   - python
 source_category:
@@ -51,6 +75,7 @@ source_category:
   - empirical-table
   - profiler-report
   - official-doc
+  - programming-guide
 symptoms:
   - scheduling-bubbles
   - ldm-pressure
@@ -59,4 +84,5 @@ symptoms:
   - ace-feeding-stall
   - icache-miss
   - runtime-launch-overhead
-
+  - compile-error
+  - porting-mismatch
