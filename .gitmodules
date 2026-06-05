@@ -1,8 +1,0 @@
-[submodule "external/KernelWiki"]
-	path = external/KernelWiki
-	url = https://github.com/BBuf/KernelWiki.git
-	branch = kernelpilot-knowledge-expansion
-[submodule "external/ncu-report-skill"]
-	path = external/ncu-report-skill
-	url = https://github.com/DongyunZou/ncu-report-skill.git
-	branch = main
