@@ -1,6 +1,29 @@
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
 .pytest_cache/
+
+# Humanize / Codex
 .humanize/
 .humanize-*/
-*.py[cod]
-*.egg-info/
+.codex
+.claude/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Compiled artifacts
+*.o
+*.d
+*.so
+
+# NCU profile outputs
+*.ncu-rep
+*.ncu-proj
+ncu_home/
