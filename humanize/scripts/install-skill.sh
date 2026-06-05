@@ -207,23 +207,22 @@ resolve_sdaa_kernelwiki_root() {
 validate_external_skill_roots() {
     [[ -n "$KERNELPILOT_ROOT" ]] || die "KernelPilot root not found; run from the kernel-pilot/humanize checkout or pass --kernelpilot-root PATH"
     [[ -d "$KERNELPILOT_ROOT" ]] || die "KernelPilot root is not a directory: $KERNELPILOT_ROOT"
-    [[ -n "$KERNELWIKI_ROOT" ]] || die "KernelWiki root not found; pass --kernelwiki-root PATH or initialize external/KernelWiki"
-    [[ -d "$KERNELWIKI_ROOT" ]] || die "KernelWiki root is not a directory: $KERNELWIKI_ROOT"
-    [[ -f "$KERNELWIKI_ROOT/SKILL.md" ]] || die "KernelWiki skill not found: $KERNELWIKI_ROOT/SKILL.md"
-    [[ -f "$KERNELWIKI_ROOT/scripts/query.py" ]] || die "KernelWiki query script not found: $KERNELWIKI_ROOT/scripts/query.py"
-    [[ -d "$KERNELWIKI_ROOT/sources/prs" ]] || die "KernelWiki PR pages not found: $KERNELWIKI_ROOT/sources/prs"
+    # KernelWiki is optional (replaced by SDAAKernelWiki)
+    if [[ -n "$KERNELWIKI_ROOT" ]]; then
+        [[ -d "$KERNELWIKI_ROOT" ]] || die "KernelWiki root is not a directory: $KERNELWIKI_ROOT"
+        [[ -f "$KERNELWIKI_ROOT/SKILL.md" ]] || { log "KernelWiki SKILL.md missing; skipping KernelWiki"; KERNELWIKI_ROOT=""; }
+    fi
+    [[ -n "$SDAA_KERNELWIKI_ROOT" ]] || die "SDAAKernelWiki root not found; pass --sdaa-kernelwiki-root PATH"
+    [[ -d "$SDAA_KERNELWIKI_ROOT" ]] || die "SDAAKernelWiki root is not a directory: $SDAA_KERNELWIKI_ROOT"
+    [[ -f "$SDAA_KERNELWIKI_ROOT/SKILL.md" ]] || die "SDAAKernelWiki skill not found: $SDAA_KERNELWIKI_ROOT/SKILL.md"
+    [[ -f "$SDAA_KERNELWIKI_ROOT/scripts/query.py" ]] || die "SDAAKernelWiki query script not found: $SDAA_KERNELWIKI_ROOT/scripts/query.py"
+    [[ -f "$SDAA_KERNELWIKI_ROOT/data/tags.yaml" ]] || die "SDAAKernelWiki tags not found: $SDAA_KERNELWIKI_ROOT/data/tags.yaml"
+    [[ -d "$SDAA_KERNELWIKI_ROOT/wiki" ]] || die "SDAAKernelWiki wiki pages not found: $SDAA_KERNELWIKI_ROOT/wiki"
     [[ -n "$NCU_REPORT_SKILL_ROOT" ]] || die "ncu-report-skill root not found; pass --ncu-report-skill-root PATH or initialize external/ncu-report-skill"
     [[ -d "$NCU_REPORT_SKILL_ROOT" ]] || die "ncu-report-skill root is not a directory: $NCU_REPORT_SKILL_ROOT"
     [[ -f "$NCU_REPORT_SKILL_ROOT/SKILL.md" ]] || die "ncu-report-skill not found: $NCU_REPORT_SKILL_ROOT/SKILL.md"
     [[ -d "$NCU_REPORT_SKILL_ROOT/reference" ]] || die "ncu-report-skill reference docs not found: $NCU_REPORT_SKILL_ROOT/reference"
     [[ -d "$NCU_REPORT_SKILL_ROOT/helpers" ]] || die "ncu-report-skill helpers not found: $NCU_REPORT_SKILL_ROOT/helpers"
-    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
-        [[ -d "$SDAA_KERNELWIKI_ROOT" ]] || die "SDAAKernelWiki root is not a directory: $SDAA_KERNELWIKI_ROOT"
-        [[ -f "$SDAA_KERNELWIKI_ROOT/SKILL.md" ]] || die "SDAAKernelWiki skill not found: $SDAA_KERNELWIKI_ROOT/SKILL.md"
-        [[ -f "$SDAA_KERNELWIKI_ROOT/scripts/query.py" ]] || die "SDAAKernelWiki query script not found: $SDAA_KERNELWIKI_ROOT/scripts/query.py"
-        [[ -f "$SDAA_KERNELWIKI_ROOT/data/tags.yaml" ]] || die "SDAAKernelWiki tags not found: $SDAA_KERNELWIKI_ROOT/data/tags.yaml"
-        [[ -d "$SDAA_KERNELWIKI_ROOT/wiki" ]] || die "SDAAKernelWiki wiki pages not found: $SDAA_KERNELWIKI_ROOT/wiki"
-    fi
 }
 
 sync_dir() {
@@ -413,14 +412,14 @@ sync_target() {
         log "syncing [$label] skill: $skill"
         sync_one_skill "$skill" "$target_dir"
     done
-    log "syncing [$label] skill: $KERNELWIKI_SKILL_NAME"
-    sync_kernelwiki_skill "$target_dir"
+    if [[ -n "$KERNELWIKI_ROOT" ]]; then
+        log "syncing [$label] skill: $KERNELWIKI_SKILL_NAME"
+        sync_kernelwiki_skill "$target_dir"
+    fi
     log "syncing [$label] skill: $NCU_REPORT_SKILL_NAME"
     sync_ncu_report_skill "$target_dir"
-    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
-        log "syncing [$label] skill: $SDAA_KERNELWIKI_SKILL_NAME"
-        sync_sdaa_kernelwiki_skill "$target_dir"
-    fi
+    log "syncing [$label] skill: $SDAA_KERNELWIKI_SKILL_NAME"
+    sync_sdaa_kernelwiki_skill "$target_dir"
     install_runtime_bundle "$target_dir"
     hydrate_skill_runtime_root "$target_dir"
     strip_claude_specific_frontmatter "$target_dir"
