@@ -186,25 +186,24 @@ resolve_external_skill_roots() {
         SDAA_KERNELWIKI_ROOT="$KERNELPILOT_ROOT/external/SDAAKernelWiki"
     fi
 
-    # KernelWiki is optional (replaced by SDAAKernelWiki); resolve best-effort only
     KERNELWIKI_ROOT="$(cd "$KERNELWIKI_ROOT" 2>/dev/null && pwd || true)"
-    if [[ -n "$KERNELWIKI_ROOT" ]] && ! [[ -f "$KERNELWIKI_ROOT/SKILL.md" && -f "$KERNELWIKI_ROOT/scripts/query.py" ]]; then
-        log "KernelWiki resolved but incomplete at $KERNELWIKI_ROOT; skipping KernelWiki skill"
-        KERNELWIKI_ROOT=""
-    fi
-
     NCU_REPORT_SKILL_ROOT="$(cd "$NCU_REPORT_SKILL_ROOT" 2>/dev/null && pwd || true)"
     if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
         SDAA_KERNELWIKI_ROOT="$(cd "$SDAA_KERNELWIKI_ROOT" 2>/dev/null && pwd || true)"
     fi
 
-    [[ -n "$SDAA_KERNELWIKI_ROOT" ]] || die "could not resolve SDAAKernelWiki root"
-    [[ -f "$SDAA_KERNELWIKI_ROOT/SKILL.md" ]] || die "SDAAKernelWiki skill not found: $SDAA_KERNELWIKI_ROOT/SKILL.md"
-    [[ -f "$SDAA_KERNELWIKI_ROOT/scripts/query.py" ]] || die "SDAAKernelWiki query script not found: $SDAA_KERNELWIKI_ROOT/scripts/query.py"
-    [[ -d "$SDAA_KERNELWIKI_ROOT/wiki" ]] || die "SDAAKernelWiki pages not found: $SDAA_KERNELWIKI_ROOT/wiki"
+    [[ -n "$KERNELWIKI_ROOT" ]] || die "could not resolve KernelWiki root"
+    [[ -f "$KERNELWIKI_ROOT/SKILL.md" ]] || die "KernelWiki skill not found: $KERNELWIKI_ROOT/SKILL.md"
+    [[ -f "$KERNELWIKI_ROOT/scripts/query.py" ]] || die "KernelWiki query script not found: $KERNELWIKI_ROOT/scripts/query.py"
+    [[ -d "$KERNELWIKI_ROOT/sources/prs" ]] || die "KernelWiki PR pages not found: $KERNELWIKI_ROOT/sources/prs"
     [[ -n "$NCU_REPORT_SKILL_ROOT" ]] || die "could not resolve ncu-report-skill root"
     [[ -f "$NCU_REPORT_SKILL_ROOT/SKILL.md" ]] || die "ncu-report-skill not found: $NCU_REPORT_SKILL_ROOT/SKILL.md"
     [[ -d "$NCU_REPORT_SKILL_ROOT/reference" ]] || die "ncu-report-skill reference docs not found: $NCU_REPORT_SKILL_ROOT/reference"
+    if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+        [[ -f "$SDAA_KERNELWIKI_ROOT/SKILL.md" ]] || die "SDAAKernelWiki skill not found: $SDAA_KERNELWIKI_ROOT/SKILL.md"
+        [[ -f "$SDAA_KERNELWIKI_ROOT/scripts/query.py" ]] || die "SDAAKernelWiki query script not found: $SDAA_KERNELWIKI_ROOT/scripts/query.py"
+        [[ -d "$SDAA_KERNELWIKI_ROOT/wiki" ]] || die "SDAAKernelWiki pages not found: $SDAA_KERNELWIKI_ROOT/wiki"
+    fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -296,23 +295,18 @@ if [[ "$DISABLE_POLYARCH" == "true" && "$DRY_RUN" != "true" ]]; then
 fi
 
 sync_plugin_cache_from_source "$PLUGIN_ROOT"
-if [[ -n "$KERNELWIKI_ROOT" ]]; then
-	link_skill "KernelWiki" "$KERNELWIKI_ROOT"
-fi
+if [[ -n "$KERNELWIKI_ROOT" ]]; then link_skill "KernelWiki" "$KERNELWIKI_ROOT"; fi
 link_skill "ncu-report-skill" "$NCU_REPORT_SKILL_ROOT"
-link_skill "SDAAKernelWiki" "$SDAA_KERNELWIKI_ROOT"
+if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+    link_skill "SDAAKernelWiki" "$SDAA_KERNELWIKI_ROOT"
+fi
 
 if [[ "$INSTALL_PIP" == "true" ]]; then
-	if [[ "$DRY_RUN" == "true" ]]; then
-		log "DRY-RUN python3 -m pip install -r $SDAA_KERNELWIKI_ROOT/requirements.txt"
-	else
-		python3 -m pip install -r "$SDAA_KERNELWIKI_ROOT/requirements.txt"
-	fi
-	if [[ -n "$KERNELWIKI_ROOT" && -f "$KERNELWIKI_ROOT/requirements.txt" ]]; then
-		if [[ "$DRY_RUN" != "true" ]]; then
-			python3 -m pip install -r "$KERNELWIKI_ROOT/requirements.txt"
-		fi
-	fi
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "DRY-RUN python3 -m pip install -r $SDAA_KERNELWIKI_ROOT/requirements.txt"
+    else
+        python3 -m pip install -r "$SDAA_KERNELWIKI_ROOT/requirements.txt"
+    fi
 fi
 
 hydrate_plugin_cache "$PLUGIN_ROOT"
@@ -333,15 +327,12 @@ Hydrated runtime root:
   $PLUGIN_ROOT
 
 External skills:
+  $CLAUDE_CONFIG_DIR/skills/KernelWiki -> $KERNELWIKI_ROOT
+  $CLAUDE_CONFIG_DIR/skills/ncu-report-skill -> $NCU_REPORT_SKILL_ROOT
 EOF
 
-if [[ -n "$KERNELWIKI_ROOT" ]]; then
-	cat <<EOF
-  $CLAUDE_CONFIG_DIR/skills/KernelWiki -> $KERNELWIKI_ROOT
-EOF
-fi
-cat <<EOF
-  $CLAUDE_CONFIG_DIR/skills/ncu-report-skill -> $NCU_REPORT_SKILL_ROOT
+if [[ -n "$SDAA_KERNELWIKI_ROOT" ]]; then
+    cat <<EOF
   $CLAUDE_CONFIG_DIR/skills/SDAAKernelWiki -> $SDAA_KERNELWIKI_ROOT
 EOF
 fi
