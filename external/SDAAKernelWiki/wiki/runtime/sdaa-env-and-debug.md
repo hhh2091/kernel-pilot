@@ -13,30 +13,79 @@ sources: [doc-sdaa-c-programming-guide-v3-1-0]
 
 # SDAA 环境变量、设备信息与设备端调试
 
-PDF 第 6、11、12 章覆盖环境变量、程序调试和开发工具；第 7 章还列出设备信息、printf、abort、assert 等设备端辅助接口。
-
 ## 环境变量
 
-- `SDAA_SYNC_PRINT`：用于控制或辅助同步打印行为。使用 printf 调试并行 kernel 时，应记录该变量状态，避免把输出顺序误判为执行顺序。
+### SDAA_SYNC_PRINT
 
-## 设备端辅助接口
+控制 `printf` 输出顺序：
 
-指南列出的调试相关能力包括：
+- 未设或 `0`（默认）：按 SPE **执行顺序**输出
+- `export SDAA_SYNC_PRINT=1`：按 SPE ID **升序**输出
 
-- `printf`：设备端打印，适合 smoke test 和小规模 shape。
-- `abort`：设备端主动终止。
-- `assert`：设备端断言。
-- 设备信息接口：通过 `sdaa_device_info.h` 获取 device 相关信息。
-- 性能采样：通过 `sdaa_perf.h` 的 `perf_start`、`perf_stop`、`perf_print`、`clock`、`PerfData` 标记热区。
+对比：
+```
+# 默认（执行顺序）：
+threadIdx: 4, sum: 3
+threadIdx: 0, sum: 3
+threadIdx: 6, sum: 3
+
+# SDAA_SYNC_PRINT=1（SPE 编号顺序）：
+threadIdx: 0, sum: 3
+threadIdx: 1, sum: 3
+threadIdx: 2, sum: 3
+```
+
+### SDAA_ENABLE_COREDUMP_ON_EXCEPTION
+
+控制 `abort()`/`assert()` 失败后的行为：
+
+- **已设置**：生成 Core Dump 文件（含错误上下文）+ 终止 host 执行
+- **未设置**：host 继续执行；后续 `sdaaDeviceSynchronize()` 返回相应错误码
+
+## 设备端调试接口
+
+### printf
+
+```cpp
+int printf(const char *format, ...)
+```
+
+内置接口，无需头文件。支持格式符：`%d`, `%u`, `%f`(6位小数), `%c`, `%s`, `%x/%X`, `%p`, `%%`。
+
+### abort
+
+```cpp
+void abort()
+```
+
+终止 device 端程序。用于不可恢复错误（如除数为零）。
+
+### assert
+
+```cpp
+void assert(bool condition)
+```
+
+condition 为 false 时打印文件名+行号后终止。用法：`assert(b != 0 && "b should not be zero");`
+
+## 设备信息查询
+
+通过 `sdaa_device_info.h` 获取 device 信息。SPM 空间查询接口（内置）：
+
+```cpp
+size_t get_heap_size()    // 当前 SPE 堆总大小
+size_t get_stack_size()   // 当前 SPE 栈总大小
+size_t get_local_size()   // 当前 SPE local 空间总大小
+```
 
 ## 开发工具
 
-- TecoGDB：用于调试 SPE 侧代码。
-- `sdaacfilt`：用于 SDAA C 符号解码，特别是包含 SDAA 数据类型或 device 符号时。
+- **TecoGDB**：基于 GNU GDB，支持真实硬件源码级调试（非仿真），覆盖 host+device。
+- **sdaacfilt**：SDAA C 符号解码。解码示例：`_Z4testDv16_fS_` → `test(floatv16, floatv16)`。
 
 ## KernelPilot 规则
 
-1. correctness 阶段可以用 `printf/assert`，benchmark 阶段必须移除或关闭。
-2. 出现 device crash 时先最小化 shape，再用 TecoGDB 或 assert 定位。
-3. 任何 perf sampling 结果都应和 host benchmark 分开记录。
-4. 生成报告时记录 `SDAA_SYNC_PRINT`、driver/runtime 版本和编译命令。
+1. correctness 阶段用 `printf`/`assert`，benchmark 阶段必须移除或关闭。
+2. device crash 时先最小化 shape，再用 TecoGDB 或 assert 定位。
+3. perf sampling 结果和 host benchmark 分开记录。
+4. 生成报告记录 `SDAA_SYNC_PRINT`、driver/runtime 版本和编译命令。
